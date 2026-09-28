@@ -1,0 +1,10 @@
+agent-sandbox.json
+*.png
+docs
+config.json
+data.txt
+credentials.json
+service_account*.json
+client_secret_*.json
+drive-token*.json
+task.txt

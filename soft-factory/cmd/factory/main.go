@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"soft-factory/internal/config"
+	"soft-factory/internal/executionlog"
 	"soft-factory/internal/jira"
 	"soft-factory/internal/sandbox"
 	"soft-factory/internal/taskcontext"
@@ -25,7 +26,7 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+func run(args []string) (runErr error) {
 	flags := flag.NewFlagSet("factory", flag.ContinueOnError)
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: factory [-config config.json] [--jira <issue-url>] [review]")
@@ -55,6 +56,17 @@ func run(args []string) error {
 	if emptyJira {
 		return fmt.Errorf("--jira requires a non-empty issue URL")
 	}
+	var runLog *executionlog.Run
+	if flags.NArg() == 0 {
+		var err error
+		runLog, err = executionlog.NewRun()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
+		} else {
+			fmt.Printf("Execution logs: %s\n", runLog.Path())
+			defer func() { runLog.Finish(runErr) }()
+		}
+	}
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -79,38 +91,60 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	input := sandbox.TaskContext{TaskOverride: taskOverride, Documents: documents}
+	input := sandbox.TaskContext{
+		TaskOverride: taskOverride,
+		Documents:    documents,
+		Context:      ctx,
+		Log:          runLog,
+	}
 
 	if flags.NArg() == 0 {
-		fmt.Println("Starting implementation...")
-
-		if err := sandbox.Run(input); err != nil {
+		if err := runStage(input, "implementation", "Starting implementation...", func() error {
+			return sandbox.Run(input)
+		}); err != nil {
 			return err
 		}
 	}
 
-	fmt.Println("\nStarting code review and corrections...")
-
-	codeReport, err := sandbox.Review(input)
-	if err != nil {
+	var codeReport, securityReport string
+	if err := runStage(input, "code-review", "\nStarting code review and corrections...", func() error {
+		var err error
+		codeReport, err = sandbox.Review(input)
+		return err
+	}); err != nil {
 		return err
 	}
 
-	fmt.Println("\nStarting security review and corrections...")
-
-	securityReport, err := sandbox.SecurityReview(input)
-	if err != nil {
+	if err := runStage(input, "security-review", "\nStarting security review and corrections...", func() error {
+		var err error
+		securityReport, err = sandbox.SecurityReview(input)
+		return err
+	}); err != nil {
 		return err
 	}
-	fmt.Println("\nStarting risk classification...")
 
-	if err := sandbox.RiskClassification(
-		input,
-		[]string{codeReport, securityReport},
-	); err != nil {
+	return runStage(input, "risk-classification", "\nStarting risk classification...", func() error {
+		return sandbox.RiskClassification(input, []string{codeReport, securityReport})
+	})
+}
+
+func runStage(input sandbox.TaskContext, name, message string, execute func() error) error {
+	if err := input.Context.Err(); err != nil {
 		return err
 	}
-	return nil
+	if input.Log != nil {
+		input.Log.StartStage(name)
+		input.Log.Message(message)
+	}
+	fmt.Println(message)
+	err := execute()
+	if input.Context.Err() != nil {
+		err = errors.Join(err, input.Context.Err())
+	}
+	if input.Log != nil {
+		input.Log.FinishStage(err)
+	}
+	return err
 }
 
 func loadEnvironment() error {

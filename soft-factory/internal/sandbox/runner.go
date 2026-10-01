@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,11 +11,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"soft-factory/internal/executionlog"
 )
 
 type ExecuteOptions struct {
 	Args       []string
 	ReportName string
+	Prompt     string
+	Context    context.Context
+	Log        *executionlog.Run
 }
 
 // TaskContext carries a task override and supporting documents through all stages.
@@ -22,13 +28,23 @@ type ExecuteOptions struct {
 type TaskContext struct {
 	TaskOverride string
 	Documents    string
+	Context      context.Context
+	Log          *executionlog.Run
 }
 
 func Run(input TaskContext) error {
 	args := []string{"run"}
 
-	if input.TaskOverride != "" || input.Documents != "" {
-		prompt, err := buildTaskPrompt(input)
+	var prompt string
+	if input.TaskOverride != "" || input.Documents != "" || input.Log != nil {
+		var err error
+		if input.TaskOverride != "" || input.Documents != "" {
+			prompt, err = buildTaskPrompt(input)
+		} else {
+			// Snapshot the source before launch so later edits cannot change the
+			// executed prompt independently of the saved log.
+			prompt, err = readTaskFile()
+		}
 		if err != nil {
 			return err
 		}
@@ -43,7 +59,10 @@ func Run(input TaskContext) error {
 	}
 
 	_, err := execute(ExecuteOptions{
-		Args: args,
+		Args:    args,
+		Prompt:  prompt,
+		Context: input.Context,
+		Log:     input.Log,
 	})
 
 	return err
@@ -169,6 +188,9 @@ Report:
 	return execute(ExecuteOptions{
 		Args:       []string{"resume", "-f", path},
 		ReportName: filepath.Base(filepath.Dir(skillPath)),
+		Prompt:     prompt,
+		Context:    input.Context,
+		Log:        input.Log,
 	})
 }
 
@@ -237,35 +259,96 @@ func writePrompt(prompt string) (string, error) {
 }
 
 func execute(options ExecuteOptions) (string, error) {
-	cmd := exec.Command("agent-sandbox", options.Args...)
+	ctx := options.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, "agent-sandbox", options.Args...)
+	// Let the sandbox stop its container on interruption before forcing exit.
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 20 * time.Second
 	cmd.Stdin = os.Stdin
 
-	if options.ReportName == "" {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return "", fmt.Errorf("execute agent-sandbox: %w", err)
-		}
-
-		return "", nil
+	if options.Log != nil {
+		agent, model, provider := selectionDetails(options.Args[0])
+		options.Log.Details(agent, model, provider)
+		options.Log.Command(cmd.Path, options.Args)
+		options.Log.Prompt(options.Prompt)
 	}
 
 	var output bytes.Buffer
-	writer := io.MultiWriter(os.Stdout, &output)
-
-	cmd.Stdout = writer
-	cmd.Stderr = writer
+	var stdout io.Writer = os.Stdout
+	var stderr io.Writer = os.Stderr
+	if options.ReportName != "" {
+		// Assign the exact same writer to both streams so os/exec shares one
+		// child pipe and copy goroutine, preserving combined report ordering.
+		stdout = io.MultiWriter(os.Stdout, &output)
+		if options.Log != nil {
+			stdout = io.MultiWriter(options.Log.Stream("combined"), stdout)
+		}
+		stderr = stdout
+	} else if options.Log != nil {
+		stdout = io.MultiWriter(options.Log.Stream("stdout"), stdout)
+		stderr = io.MultiWriter(options.Log.Stream("stderr"), stderr)
+	}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	runErr := cmd.Run()
+	if ctx.Err() != nil {
+		runErr = errors.Join(runErr, ctx.Err())
+	}
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) && exitErr.ExitCode() == 130 {
+		runErr = errors.Join(runErr, context.Canceled)
+	}
+	if options.Log != nil {
+		if cmd.ProcessState != nil {
+			options.Log.ExitCode(cmd.ProcessState.ExitCode())
+		}
+	}
 	if runErr != nil {
-		fmt.Fprintf(&output, "\nCommand error: %v\n", runErr)
+		if options.ReportName != "" {
+			fmt.Fprintf(&output, "\nCommand error: %v\n", runErr)
+		}
 		runErr = fmt.Errorf("execute agent-sandbox: %w", runErr)
 	}
 
+	if options.ReportName == "" {
+		return "", runErr
+	}
 	reportPath, reportErr := saveReport(options.ReportName, output.Bytes())
+	if options.Log != nil && reportPath != "" {
+		options.Log.Report(reportPath)
+	}
 
 	return reportPath, errors.Join(runErr, reportErr)
+}
+
+// selectionDetails reads only supported selection fields. Provider means the
+// selected sandbox agent, not its underlying API backend. Do not copy the
+// configuration into logs: it may also contain API keys.
+func selectionDetails(section string) (agent, model, provider string) {
+	agent = "unavailable (no configured selection)"
+	model = "unavailable (sandbox/agent default; see runtime output)"
+	provider = "unavailable (no configured agent in agent-sandbox.json)"
+	data, err := os.ReadFile("agent-sandbox.json")
+	if err != nil {
+		return
+	}
+	var settings map[string]map[string]json.RawMessage
+	if json.Unmarshal(data, &settings) != nil {
+		return
+	}
+	var value string
+	if json.Unmarshal(settings[section]["agent"], &value) == nil && value != "" {
+		agent = value + " (configured: " + section + ".agent)"
+		provider = value + " (agent-sandbox.json: " + section + ".agent)"
+	}
+	value = ""
+	if json.Unmarshal(settings[section]["model"], &value) == nil && value != "" {
+		model = value + " (configured: " + section + ".model; effective selection not verified)"
+	}
+	return
 }
 
 func saveReport(name string, content []byte) (string, error) {
@@ -351,6 +434,9 @@ Do not modify files, apply corrections, or publish changes.
 	_, err = execute(ExecuteOptions{
 		Args:       []string{"resume", "-f", path},
 		ReportName: "risk-classification",
+		Prompt:     prompt,
+		Context:    input.Context,
+		Log:        input.Log,
 	})
 
 	return err

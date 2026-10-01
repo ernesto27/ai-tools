@@ -1,6 +1,7 @@
 agent-sandbox.json
 *.png
 docs
+logs/
 config.json
 data.txt
 credentials.json

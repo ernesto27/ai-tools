@@ -15,7 +15,7 @@ This repository contains a Go CLI that coordinates implementation, code review, 
 
 Use Go 1.25.3 or later. Run commands from the repository root so relative skill paths resolve.
 
-- `go build -o /tmp/factory ./cmd/factory`: build the CLI without adding a repository artifact.
+- `go build -o /tmp/software-factory ./cmd/factory`: build the CLI without adding a repository artifact.
 - `go test ./...`: run all package tests.
 - `go vet ./...`: check for common Go mistakes.
 - `gofmt -w cmd internal`: format Go source.

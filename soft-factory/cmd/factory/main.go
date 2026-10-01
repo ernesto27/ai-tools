@@ -27,9 +27,9 @@ func main() {
 }
 
 func run(args []string) (runErr error) {
-	flags := flag.NewFlagSet("factory", flag.ContinueOnError)
+	flags := flag.NewFlagSet("software-factory", flag.ContinueOnError)
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: factory [-config config.json] [--jira <issue-url>] [review]")
+		fmt.Fprintln(flags.Output(), "Usage: software-factory [-config config.json] [--jira <issue-url>] [review]")
 		flags.PrintDefaults()
 	}
 

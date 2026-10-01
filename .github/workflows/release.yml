@@ -35,11 +35,11 @@ jobs:
       - name: Build Linux archive
         run: |
           mkdir -p dist/package
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/package/factory ./cmd/factory
-          dist/package/factory -h
-          tar -C dist/package -czf dist/factory_linux_amd64.tar.gz factory
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/package/software-factory ./cmd/factory
+          dist/package/software-factory -h
+          tar -C dist/package -czf dist/software-factory_linux_amd64.tar.gz software-factory
           cd dist
-          sha256sum factory_linux_amd64.tar.gz > factory_linux_amd64.tar.gz.sha256
+          sha256sum software-factory_linux_amd64.tar.gz > software-factory_linux_amd64.tar.gz.sha256
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -47,5 +47,5 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            soft-factory/dist/factory_linux_amd64.tar.gz
-            soft-factory/dist/factory_linux_amd64.tar.gz.sha256
+            soft-factory/dist/software-factory_linux_amd64.tar.gz
+            soft-factory/dist/software-factory_linux_amd64.tar.gz.sha256

@@ -121,11 +121,32 @@ Soft Factory supplies generated prompts for reviews and for tasks with supportin
 
 ## Requirements
 
-- Go 1.25.3 or later.
+- Go 1.25.3 or later when building from source.
 - `agent-sandbox` installed and configured.
 - Docker running and the selected agent authenticated.
 
 Run the commands below from the project folder.
+
+## Installation
+
+For Linux x86_64, run [install.sh](https://github.com/ernesto27/ai-tools/blob/master/soft-factory/install.sh) with curl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/soft-factory/install.sh | bash
+```
+
+The installer downloads `software-factory_linux_amd64.tar.gz` from the latest GitHub release, verifies its SHA-256 checksum, and installs `software-factory` in `~/.local/bin`. Set `INSTALL_DIR` to choose a different destination. Add that directory to your `PATH` if needed.
+
+Alternatively, build from this folder:
+
+```bash
+go build -o /tmp/software-factory ./cmd/factory
+install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
+```
+
+Run `software-factory -config config.json` or `software-factory -config config.json review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
+
+The repository-root GitHub workflows run tests, vet, formatting checks, and a CLI build for `soft-factory/`. Pushing a tag matching `v*` builds and publishes the Linux x86_64 archive and checksum after tests and vet pass.
 
 ## Getting started
 

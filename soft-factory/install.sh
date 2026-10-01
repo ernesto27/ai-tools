@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO="ernesto27/ai-tools"
-BINARY="factory"
+BINARY="software-factory"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
 
 # --- OS check ---
@@ -16,7 +16,7 @@ fi
 # --- Architecture check ---
 ARCH="$(uname -m)"
 case "$ARCH" in
-	x86_64) ASSET="factory_linux_amd64.tar.gz" ;;
+	x86_64) ASSET="software-factory_linux_amd64.tar.gz" ;;
 	*)
 		echo "error: unsupported architecture '$ARCH' (only x86_64 is available)" >&2
 		exit 1

@@ -35,9 +35,9 @@ jobs:
         run: go vet ./...
 
       - name: Build CLI
-        run: go build -o /tmp/factory ./cmd/factory
+        run: go build -o /tmp/software-factory ./cmd/factory
 
       - name: Check CLI and installer syntax
         run: |
-          /tmp/factory -h
+          /tmp/software-factory -h
           bash -n install.sh

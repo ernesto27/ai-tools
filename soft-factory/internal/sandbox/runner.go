@@ -17,11 +17,18 @@ type ExecuteOptions struct {
 	ReportName string
 }
 
-func Run(documents string) error {
+// TaskContext carries a task override and supporting documents through all stages.
+// An empty override retains the configured file-prompt behavior.
+type TaskContext struct {
+	TaskOverride string
+	Documents    string
+}
+
+func Run(input TaskContext) error {
 	args := []string{"run"}
 
-	if documents != "" {
-		prompt, err := buildTaskPrompt(documents)
+	if input.TaskOverride != "" || input.Documents != "" {
+		prompt, err := buildTaskPrompt(input)
 		if err != nil {
 			return err
 		}
@@ -42,21 +49,21 @@ func Run(documents string) error {
 	return err
 }
 
-func Review(documents string) (string, error) {
-	return review(documents, "skills/code-review/SKILL.md")
+func Review(input TaskContext) (string, error) {
+	return review(input, "skills/code-review/SKILL.md")
 }
 
-func SecurityReview(documents string) (string, error) {
-	return review(documents, "skills/security-review/SKILL.md")
+func SecurityReview(input TaskContext) (string, error) {
+	return review(input, "skills/security-review/SKILL.md")
 }
 
-func review(documents string, skillPath string) (string, error) {
+func review(input TaskContext, skillPath string) (string, error) {
 	skill, err := os.ReadFile(skillPath)
 	if err != nil {
 		return "", fmt.Errorf("read review skill %q: %w", skillPath, err)
 	}
 
-	task, err := buildTaskPrompt(documents)
+	task, err := buildTaskPrompt(input)
 	if err != nil {
 		return "", err
 	}
@@ -165,7 +172,23 @@ Report:
 	})
 }
 
-func buildTaskPrompt(documents string) (string, error) {
+func buildTaskPrompt(input TaskContext) (string, error) {
+	task := input.TaskOverride
+	if task == "" {
+		var err error
+		task, err = readTaskFile()
+		if err != nil {
+			return "", err
+		}
+	}
+	prompt := "# Task\n\n" + task
+	if input.Documents != "" {
+		prompt += "\n\n# Supporting context\n\n" + input.Documents
+	}
+	return prompt, nil
+}
+
+func readTaskFile() (string, error) {
 	data, err := os.ReadFile("agent-sandbox.json")
 	if err != nil {
 		return "", fmt.Errorf("read sandbox configuration: %w", err)
@@ -188,13 +211,7 @@ func buildTaskPrompt(documents string) (string, error) {
 		return "", fmt.Errorf("read task file %q: %w", taskPath, err)
 	}
 
-	prompt := "# Task\n\n" + string(task)
-
-	if documents != "" {
-		prompt += "\n\n# Supporting context\n\n" + documents
-	}
-
-	return prompt, nil
+	return string(task), nil
 }
 
 func writePrompt(prompt string) (string, error) {
@@ -269,13 +286,13 @@ func saveReport(name string, content []byte) (string, error) {
 	return path, nil
 }
 
-func RiskClassification(documents string, reportPaths []string) error {
+func RiskClassification(input TaskContext, reportPaths []string) error {
 	skill, err := os.ReadFile("skills/risk-classification/SKILL.md")
 	if err != nil {
 		return fmt.Errorf("read risk-classification skill: %w", err)
 	}
 
-	task, err := buildTaskPrompt(documents)
+	task, err := buildTaskPrompt(input)
 	if err != nil {
 		return err
 	}

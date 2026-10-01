@@ -1,0 +1,232 @@
+# Soft Factory
+
+Soft Factory is a command-line tool that uses `agent-sandbox` to implement a task, review the changes, apply corrections, and assess the final risk.
+
+You can provide a task from a local file or a Jira issue, and include supporting documents from local files or Google Drive.
+
+## Configuration
+
+Create these two files in the project folder before running Soft Factory.
+
+### `config.json`: supporting documents
+
+These are all the options currently supported:
+
+| Option | Purpose |
+| --- | --- |
+| `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
+| `google_drive` | Optional Google Drive settings. Omit this section when Drive is not needed. |
+| `google_drive.folders` | Required when `google_drive` is present: a nonempty list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
+
+Minimal example:
+
+```json
+{
+  "documents": []
+}
+```
+
+Example using both local documents and Google Drive:
+
+```json
+{
+  "documents": ["requirements.md", "guidelines.md"],
+  "google_drive": {
+    "folders": ["Project Documentation"]
+  }
+}
+```
+
+Google Drive requires a separate credentials JSON file named **`service_account.json`** in the project folder. This is the service-account key downloaded from Google Cloud, not `config.json`. The filename and location are fixed in the current version.
+
+The downloaded file must contain service-account credentials, including:
+
+```json
+{
+  "type": "service_account",
+  "client_email": "drive-reader@YOUR_PROJECT_ID.iam.gserviceaccount.com",
+  "private_key": "..."
+}
+```
+
+This is only an illustration: use the complete downloaded JSON file. Enable the Google Drive API and share the selected folders with the email in `client_email`. OAuth client credentials are not supported.
+
+When `google_drive` is configured, a missing or invalid credentials file stops the workflow. Without `google_drive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
+
+Only Google Docs directly inside the selected folders are included. See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for download and sharing instructions.
+
+### `agent-sandbox.json`: agent and task
+
+The `run` section controls implementation. The `resume` section controls code review, security review, and risk classification. Set the same branch in both sections so all stages use the same sandbox worktree.
+
+Example for a local task:
+
+```json
+{
+  "run": {
+    "agent": "codex",
+    "branch": "factory-task",
+    "file-prompt": "task.txt",
+    "push": false,
+    "pr": false
+  },
+  "resume": {
+    "agent": "codex",
+    "branch": "factory-task",
+    "push": false,
+    "pr": false
+  }
+}
+```
+
+Choose a new branch name for each new task. For review-only runs, use an existing sandbox branch in `resume.branch`; list available branches with `agent-sandbox worktree-list`.
+
+Example for a Jira task, where `--jira` supplies the task instead of a local file:
+
+```json
+{
+  "run": {
+    "agent": "codex",
+    "branch": "eng-123",
+    "push": false,
+    "pr": false
+  },
+  "resume": {
+    "agent": "codex",
+    "branch": "eng-123",
+    "push": false,
+    "pr": false
+  }
+}
+```
+
+Common settings in either section:
+
+| Option | Purpose |
+| --- | --- |
+| `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
+| `branch` | Sandbox branch to create (`run`) or continue (`resume`). |
+| `file-prompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
+| `model` | Optional model selection; otherwise use the agent's default. |
+| `base-image` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
+| `api-key` | Optional API key for Codex or Claude. Otherwise, use the agent's existing host authentication. |
+| `push` | Commit and push changes after a sandbox stage. The examples leave this disabled. |
+| `pr` | Commit, push, and create or reuse a GitHub pull request after a sandbox stage. The examples leave this disabled. |
+| `commit-message` | Optional commit message when `push` or `pr` is enabled. |
+| `hn` | Allow the container to access host services; defaults to `false`. |
+| `image` | Optional list of image paths to attach for agents that support them. |
+| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.file-prompt` or `--jira` to keep the original task available to every stage. |
+
+Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.
+
+## Requirements
+
+- Go 1.25.3 or later.
+- `agent-sandbox` installed and configured.
+- Docker running and the selected agent authenticated.
+
+Run the commands below from the project folder.
+
+## Getting started
+
+1. Write your task in `task.txt`.
+2. Create `agent-sandbox.json` using the local-task example above.
+3. Create `config.json`. If you do not need supporting documents, use:
+
+   ```json
+   {"documents": []}
+   ```
+
+4. Start the workflow:
+
+   ```bash
+   go run ./cmd/factory -config config.json
+   ```
+
+Soft Factory runs these stages in order:
+
+1. Implement the task.
+2. Review the code and apply corrections.
+3. Review security and apply corrections.
+4. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
+
+Each review stage allows up to three rounds. Reviews require reviewer and fixer subagents; unavailable subagents or incomplete necessary verification are reported as **BLOCKED**.
+
+## Workflow
+
+```mermaid
+flowchart TD
+    Task[Local task file or Jira issue] --> Context[Add local documents and Google Docs]
+    Context --> Mode{Command}
+    Mode -->|Default| Implement[Implement task in sandbox worktree]
+    Mode -->|review| Code[Code review and corrections]
+    Implement --> Code
+    Code --> Security[Security review and corrections]
+    Security --> Risk[Classify final risk]
+    Risk --> Reports[Reports in terminal and docs/]
+```
+
+Each review follows **review → corrections when needed → verification**, with up to three rounds. A command failure stops the workflow.
+
+## Review existing changes
+
+Skip implementation and review the changes in the sandbox worktree selected by `resume.branch`:
+
+```bash
+go run ./cmd/factory -config config.json review
+```
+
+This command can modify files to correct review findings.
+
+## Use a Jira task
+
+Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in your environment or in a local `.env` file. You can use `.env.example` as a starting point.
+
+```bash
+go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123'
+```
+
+To review existing changes against a Jira task:
+
+```bash
+go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123' review
+```
+
+The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `config.json` is still required. Place all flags before `review`.
+
+See [Jira setup](JIRA_SETUP.md) for supported credentials and configuration.
+
+## Add supporting documents
+
+List local documents in `config.json`:
+
+```json
+{
+  "documents": ["requirements.md", "guidelines.md"]
+}
+```
+
+Document paths are relative to the configuration file. Their contents accompany the task throughout the workflow.
+
+To also include Google Docs from shared Drive folders:
+
+```json
+{
+  "documents": ["requirements.md"],
+  "google_drive": {
+    "folders": ["Project Documentation"]
+  }
+}
+```
+
+Save your service-account key as `service_account.json` in the project folder and share the Drive folder with that account. Folder names must identify a single accessible folder. Only Google Docs directly inside the selected folders are included; subfolders and other file types are excluded.
+
+See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions.
+
+## Reports
+
+Code review, security review, and risk classification output appears in the terminal and is saved as timestamped Markdown files in `docs/`.
+
+Review reports include their status (**PASS**, **UNRESOLVED**, or **BLOCKED**), corrections, remaining findings, and verification gaps. Read the reports before accepting the changes: a successful command exit does not guarantee that every finding was resolved.
+
+Local configuration, credentials, task files, and generated reports are ignored by Git. Keep sensitive content out of commits.

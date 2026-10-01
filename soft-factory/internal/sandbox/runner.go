@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"soft-factory/internal/executionlog"
+	"soft-factory/skills"
 )
 
 type ExecuteOptions struct {
@@ -69,15 +70,15 @@ func Run(input TaskContext) error {
 }
 
 func Review(input TaskContext) (string, error) {
-	return review(input, "skills/code-review/SKILL.md")
+	return review(input, "code-review/SKILL.md")
 }
 
 func SecurityReview(input TaskContext) (string, error) {
-	return review(input, "skills/security-review/SKILL.md")
+	return review(input, "security-review/SKILL.md")
 }
 
 func review(input TaskContext, skillPath string) (string, error) {
-	skill, err := os.ReadFile(skillPath)
+	skill, err := skills.ReadFile(skillPath)
 	if err != nil {
 		return "", fmt.Errorf("read review skill %q: %w", skillPath, err)
 	}
@@ -370,7 +371,7 @@ func saveReport(name string, content []byte) (string, error) {
 }
 
 func RiskClassification(input TaskContext, reportPaths []string) error {
-	skill, err := os.ReadFile("skills/risk-classification/SKILL.md")
+	skill, err := skills.ReadFile("risk-classification/SKILL.md")
 	if err != nil {
 		return fmt.Errorf("read risk-classification skill: %w", err)
 	}

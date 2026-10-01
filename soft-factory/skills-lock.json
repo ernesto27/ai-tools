@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "code-review-and-quality": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-and-quality/SKILL.md",
+      "computedHash": "03790162b6550eddca4dc66b24ba70df417479499972abe7ccd451d191d2b0fe"
+    },
     "interview-me": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",

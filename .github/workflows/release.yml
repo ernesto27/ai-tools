@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish Linux release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: soft-factory
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: soft-factory/go.mod
+          cache: true
+          cache-dependency-path: soft-factory/go.sum
+
+      - name: Verify release
+        run: |
+          go test ./...
+          go vet ./...
+          bash -n install.sh
+
+      - name: Build Linux archive
+        run: |
+          mkdir -p dist/package
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/package/factory ./cmd/factory
+          dist/package/factory -h
+          tar -C dist/package -czf dist/factory_linux_amd64.tar.gz factory
+          cd dist
+          sha256sum factory_linux_amd64.tar.gz > factory_linux_amd64.tar.gz.sha256
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            soft-factory/dist/factory_linux_amd64.tar.gz
+            soft-factory/dist/factory_linux_amd64.tar.gz.sha256

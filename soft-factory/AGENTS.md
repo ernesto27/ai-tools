@@ -5,6 +5,7 @@
 This repository contains a Go CLI that coordinates implementation, code review, security review, and risk classification through `agent-sandbox`.
 
 - `cmd/factory/main.go`: CLI entry point and workflow sequencing.
+- `cmd/factory/commands.go`: Cobra command tree and flags.
 - `internal/config/`: JSON configuration loading and validation.
 - `internal/taskcontext/`: supporting-document resolution and prompt assembly.
 - `internal/sandbox/`: subprocess execution, review prompts, and report storage.
@@ -19,8 +20,8 @@ Use Go 1.25.3 or later. Run commands from the repository root so relative skill 
 - `go test ./...`: run all package tests.
 - `go vet ./...`: check for common Go mistakes.
 - `gofmt -w cmd internal`: format Go source.
-- `go run ./cmd/factory -config config.json`: run implementation and all review stages.
-- `go run ./cmd/factory -config config.json review`: run reviews and risk classification on existing changes; reviews can apply corrections.
+- `go run ./cmd/factory --config config.json`: run implementation and all review stages.
+- `go run ./cmd/factory --config config.json review`: run reviews and risk classification on existing changes; reviews can apply corrections.
 
 Workflow commands require `agent-sandbox` on `PATH` and local configuration.
 

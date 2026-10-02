@@ -144,7 +144,7 @@ go build -o /tmp/software-factory ./cmd/factory
 install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
 ```
 
-Run `software-factory -config config.json` or `software-factory -config config.json review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
+Run `software-factory --config config.json` or `software-factory --config config.json review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
 
 The repository-root GitHub workflows run tests, vet, formatting checks, and a CLI build for `soft-factory/`. Pushing a tag matching `v*` builds and publishes the Linux x86_64 archive and checksum after tests and vet pass.
 
@@ -161,7 +161,7 @@ The repository-root GitHub workflows run tests, vet, formatting checks, and a CL
 4. Start the workflow:
 
    ```bash
-   go run ./cmd/factory -config config.json
+   go run ./cmd/factory --config config.json
    ```
 
 Soft Factory runs these stages in order:
@@ -194,7 +194,7 @@ Each review follows **review → corrections when needed → verification**, wit
 Skip implementation and review the changes in the sandbox worktree selected by `resume.branch`:
 
 ```bash
-go run ./cmd/factory -config config.json review
+go run ./cmd/factory --config config.json review
 ```
 
 This command can modify files to correct review findings.
@@ -213,7 +213,7 @@ To review existing changes against a Jira task:
 go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123' review
 ```
 
-The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `config.json` is still required. Place all flags before `review`.
+The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `config.json` is still required.
 
 See [Jira setup](JIRA_SETUP.md) for supported credentials and configuration.
 

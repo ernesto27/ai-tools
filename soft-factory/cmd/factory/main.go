@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 
 	"github.com/joho/godotenv"
 
@@ -20,44 +18,23 @@ import (
 )
 
 func main() {
-	if err := run(os.Args[1:]); err != nil && !errors.Is(err, flag.ErrHelp) {
+	if err := newRootCmd(runWorkflow).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string) (runErr error) {
-	flags := flag.NewFlagSet("software-factory", flag.ContinueOnError)
-	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: software-factory [-config config.json] [--jira <issue-url>] [review]")
-		flags.PrintDefaults()
-	}
+// workflowOptions holds the parsed command-line inputs for one workflow run.
+type workflowOptions struct {
+	ConfigPath string
+	IssueURL   string
+	// Implement runs the implementation stage before the reviews.
+	Implement bool
+}
 
-	configPath := flags.String(
-		"config",
-		"config.json",
-		"Path to the factory configuration",
-	)
-	issueURL := flags.String("jira", "", "Jira Cloud issue URL to use instead of run.file-prompt")
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-
-	if flags.NArg() > 1 || (flags.NArg() == 1 && flags.Arg(0) != "review") {
-		flags.Usage()
-		return fmt.Errorf("expected only the optional review command; place flags before it")
-	}
-	var emptyJira bool
-	flags.Visit(func(f *flag.Flag) {
-		if f.Name == "jira" && strings.TrimSpace(*issueURL) == "" {
-			emptyJira = true
-		}
-	})
-	if emptyJira {
-		return fmt.Errorf("--jira requires a non-empty issue URL")
-	}
+func runWorkflow(opts workflowOptions) (runErr error) {
 	var runLog *executionlog.Run
-	if flags.NArg() == 0 {
+	if opts.Implement {
 		var err error
 		runLog, err = executionlog.NewRun()
 		if err != nil {
@@ -71,7 +48,7 @@ func run(args []string) (runErr error) {
 		return err
 	}
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Load(opts.ConfigPath)
 	if err != nil {
 		return err
 	}
@@ -80,14 +57,14 @@ func run(args []string) (runErr error) {
 	defer stop()
 
 	var taskOverride string
-	if *issueURL != "" {
-		taskOverride, err = loadJiraTask(ctx, *issueURL)
+	if opts.IssueURL != "" {
+		taskOverride, err = loadJiraTask(ctx, opts.IssueURL)
 		if err != nil {
 			return err
 		}
 	}
 
-	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(*configPath))
+	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(opts.ConfigPath))
 	if err != nil {
 		return err
 	}
@@ -98,7 +75,7 @@ func run(args []string) (runErr error) {
 		Log:          runLog,
 	}
 
-	if flags.NArg() == 0 {
+	if opts.Implement {
 		if err := runStage(input, "implementation", "Starting implementation...", func() error {
 			return sandbox.Run(input)
 		}); err != nil {

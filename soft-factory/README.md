@@ -127,6 +127,20 @@ Soft Factory supplies generated prompts for reviews and for tasks with supportin
 
 Run the commands below from the project folder.
 
+Check installed dependencies before configuring a workflow:
+
+```bash
+software-factory doctor
+```
+
+Doctor checks `agent-sandbox`, `git`, and `docker` on `PATH`, then displays all
+results together in a table with Dependency, Status, and Path columns.
+`FOUND` is green and `MISSING` is red by default; set a non-empty `NO_COLOR`
+to disable colors.
+The command exits with status 0 when all three are found and 1 if any are
+missing. It works without configuration files and does not check agent CLIs,
+API keys, versions, or Docker daemon access.
+
 ## Installation
 
 For Linux x86_64, run [install.sh](https://github.com/ernesto27/ai-tools/blob/master/soft-factory/install.sh) with curl:

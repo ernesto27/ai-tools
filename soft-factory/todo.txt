@@ -1,0 +1,4 @@
+[] - option to run skills in specific state (review, security, etc)
+[x] - integration with Jira to get task content from task
+[x] - save logs
+[] - doctor command

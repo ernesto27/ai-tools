@@ -40,6 +40,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 			return run(opts)
 		},
 	})
+	root.AddCommand(newDoctorCmd())
 	return root
 }
 

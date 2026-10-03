@@ -52,6 +52,13 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	if err != nil {
 		return err
 	}
+	var codeReviewSkill *sandbox.CodeReviewSkill
+	if cfg.CodeReviewSkill != nil {
+		codeReviewSkill, err = sandbox.LoadProjectSkill(filepath.Dir(opts.ConfigPath), *cfg.CodeReviewSkill)
+		if err != nil {
+			return err
+		}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -69,10 +76,11 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 	input := sandbox.TaskContext{
-		TaskOverride: taskOverride,
-		Documents:    documents,
-		Context:      ctx,
-		Log:          runLog,
+		TaskOverride:    taskOverride,
+		Documents:       documents,
+		CodeReviewSkill: codeReviewSkill,
+		Context:         ctx,
+		Log:             runLog,
 	}
 
 	if opts.Implement {

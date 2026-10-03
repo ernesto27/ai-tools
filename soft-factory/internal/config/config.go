@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,8 +9,9 @@ import (
 )
 
 type Config struct {
-	Documents   []string           `json:"documents"`
-	GoogleDrive *GoogleDriveConfig `json:"google_drive,omitempty"`
+	Documents       []string           `json:"documents"`
+	GoogleDrive     *GoogleDriveConfig `json:"google_drive,omitempty"`
+	CodeReviewSkill *string            `json:"code-review-skill,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -26,6 +28,13 @@ func Load(path string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
+	}
+	if value, ok := fields["code-review-skill"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		return Config{}, fmt.Errorf("validate factory configuration: code-review-skill must be a skill name, not null")
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
@@ -35,6 +44,12 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.CodeReviewSkill != nil {
+		name := *c.CodeReviewSkill
+		if strings.TrimSpace(name) == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+			return fmt.Errorf("code-review-skill must be a single nonempty skill name")
+		}
+	}
 	for i, path := range c.Documents {
 		if strings.TrimSpace(path) == "" {
 			return fmt.Errorf("documents[%d] must not be empty", i)

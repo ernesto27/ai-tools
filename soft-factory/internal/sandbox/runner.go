@@ -24,13 +24,20 @@ type ExecuteOptions struct {
 	Log        *executionlog.Run
 }
 
+// CodeReviewSkill holds a project skill loaded during workflow setup.
+type CodeReviewSkill struct {
+	Name    string
+	Content string
+}
+
 // TaskContext carries a task override and supporting documents through all stages.
 // An empty override retains the configured file-prompt behavior.
 type TaskContext struct {
-	TaskOverride string
-	Documents    string
-	Context      context.Context
-	Log          *executionlog.Run
+	TaskOverride    string
+	Documents       string
+	CodeReviewSkill *CodeReviewSkill
+	Context         context.Context
+	Log             *executionlog.Run
 }
 
 func Run(input TaskContext) error {
@@ -70,14 +77,34 @@ func Run(input TaskContext) error {
 }
 
 func Review(input TaskContext) (string, error) {
-	return review(input, "code-review/SKILL.md")
+	var additionalSkill string
+	if input.CodeReviewSkill != nil {
+		additionalSkill = fmt.Sprintf("\n## Additional project code review skill: %s\n\nGive this skill to the reviewer after the default code review skill. It applies only to the reviewer role.\n\n%s\n", input.CodeReviewSkill.Name, input.CodeReviewSkill.Content)
+	}
+	return review(input, "code-review/SKILL.md", additionalSkill)
 }
 
 func SecurityReview(input TaskContext) (string, error) {
-	return review(input, "security-review/SKILL.md")
+	return review(input, "security-review/SKILL.md", "")
 }
 
-func review(input TaskContext, skillPath string) (string, error) {
+// LoadProjectSkill resolves and reads a named skill before a workflow starts.
+func LoadProjectSkill(projectDir, name string) (*CodeReviewSkill, error) {
+	first := filepath.Join(projectDir, ".agents", "skills", name, "SKILL.md")
+	second := filepath.Join(projectDir, ".claude", "skills", name, "SKILL.md")
+	for _, path := range []string{first, second} {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			return &CodeReviewSkill{Name: name, Content: string(data)}, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("read code review skill %q: %w", path, err)
+		}
+	}
+	return nil, fmt.Errorf("code review skill %q not found; searched %q and %q", name, first, second)
+}
+
+func review(input TaskContext, skillPath, additionalSkill string) (string, error) {
 	skill, err := skills.ReadFile(skillPath)
 	if err != nil {
 		return "", fmt.Errorf("read review skill %q: %w", skillPath, err)
@@ -172,11 +199,13 @@ Report:
 
 %s
 
+%s
 ## Original task and supporting context
 
 %s
 `,
 		string(skill),
+		additionalSkill,
 		task,
 	)
 

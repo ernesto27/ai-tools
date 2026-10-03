@@ -8,7 +8,7 @@ You can provide a task from a local file or a Jira issue, and include supporting
 
 Create these two files in the project folder before running Soft Factory.
 
-### `config.json`: supporting documents
+### `config.json`: supporting documents and code review skill
 
 These are all the options currently supported:
 
@@ -17,6 +17,7 @@ These are all the options currently supported:
 | `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
 | `google_drive` | Optional Google Drive settings. Omit this section when Drive is not needed. |
 | `google_drive.folders` | Required when `google_drive` is present: a nonempty list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
+| `code-review-skill` | Optional project skill name to add after the default code review skill. The name must be one directory name, not a path. |
 
 Minimal example:
 
@@ -25,6 +26,21 @@ Minimal example:
   "documents": []
 }
 ```
+
+To add project-specific code review instructions, set the skill name:
+
+```json
+{
+  "code-review-skill": "mynameskill"
+}
+```
+
+Soft Factory searches for `.agents/skills/mynameskill/SKILL.md` first, then
+`.claude/skills/mynameskill/SKILL.md`, relative to `config.json`. The first
+matching skill is given to the code reviewer after the default code review
+skill. A configured skill that is missing or cannot be read stops the workflow
+before implementation with an error. Security review and risk classification
+do not use it.
 
 Example using both local documents and Google Drive:
 

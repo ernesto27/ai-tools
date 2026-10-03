@@ -10,3 +10,5 @@ client_secret_*.json
 drive-token*.json
 task.txt
 .env
+.agents/skills/mynameskill/
+.claude/skills/claude-review/

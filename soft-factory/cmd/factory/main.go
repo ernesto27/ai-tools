@@ -17,6 +17,9 @@ import (
 	"soft-factory/internal/taskcontext"
 )
 
+// version is set to the release tag when building a release binary.
+var version = "dev"
+
 func main() {
 	if err := newRootCmd(runWorkflow).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)

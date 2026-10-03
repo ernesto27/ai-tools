@@ -35,8 +35,10 @@ jobs:
       - name: Build Linux archive
         run: |
           mkdir -p dist/package
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/package/software-factory ./cmd/factory
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o dist/package/software-factory ./cmd/factory
           dist/package/software-factory -h
+          test "$(dist/package/software-factory -v)" = "$GITHUB_REF_NAME"
+          test "$(dist/package/software-factory --version)" = "$GITHUB_REF_NAME"
           tar -C dist/package -czf dist/software-factory_linux_amd64.tar.gz software-factory
           cd dist
           sha256sum software-factory_linux_amd64.tar.gz > software-factory_linux_amd64.tar.gz.sha256

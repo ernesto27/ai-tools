@@ -176,6 +176,8 @@ install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
 
 Run `software-factory --config config.json` or `software-factory --config config.json review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
 
+Run `software-factory -v` or `software-factory --version` to print the binary's release tag. Binaries built locally without an injected release tag print `dev`. These flags do not require configuration files.
+
 The repository-root GitHub workflows run tests, vet, formatting checks, and a CLI build for `soft-factory/`. Pushing a tag matching `software-factory-v*` builds and publishes the Linux x86_64 archive and checksum after tests and vet pass.
 
 ## Getting started

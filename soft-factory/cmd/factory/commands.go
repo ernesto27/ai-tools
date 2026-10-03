@@ -13,6 +13,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "software-factory",
 		Short:         "Implement a task, review the changes, and classify the risk.",
+		Version:       version,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -24,6 +25,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 			return run(opts)
 		},
 	}
+	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.PersistentFlags().StringP("config", "c", "config.json", "Path to the factory configuration")
 	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of run.file-prompt")

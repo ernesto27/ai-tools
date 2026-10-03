@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"testing"
 )
@@ -49,6 +50,34 @@ func TestRootCmdRouting(t *testing.T) {
 			}
 			if ran && got != tt.want {
 				t.Errorf("options = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVersionFlags(t *testing.T) {
+	const releaseTag = "software-factory-v9.8.7"
+	for _, flag := range []string{"-v", "--version"} {
+		t.Run(flag, func(t *testing.T) {
+			var output bytes.Buffer
+			ran := false
+			cmd := newRootCmd(func(workflowOptions) error {
+				ran = true
+				return nil
+			})
+			cmd.Version = releaseTag
+			cmd.SetArgs([]string{flag})
+			cmd.SetOut(&output)
+			cmd.SetErr(io.Discard)
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if ran {
+				t.Error("version flag ran the workflow")
+			}
+			if got, want := output.String(), releaseTag+"\n"; got != want {
+				t.Errorf("version output = %q, want %q", got, want)
 			}
 		})
 	}

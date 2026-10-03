@@ -3,6 +3,7 @@ package executionlog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,14 +21,15 @@ const (
 
 var stageNames = []string{"implementation", "code-review", "security-review", "risk-classification"}
 
-// Run owns one log file. Writes are serialized and best effort: after creation,
+// Run owns one directory of log files. Writes are serialized and best effort: after creation,
 // logging failures warn once and never become workflow errors.
 type Run struct {
 	mu       sync.Mutex
 	file     *os.File
 	path     string
+	header   string
 	err      error
-	statuses map[string]string
+	attempts map[string]int
 	active   string
 	stream   string
 	newline  bool
@@ -35,47 +37,73 @@ type Run struct {
 	ready    bool
 }
 
-// NewRun initializes a private log file before any workflow work starts.
+// NewRun initializes a private run directory before any workflow work starts.
 func NewRun() (*Run, error) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("resolve working directory: %w", err)
+	}
 	if err := os.MkdirAll(logDirectory, 0700); err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
-	file, err := createLogFile(time.Now().UTC())
+	branch, branchNote := sandboxBranch()
+	path, err := createRunDirectory(branch, time.Now().UTC())
 	if err != nil {
-		return nil, fmt.Errorf("create execution log: %w", err)
+		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
-	r := &Run{file: file, path: file.Name(), statuses: make(map[string]string), newline: true}
-	for _, name := range stageNames {
-		r.statuses[name] = "PENDING"
+	header := fmt.Sprintf("EXECUTION\nRun: %s\nBranch: %s\nStarted: %s\nDirectory: %s\nPlanned stages: %s\n",
+		filepath.Base(path), branch, timestamp(), workingDirectory, strings.Join(stageNames, ", "))
+	if branchNote == "agent-sandbox.json: run.branch" {
+		header += "Branch source: " + branchNote + "\n"
+	} else {
+		header += "Branch note: " + branchNote + "\n"
 	}
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, errors.Join(fmt.Errorf("resolve working directory: %w", err), file.Close())
-	}
-	r.writeLocked(fmt.Sprintf("EXECUTION\nRun: %s\nStarted: %s\nDirectory: %s\nPlanned stages: %s\n",
-		filepath.Base(r.path), timestamp(), workingDirectory, strings.Join(stageNames, ", ")))
-	if r.err != nil {
-		return nil, errors.Join(r.err, file.Close())
-	}
-	r.ready = true
-	return r, nil
+	return &Run{path: path, header: header, attempts: make(map[string]int), newline: true, ready: true}, nil
 }
 
-// createLogFile creates a permanent log without replacing an existing run.
-func createLogFile(started time.Time) (*os.File, error) {
-	name := started.Format("2006-01-02_15-04-05.000000000")
+// createRunDirectory reserves a unique name without replacing an existing run.
+func createRunDirectory(branch string, started time.Time) (string, error) {
+	name := sanitizeBranch(branch) + "-" + started.Format("2006-01-02_15-04-05.000000000")
 	for suffix := 0; ; suffix++ {
-		filename := name + ".log"
+		directory := name
 		if suffix > 0 {
-			filename = fmt.Sprintf("%s-%d.log", name, suffix)
+			directory = fmt.Sprintf("%s-%d", name, suffix+1)
 		}
-		path := filepath.Join(logDirectory, filename)
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		path := filepath.Join(logDirectory, directory)
+		err := os.Mkdir(path, 0700)
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}
-		return file, err
+		return path, err
 	}
+}
+
+func sandboxBranch() (string, string) {
+	data, err := os.ReadFile("agent-sandbox.json")
+	if err != nil {
+		return "no-branch", "agent-sandbox.json unavailable"
+	}
+	var settings struct {
+		Run struct {
+			Branch string `json:"branch"`
+		} `json:"run"`
+	}
+	if json.Unmarshal(data, &settings) != nil || strings.TrimSpace(settings.Run.Branch) == "" {
+		return "no-branch", "run.branch unavailable in agent-sandbox.json"
+	}
+	return settings.Run.Branch, "agent-sandbox.json: run.branch"
+}
+
+func sanitizeBranch(branch string) string {
+	var name strings.Builder
+	for _, char := range branch {
+		if char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || char == '.' || char == '_' || char == '-' {
+			name.WriteRune(char)
+		} else {
+			name.WriteByte('-')
+		}
+	}
+	return name.String()
 }
 
 func (r *Run) Path() string { return r.path }
@@ -95,12 +123,27 @@ func (r *Run) StartStage(name string) {
 			index = i + 1
 		}
 	}
-	if index == 0 || r.active != "" || r.statuses[name] != "PENDING" {
+	if index == 0 || r.active != "" || r.closed {
 		r.failLocked(fmt.Errorf("cannot start execution log stage %q", name))
 		return
 	}
+	r.attempts[name]++
+	filename := fmt.Sprintf("%02d-%s.log", index, name)
+	if r.attempts[name] > 1 {
+		filename = fmt.Sprintf("%02d-%s-%d.log", index, name, r.attempts[name])
+	}
+	var file *os.File
+	if r.err == nil {
+		var err error
+		file, err = os.OpenFile(filepath.Join(r.path, filename), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			r.failLocked(fmt.Errorf("create stage log %q: %w", filename, err))
+		}
+	}
 	r.active, r.stream = name, ""
-	r.statuses[name] = "RUNNING"
+	r.file = file
+	r.newline = true
+	r.writeLocked(r.header)
 	r.sectionLocked(fmt.Sprintf("%s\nSTAGE %d: %s\n%s\nStarted: %s\n",
 		separator, index, strings.ToUpper(name), separator, timestamp()))
 }
@@ -145,34 +188,42 @@ func (r *Run) Report(path string) {
 func (r *Run) FinishStage(err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.finishStageLocked(err)
+}
+
+func (r *Run) finishStageLocked(err error) {
+	if r.active == "" {
+		return
+	}
 	status := outcome(err)
 	if err != nil {
 		r.sectionLocked("--- ERROR ---\n" + err.Error() + "\n")
 	}
 	r.sectionLocked(fmt.Sprintf("--- RESULT ---\nStatus: %s\nFinished: %s\n", status, timestamp()))
-	r.statuses[r.active] = status
+	r.closeStageLocked()
+}
+
+// closeStageLocked releases the active stage file. The caller holds r.mu.
+func (r *Run) closeStageLocked() {
+	if r.active != "" && r.file != nil {
+		if closeErr := r.file.Close(); closeErr != nil {
+			r.failLocked(fmt.Errorf("close stage log %q: %w", r.file.Name(), closeErr))
+		}
+	}
+	r.file = nil
+	r.newline = true
 	r.active, r.stream = "", ""
 }
 
-// Finish writes the final summary and closes the file, even after a run failure.
+// Finish closes an active stage, if any, even after a run failure.
 func (r *Run) Finish(err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed {
 		return
 	}
-	if err != nil {
-		r.sectionLocked("--- ERROR ---\n" + err.Error() + "\n")
-	}
-	r.sectionLocked(fmt.Sprintf("%s\nEXECUTION FINISHED\nStatus: %s\nFinished: %s\n",
-		separator, outcome(err), timestamp()))
-	for _, name := range stageNames {
-		r.writeLocked(fmt.Sprintf("%s: %s\n", name, r.statuses[name]))
-	}
+	r.finishStageLocked(err)
 	r.closed = true
-	if err := r.file.Close(); err != nil {
-		r.failLocked(fmt.Errorf("close execution log %q: %w", r.path, err))
-	}
 }
 
 // Stream preserves output chunks without scanner limits or whole-run buffering.
@@ -219,7 +270,10 @@ func (r *Run) writeLocked(text string) {
 		return
 	}
 	if r.closed {
-		r.failLocked(fmt.Errorf("write execution log %q: file is closed", r.path))
+		r.failLocked(fmt.Errorf("write execution log: run is closed"))
+		return
+	}
+	if r.file == nil {
 		return
 	}
 	n, err := io.WriteString(r.file, text)
@@ -227,7 +281,7 @@ func (r *Run) writeLocked(text string) {
 		err = io.ErrShortWrite
 	}
 	if err != nil {
-		r.failLocked(fmt.Errorf("write execution log %q: %w", r.path, err))
+		r.failLocked(fmt.Errorf("write execution log %q: %w", r.file.Name(), err))
 	}
 	r.newline = strings.HasSuffix(text, "\n")
 }

@@ -203,6 +203,17 @@ Soft Factory runs these stages in order:
 3. Review security and apply corrections.
 4. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
 
+The default workflow saves logs in `logs/<branch>-<UTC-datetime>/`, using the
+sandbox worktree branch from `agent-sandbox.json` (`run.branch`). Branch slashes
+become hyphens, so `feature/logs` appears as `feature-logs`. Each
+stage has its own position-prefixed file (`01-implementation.log`,
+`02-code-review.log`, `03-security-review.log`, and
+`04-risk-classification.log`); another attempt at a stage uses a numbered file
+such as `01-implementation-2.log`. Each stage file includes the run details
+and that stage's result. A stage that never starts has no file. The CLI prints
+the directory path when the run starts and continues to show stage output
+live. The standalone `review` command does not create these logs.
+
 Each review stage allows up to three rounds. Reviews require reviewer and fixer subagents; unavailable subagents or incomplete necessary verification are reported as **BLOCKED**.
 
 ## Workflow

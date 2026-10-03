@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "skills": {
+    "caveman": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "a818cdc41dcfaa50dd891c5cb5e5705968338de02e7e37949ca56e8c30ad4176"
+    },
+    "code-review-and-quality": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-and-quality/SKILL.md",
+      "computedHash": "6231479cc74c7ed70a5618b81b3f94034d9806c0319a1a23d15f9b94a368c581"
+    },
+    "code-simplification": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-simplification/SKILL.md",
+      "computedHash": "7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677"
+    },
+    "commit-push": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/commit-push/SKILL.md",
+      "computedHash": "59f863746796f224c38ead71b63c982956cd6222a2609af11d029305a92b2853"
+    },
+    "deep-research": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/deep-research/SKILL.md",
+      "computedHash": "59a9a850fb0e77692c24605360a9ee76a13f6636a9c8c7ee01598c175d606d9f"
+    },
+    "explain-changes": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/explain-changes/SKILL.md",
+      "computedHash": "5fda90606862811c27f643a905430418887b986ecc3940831bc45d32554f3231"
+    },
+    "interview-me": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/interview-me/SKILL.md",
+      "computedHash": "efded91ac7f7626239b338ce8622afeb557151b86532b632f3c9eb5b2ff9048f"
+    },
+    "plan-from-spec": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/plan-from-spec/SKILL.md",
+      "computedHash": "d1cb8a19dd0884f69452ef9fa96387777c034827d2ab6defe83effe7fde8a3b2"
+    },
+    "push-github-tag": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/push-github-tag/SKILL.md",
+      "computedHash": "57b50eca6b57ebc0c9baa18e6f234e450fe7e64170d952395fa8d446a71731d4"
+    },
+    "show-me": {
+      "source": "humanlayer/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/show-me/skills/show-me/SKILL.md",
+      "computedHash": "de32a72f802801f08a84641b467f2c6306d35a58ce5e59ea607ac3a993a18c91"
+    },
+    "spec-driven-development": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/spec-driven-development/SKILL.md",
+      "computedHash": "a6cdfed42f757f84d3d6968fbea5b257b28c08ff9aa52de6f12fe78a5fb1393b"
+    },
+    "update-readme": {
+      "source": "PigmalionSoftware/skill-library",
+      "sourceType": "github",
+      "skillPath": "skills/update-readme/SKILL.md",
+      "computedHash": "30efb1e2b70009ab6913c2e273e55d2a9ee27267c14f98799355783d04d7649c"
+    }
+  }
+}

@@ -1,9 +1,9 @@
-name: Release
+name: Release Software Factory
 
 on:
   push:
     tags:
-      - "v*"
+      - "software-factory-v*"
 
 permissions:
   contents: write

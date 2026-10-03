@@ -1,0 +1,8 @@
+{
+  "openai": {
+    "defaultModel": "gpt-6.1-sol"
+  },
+  "anthropic": {
+    "defaultModel": "claude-opus-5-5"
+  }
+}

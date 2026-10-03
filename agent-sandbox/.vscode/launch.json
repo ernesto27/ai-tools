@@ -1,0 +1,152 @@
+{
+  // Debug configurations for agent-sandbox. Assumes this `go/` directory is the
+  // VS Code workspace root; if you open the repository root instead, prefix
+  // every `program` and `cwd` with `/agent-sandbox/go`.
+  //
+  // `cwd` is load-bearing: sandbox.Run calls os.Getwd, opens the repository
+  // through it, and creates the worktree as a *sibling of that directory*
+  // (filepath.Join(filepath.Dir(cwd), branch)). With cwd = this folder, a run
+  // on branch `foo` builds its worktree at ../foo, i.e. agent-sandbox/foo.
+  //
+  // `console: integratedTerminal` is required for any config that actually runs
+  // an agent: docker.Run is TTY-aware, and the debug console is not a TTY.
+  //
+  // No env vars are set anywhere on purpose. Credentials reach the container
+  // only as bind mounts of the agent's host config directory; a config that
+  // passed an API key through here would be testing a path that does not exist.
+  "version": "0.2.0",
+
+  "configurations": [
+    {
+      // Needs Docker and an authenticated agent on the host. On first use it
+      // builds the image, and every run checks the image against
+      // `npm view <package> version`, so expect a slow start.
+      "name": "run: agent",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "${input:branch}",
+        "--agent",
+        "${input:agent}",
+        "--model",
+        "${input:model}",
+        "${input:prompt}"
+      ]
+    },
+    {
+      // Same, plus the commit-and-push tail. Note the commit message uses
+      // Options.Prompt, not FullPrompt.
+      "name": "run: agent --push",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "${input:branch}",
+        "--agent",
+        "${input:agent}",
+        "--model",
+        "${input:model}",
+        "--push",
+        "${input:prompt}"
+      ]
+    },
+    {
+      // git only: no Docker, no network, no image check. Good place to break on
+      // addedWorktrees.
+      "name": "worktree-list",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["worktree-list"]
+    },
+    {
+      // Every refusal happens before anything is removed, so stepping through
+      // this against a branch that does not exist, or against master, is safe.
+      "name": "worktree-delete",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["worktree-delete", "-b", "${input:branch}"]
+    },
+    {
+      // Destructive once it gets past the refusals: --force skips the
+      // uncommitted-changes check in removeWorktree.
+      "name": "worktree-delete --force",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["worktree-delete", "-b", "${input:branch}", "--force"]
+    },
+    {
+      // Argument handling on its own: nothing here reaches git or Docker.
+      // Swap the args for the case you are chasing — "" for the bare synopsis,
+      // ["br","--badflag","x","p"] for SetFlagErrorFunc, ["worktree-list","x"]
+      // for the usageArgs wrapper, ["br","p"] for the missing --agent.
+      "name": "parse only: --help",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["--help"]
+    },
+    {
+      // The release workflow injects the version with a linker flag; this is the
+      // only way to exercise that branch of buildVersion() from the editor.
+      "name": "parse only: --version (ldflags)",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "buildFlags": "-ldflags=-X main.version=debug-0.0.0",
+      "args": ["--version"]
+    }
+  ],
+
+  "inputs": [
+    {
+      "id": "branch",
+      "type": "promptString",
+      "description": "Branch name — the worktree is created at ../<branch>",
+      "default": "tmp-debug"
+    },
+    {
+      "id": "agent",
+      "type": "pickString",
+      "description": "Agent to run (order matches internal/agent.registry)",
+      "options": ["codex", "claude", "opencode", "pi"],
+      "default": "claude"
+    },
+    {
+      "id": "model",
+      "type": "promptString",
+      "description": "Model, or empty to let the agent's DefaultModel() decide",
+      "default": ""
+    },
+    {
+      "id": "prompt",
+      "type": "promptString",
+      "description": "Prompt for the agent (one argument, so dashes are safe here)",
+      "default": "create a hello.txt file"
+    }
+  ]
+}

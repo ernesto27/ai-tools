@@ -1,11 +1,29 @@
 {
   "version": 1,
   "skills": {
+    "caveman": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "a818cdc41dcfaa50dd891c5cb5e5705968338de02e7e37949ca56e8c30ad4176"
+    },
     "code-review-and-quality": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/code-review-and-quality/SKILL.md",
       "computedHash": "03790162b6550eddca4dc66b24ba70df417479499972abe7ccd451d191d2b0fe"
+    },
+    "commit-push": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/commit-push/SKILL.md",
+      "computedHash": "e4393197d4aeb4dbe6621575b71dc84b62f7130ec99db9c4c507d2d61d5a294f"
+    },
+    "explain-changes": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/explain-changes/SKILL.md",
+      "computedHash": "b92c9736ab83f2886b890efccdeb9feed5da114c3c556fd2d70a3c5b954eb410"
     },
     "interview-me": {
       "source": "addyosmani/agent-skills",
@@ -13,11 +31,29 @@
       "skillPath": "skills/interview-me/SKILL.md",
       "computedHash": "4229002dd862e6e037c8a01c3e31d9af097465c58b2c3611912edb2af005f303"
     },
+    "plan-from-spec": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/plan-from-spec/SKILL.md",
+      "computedHash": "8c2e709d1cd6b7db90edf1401d13c4c4c766ed4ede1db7292bbbd1df4ae24126"
+    },
+    "push-github-tag": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/push-github-tag/SKILL.md",
+      "computedHash": "963029e4b352a7c6218380069695e39b27fe6016880ce7210a4114473d12c774"
+    },
     "spec-driven-development": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/spec-driven-development/SKILL.md",
       "computedHash": "d4dc15caa8d97749267da68676aeadff3fb5b8d9a4462664937137ac09610e4f"
+    },
+    "tutorial-master": {
+      "source": "ernesto27/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tutorial-master/SKILL.md",
+      "computedHash": "81295f597cc55f381082d3937cb7265f88a7613292f6b40beda3a86c520aaef2"
     }
   }
 }

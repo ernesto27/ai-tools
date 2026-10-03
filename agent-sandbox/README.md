@@ -63,25 +63,23 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [opciones] (-q <c
 | `-m`, `--model` | Opcional. Sobrescribe el modelo que resuelve el agente. |
 | `-i`, `--base-image` | Opcional. Deriva una imagen desde una base compatible, para disponer de su toolchain dentro del sandbox. |
 | `--hn` | Opcional. Comparte la red del host con el contenedor, sin limitar puertos. Desactivado por defecto; ver los riesgos en "Red del host". |
-| `-p`, `--push` | Al finalizar, agrega todos los cambios, crea un commit y hace `git push --set-upstream origin <branch>`. |
-| `--pr` | Opcional. Si el agente termina correctamente, commitea los cambios pendientes, publica el branch en `origin` y crea o reutiliza un pull request de GitHub. No requiere `--push`; ver "Pull requests de GitHub". |
+| `-p`, `--push` | El agente crea el commit dentro del contenedor. Si termina correctamente y deja el worktree limpio, se hace `git push --set-upstream origin <branch>` sin crear un PR. |
+| `--pr` | Opcional. El agente commitea dentro del contenedor; si termina correctamente y deja el worktree limpio, se publica el branch en `origin` y se crea o reutiliza un pull request de GitHub. No requiere `--push`; ver "Pull requests de GitHub". |
 | `-q`, `--query` | Instrucción para el agente. |
-| `-c`, `--commit-message` | Opcional. Mensaje del commit creado por `-p`/`--push` o `--pr`; si se omite, usa el prompt resuelto. Sin esas opciones, no tiene efecto. |
+| `-c`, `--commit-message` | Opcional. Con `--push` o `--pr`, se le indica al agente que use este mensaje exacto en el commit dentro del contenedor. |
 | `-f`, `--file-prompt` | Archivo cuyo contenido se usa como instrucción para el agente, en lugar de `-q` o `--query`. |
 | `--image <archivo>` | Opcional y repetible. Adjunta imágenes al prompt inicial de Codex o Claude Code. Cada ruta debe ser un archivo regular existente en el host; opencode y pi la ignoran. Usá `--` antes del prompt de texto para que Codex no lo interprete como otra imagen. |
 
 Sin `-p`/`--push` ni `--pr`, los cambios quedan sin commitear en el worktree.
-Con cualquiera de esas opciones, no se crea un commit vacío. Hay que
+Con cualquiera de esas opciones, el agente commitea antes de terminar. Hay que
 proporcionar exactamente una fuente de prompt: `-q`/`--query`, `-f`/`--file-prompt`
 o el valor `"query"`/`"file-prompt"` del JSON. No se pueden usar ambas fuentes
-a la vez ni se aceptan instrucciones posicionales. Si se usa `--push` o `--pr`
-sin `--commit-message`, el contenido
-del archivo se convierte en el mensaje de commit por defecto cuando se eligió
-`--file-prompt`.
+a la vez ni se aceptan instrucciones posicionales. Sin `--commit-message`,
+el agente elige un mensaje basado en los cambios reales.
 
 Para continuar un worktree registrado, usá `agent-sandbox resume -b <branch>`.
 El branch es el nombre mostrado por `worktree-list`. Si se combina con
-`--push` o `--pr`, se commitean todos los cambios pendientes al publicar.
+`--push` o `--pr`, el agente debe commitear los cambios antes de terminar la sesión.
 
 `run` y `resume` leen `./agent-sandbox.json` si existe en el directorio desde
 el que se ejecutan. Cada sección admite los nombres largos de las opciones
@@ -120,8 +118,10 @@ consulta del JSON. Los comandos de gestión de worktrees no leen el archivo.
 GitHub CLI (`gh`) instalado y autenticado en el host para el servidor de
 `origin`, además de permisos para hacer push y crear el PR. Las URLs de fetch
 y push de `origin` deben identificar el mismo repositorio de GitHub y debe
-haber un único destino de push. Las operaciones de Git y GitHub se ejecutan
-en el host.
+haber un único destino de push. Con `--push` y `--pr`, el commit se hace dentro del contenedor;
+el push y las operaciones de GitHub se ejecutan en el host. Para `--pr`,
+el contenedor recibe acceso de escritura a los metadatos Git del repositorio
+y usa la identidad Git configurada en el host.
 
 La base del PR es el branch desde el que se creó el worktree con `run` y queda
 registrada para futuros `resume`. Ese branch debe existir en `origin` y ser
@@ -141,9 +141,10 @@ Continuar ese worktree y actualizar el branch del PR:
 agent-sandbox resume -b fix-login -a codex --pr -q "add a regression test for the login redirect"
 ```
 
-Si el agente termina con estado distinto de cero, se omite la publicación y
-los cambios quedan en el worktree. Si termina correctamente, se commitean los
-cambios pendientes y se compara el resultado con la base actual de `origin`.
+Con `--push` o `--pr`, si el agente termina con estado distinto de cero, se omite la publicación y
+los cambios quedan en el worktree. Si termina correctamente pero deja cambios
+sin commitear, se informa un error y no se hace push. Con el worktree limpio,
+se compara el resultado con la base actual de `origin`.
 Sin diferencias para revisar, no se hace push ni se crea un PR. Un worktree
 limpio con commits que aportan diferencias respecto de la base también se
 puede publicar.
@@ -157,7 +158,8 @@ consume uso del modelo. Si falla la generación o creación del PR, el branch
 ya quedó publicado; podés reintentar con `resume --pr`.
 
 Combinar `--pr` con `--push` sigue este mismo flujo, sin duplicar el commit ni
-el push. `--commit-message` controla el mensaje del commit, no el título del PR.
+el push. `--commit-message` controla el mensaje indicado al agente para el
+commit, no el título del PR.
 
 ### Red del host
 

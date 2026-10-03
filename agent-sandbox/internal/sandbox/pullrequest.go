@@ -50,19 +50,18 @@ func preparePullRequest(ctx context.Context, opts Options, repo *git.Repo, base 
 	return client, nil
 }
 
-// publishResult keeps the older --push path intact, including its behavior on
-// a nonzero agent status. PR publication is a separate path that requires a
-// successful coding session and commits/pushes at most once when -p is also set.
+// publishResult only publishes a completed agent session. Both publishing
+// modes require the agent to commit first; PR mode additionally creates a PR.
 func publishResult(ctx context.Context, opts Options, record worktreeRecord, repo *git.Repo, dockerClient *docker.Client, githubClient *github.Client, status int, out io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if status != 0 && (opts.PR || opts.Push) {
+		fmt.Fprintf(out, "Agent exited with status %d. Skipping publication; changes left in %s\n", status, record.Path)
+		return nil
+	}
 	if !opts.PR {
 		return publish(opts, record.Path, repo, out)
-	}
-	if status != 0 {
-		fmt.Fprintf(out, "Agent exited with status %d. Skipping pull request publication; changes left in %s\n", status, record.Path)
-		return nil
 	}
 	return publishPullRequest(ctx, opts, record, repo, dockerClient, githubClient, out)
 }
@@ -71,16 +70,14 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 	worktree := repo.At(record.Path)
 	branch, err := worktree.CurrentBranch(ctx)
 	if err != nil {
-		return fmt.Errorf("checking PR head before committing; branch has not been pushed: %w", err)
+		return fmt.Errorf("checking PR head before publishing; branch has not been pushed: %w", err)
 	}
 	if branch != opts.Branch {
 		return fmt.Errorf("PR worktree must remain on branch %s, found %q; branch has not been pushed", opts.Branch, branch)
 	}
-	message := resolveCommitMessage(opts, record.Path, out)
-	if err := worktree.CommitPending(ctx, message); err != nil {
-		return fmt.Errorf("committing PR changes; branch has not been pushed: %w", err)
+	if err := requireCommittedWorktree(worktree); err != nil {
+		return err
 	}
-	removeCommitMessage(record.Path, out)
 	base, err := worktree.FetchBase(ctx, record.BaseBranch)
 	if err != nil {
 		return fmt.Errorf("fetching PR base; branch has not been pushed: %w", err)
@@ -127,6 +124,20 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 		return nil
 	}
 	return fmt.Errorf("creating PR after successful push: %w", createErr)
+}
+
+// requireCommittedWorktree prevents publication of a partial agent result.
+// A clean branch may already hold commits from an earlier session, so it does
+// not require this particular invocation to have created another commit.
+func requireCommittedWorktree(worktree *git.Repo) error {
+	clean, err := worktree.IsClean()
+	if err != nil {
+		return fmt.Errorf("checking PR worktree after agent commit: %w", err)
+	}
+	if !clean {
+		return fmt.Errorf("agent left uncommitted changes in %s; branch has not been pushed", worktree.Dir)
+	}
+	return nil
 }
 
 func printExistingPR(out io.Writer, pr *github.PullRequest) {

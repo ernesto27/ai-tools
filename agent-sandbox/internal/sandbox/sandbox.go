@@ -72,6 +72,9 @@ func Run(ctx context.Context, opts Options, out io.Writer) (int, error) {
 	if err := ensureImage(ctx, client, opts, out); err != nil {
 		return 0, err
 	}
+	if err := ensureCommitGit(ctx, client, opts, out); err != nil {
+		return 0, err
+	}
 
 	if err := git.CheckBranchName(opts.Branch); err != nil {
 		// A bad branch name is a bad argument, so it exits like one, but git's
@@ -139,7 +142,7 @@ func Resume(ctx context.Context, opts Options, out io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if opts.PR {
+	if opts.PR || opts.Push {
 		branch, err := found.repo.At(worktree.Path).CurrentBranch(ctx)
 		if err != nil {
 			return 0, err
@@ -156,6 +159,9 @@ func Resume(ctx context.Context, opts Options, out io.Writer) (int, error) {
 	defer client.Close()
 
 	if err := ensureImage(ctx, client, opts, out); err != nil {
+		return 0, err
+	}
+	if err := ensureCommitGit(ctx, client, opts, out); err != nil {
 		return 0, err
 	}
 
@@ -251,6 +257,30 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	}
 	runOpts.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: worktreeDir, Container: workspace})
+	if opts.PR || opts.Push {
+		worktree := &git.Repo{Dir: worktreeDir}
+		gitDir, commonDir, err := worktree.WorktreeGitDirs()
+		if err != nil {
+			return docker.RunOptions{}, err
+		}
+		name, email, err := worktree.CommitIdentity()
+		if err != nil {
+			return docker.RunOptions{}, err
+		}
+		// Linked worktrees keep their Git administration under the repository's
+		// common directory. Mounting it at its original absolute path keeps the
+		// worktree metadata valid without exposing the caller's working files.
+		runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: commonDir, Container: commonDir})
+		runOpts.Env = append(runOpts.Env,
+			"GIT_DIR="+gitDir,
+			"GIT_COMMON_DIR="+commonDir,
+			"GIT_WORK_TREE="+workspace,
+			"GIT_AUTHOR_NAME="+name,
+			"GIT_AUTHOR_EMAIL="+email,
+			"GIT_COMMITTER_NAME="+name,
+			"GIT_COMMITTER_EMAIL="+email,
+		)
+	}
 	runOpts.HostNetwork = opts.HostNetwork
 	if opts.BaseImage != "" {
 		// An arbitrary Alpine base may leave a numeric host UID trying to create
@@ -301,8 +331,7 @@ func imageAttachmentName(index int, image string) string {
 	return strconv.Itoa(index+1) + filepath.Ext(image)
 }
 
-// publish commits and pushes what the agent produced, unless --push was left
-// out, in which case the changes simply stay in the worktree.
+// publish pushes an agent-committed branch unless --push was left out.
 func publish(opts Options, worktreeDir string, repo *git.Repo, out io.Writer) error {
 	if !opts.Push {
 		fmt.Fprintf(out, "Skipping commit and push. Changes left in %s\n", worktreeDir)
@@ -310,21 +339,35 @@ func publish(opts Options, worktreeDir string, repo *git.Repo, out io.Writer) er
 	}
 
 	worktree := repo.At(worktreeDir)
-	if err := worktree.StageAll(); err != nil {
+	if err := requireCommittedWorktree(worktree); err != nil {
 		return err
 	}
+	return worktree.Push(opts.Branch)
+}
 
-	if !worktree.HasStagedChanges() {
-		fmt.Fprintf(out, "Nothing to commit in %s\n", worktreeDir)
+// ensureCommitGit upgrades a cached default image built before Git was installed.
+// Custom-base images already include Git, so a failure there is a broken image
+// rather than a reason to rebuild an unrelated caller-owned base.
+func ensureCommitGit(ctx context.Context, client *docker.Client, opts Options, out io.Writer) error {
+	if !opts.PR && !opts.Push {
 		return nil
 	}
-	commitMessage := resolveCommitMessage(opts, worktreeDir, out)
-
-	if err := worktree.Commit(commitMessage); err != nil {
+	if _, err := client.Output(ctx, "git", "--version"); err == nil {
+		return nil
+	} else if opts.BaseImage != "" {
+		return fmt.Errorf("--push and --pr require Git in the sandbox image: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	removeCommitMessage(worktreeDir, out)
-	return worktree.Push(opts.Branch)
+	fmt.Fprintf(out, "Rebuilding %s with Git for publication.\n", imageName)
+	if err := client.Build(ctx, nil); err != nil {
+		return err
+	}
+	if _, err := client.Output(ctx, "git", "--version"); err != nil {
+		return fmt.Errorf("Git is unavailable in rebuilt sandbox image: %w", err)
+	}
+	return nil
 }
 
 // ensureImageLatest builds the image when it is missing and rebuilds it when

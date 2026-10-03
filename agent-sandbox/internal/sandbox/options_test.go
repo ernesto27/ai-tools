@@ -3,12 +3,87 @@ package sandbox
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 )
+
+func TestFullPromptCommitRules(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		pr       bool
+		push     bool
+		message  string
+		want     []string
+		unwanted []string
+	}{
+		{name: "ordinary run", want: []string{"Do not stage, commit, or push"}, unwanted: []string{"Before finishing, stage and commit"}},
+		{name: "push commits in container", push: true, want: []string{"Before finishing, stage and commit", "Do not push or create a pull request", "Do not change Git configuration, hooks, refs", "Inspect the staged diff"}, unwanted: []string{"Do not stage, commit, or push"}},
+		{name: "PR chooses message", pr: true, want: []string{"Before finishing, stage and commit", "Choose one short commit message", "Do not push or create a pull request"}, unwanted: []string{"Do not stage, commit, or push"}},
+		{name: "PR uses explicit message", pr: true, message: "fix login", want: []string{"Use this exact commit message: \"fix login\""}, unwanted: []string{"Choose one short commit message"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt := (Options{Prompt: "implement this", PR: tc.pr, Push: tc.push, CommitMessage: tc.message}).FullPrompt()
+			for _, value := range tc.want {
+				if !strings.Contains(prompt, value) {
+					t.Errorf("prompt does not contain %q", value)
+				}
+			}
+			for _, value := range tc.unwanted {
+				if strings.Contains(prompt, value) {
+					t.Errorf("prompt unexpectedly contains %q", value)
+				}
+			}
+		})
+	}
+}
+
+func TestPRContainerOptionsMountGitMetadata(t *testing.T) {
+	repoDir := setupDeleteTestRepo(t)
+	worktree := addDeleteTestWorktree(t, repoDir, "feature")
+	runGit(t, repoDir, "config", "user.name", "Test User")
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	opts, err := NewOptions(Options{AgentName: "codex", APIKey: "test-key", Branch: "feature", PR: true, Prompt: "fix this"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runOpts, err := containerOptions(opts, worktree.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commonDir := filepath.Join(repoDir, ".git")
+	found := false
+	for _, mount := range runOpts.Mounts {
+		if mount.Host == commonDir && mount.Container == commonDir && !mount.ReadOnly {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("Git metadata mount missing: %#v", runOpts.Mounts)
+	}
+	for _, value := range []string{"GIT_COMMON_DIR=" + commonDir, "GIT_WORK_TREE=/workspace", "GIT_AUTHOR_NAME=Test User", "GIT_AUTHOR_EMAIL=test@example.com"} {
+		if !slices.Contains(runOpts.Env, value) {
+			t.Errorf("environment missing %q", value)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("committed in container\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "change.txt"}, {"commit", "-m", "agent commit"}} {
+		command := exec.Command("git", append([]string{"-C", worktree.Path}, args...)...)
+		command.Env = append(append(os.Environ(), runOpts.Env...), "GIT_WORK_TREE="+worktree.Path)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v with container environment: %v: %s", args, err, output)
+		}
+	}
+	command := exec.Command("git", "-C", worktree.Path, "log", "-1", "--format=%s")
+	if output, err := command.Output(); err != nil || strings.TrimSpace(string(output)) != "agent commit" {
+		t.Fatalf("host worktree does not see container commit: %q, %v", output, err)
+	}
+}
 
 func TestCodexCredentialSelection(t *testing.T) {
 	const key = "test-api-key"

@@ -3,12 +3,12 @@
 package git
 
 import (
-	"agent-sandbox/internal/utils"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -37,6 +37,40 @@ func Open(dir string) (*Repo, error) {
 // such as a worktree created by AddWorktree.
 func (r *Repo) At(dir string) *Repo {
 	return &Repo{Dir: dir, Stdout: r.Stdout, Stderr: r.Stderr}
+}
+
+// WorktreeGitDirs returns absolute paths because a container sees the worktree
+// at /workspace while its Git administration files remain at host paths.
+func (r *Repo) WorktreeGitDirs() (string, string, error) {
+	gitDir, err := r.output("rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return "", "", fmt.Errorf("finding worktree Git directory: %w", err)
+	}
+	commonDir, err := r.output("rev-parse", "--git-common-dir")
+	if err != nil {
+		return "", "", fmt.Errorf("finding repository Git directory: %w", err)
+	}
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(r.Dir, commonDir)
+	}
+	return filepath.Clean(gitDir), filepath.Clean(commonDir), nil
+}
+
+// CommitIdentity resolves the same local/global Git identity the host would
+// use, so a container without the host's home configuration can still commit.
+func (r *Repo) CommitIdentity() (string, string, error) {
+	name := os.Getenv("GIT_COMMITTER_NAME")
+	if name == "" {
+		name, _ = r.output("config", "--get", "user.name")
+	}
+	email := os.Getenv("GIT_COMMITTER_EMAIL")
+	if email == "" {
+		email, _ = r.output("config", "--get", "user.email")
+	}
+	if name == "" || email == "" {
+		return "", "", fmt.Errorf("--pr requires Git user.name and user.email on the host")
+	}
+	return name, email, nil
 }
 
 // CheckBranchName reports whether name is a valid branch name.
@@ -92,15 +126,14 @@ func (r *Repo) AddWorktree(dir, branch string, create bool) error {
 	return nil
 }
 
-// StageAll stages changes except the generated commit-message artifact.
+// StageAll stages all changes in the worktree.
 func (r *Repo) StageAll() error {
 	return r.stageAll(context.Background())
 }
 
-// stageAll shares the artifact exclusion between publishing paths while
-// allowing callers with a context to cancel the Git command.
+// stageAll lets callers cancel staging when publishing a branch.
 func (r *Repo) stageAll(ctx context.Context) error {
-	return r.runContext(ctx, "add", "-A", "--", ".", ":(top,exclude)"+utils.CommitMessageFile)
+	return r.runContext(ctx, "add", "-A")
 }
 
 // HasStagedChanges reports whether anything is staged for commit.

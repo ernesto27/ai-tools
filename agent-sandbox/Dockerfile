@@ -1,7 +1,7 @@
 FROM node:22-bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ripgrep ca-certificates curl \
+    && apt-get install -y --no-install-recommends ripgrep ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/*
 
 ARG CODEX_VERSION=latest

@@ -4,16 +4,17 @@
 # list, editor, single delete, and bulk delete. It shows that the state file,
 # not git, decides what the verbs can see.
 # Nothing is asserted: read the output.
-# Generated commit messages are displayed after run and resume. Publication
-# stays disabled, so commit fallback and post-commit cleanup are not exercised.
+# Publication stays disabled, so commit fallback and post-commit cleanup are
+# not exercised.
 #
 # Needs Docker and an authenticated claude. Point XDG_CONFIG_HOME at a scratch
 # directory to keep the real ~/.config/agent-sandbox out of it.
 # TEST_EDITOR=1 opens VS Code for the resumed worktree. TEST_CLAUDE_IMAGES=1
 # or TEST_CODEX_IMAGES=1 needs the corresponding authenticated agent and
 # verifies actual --image attachment handling.
-# JSON PR defaults are overridden with --pr=false on run and resume. No
-# GitHub publication is tested, and these sessions leave their changes local.
+# Shared JSON PR and host-network defaults are overridden with --pr=false and
+# --hn=false on run and resume. No GitHub publication is tested, and these
+# sessions leave their changes local without host networking.
 #
 # Usage: ./test-worktree.sh
 
@@ -102,41 +103,37 @@ check_help worktree-delete-all
 # 1.26 before creating hello.txt. Its flags and prompt come from the JSON in
 # the invocation directory; the clean directory used by other commands has no
 # JSON and cannot inherit the caller's private agent-sandbox.json.
-# The JSON enables PRs so --pr=false must override it before checking gh or
-# running the agent. Newly created state records also show the starting branch
-# in base_branch, which must survive the resume below.
+# Shared JSON defaults provide the agent, model, base image, PR setting and
+# host-network setting to both commands. Explicit false flags must override
+# the PR and host-network defaults. Newly created state records also show the
+# starting branch in base_branch, which must survive the resume below.
 cat >"$config_dir/agent-sandbox.json" <<'JSON'
 {
+  "agent": "claude",
+  "model": "opus",
+  "base-image": "golang:1.26-alpine",
+  "pr": true,
+  "push": false,
+  "hn": true,
   "run": {
     "branch": "tmp-run-test",
-    "agent": "claude",
-    "model": "opus",
-    "base-image": "golang:1.26-alpine",
-    "pr": true,
-    "push": false,
     "query": "run go version, then create a file named hello.txt at the repository root containing the text hello world"
   },
   "resume": {
     "branch": "tmp-run-test",
-    "agent": "claude",
-    "model": "opus",
-    "base-image": "golang:1.26-alpine",
-    "pr": true,
-    "push": false,
     "query": "this default prompt should be overridden by -q"
   }
 }
 JSON
-execute_from "$config_dir" run --pr=false
+execute_from "$config_dir" run --pr=false --hn=false
 show_state
 
-# Resume takes its branch and agent defaults from JSON while -q overrides the
+# Resume takes its branch and shared agent default from JSON while -q overrides the
 # JSON prompt. It must see the uncommitted hello.txt from the first session,
 # add a second file, and leave the state file with its original one line.
-# Its PR default is disabled independently, just as on the initial run.
-execute_from "$config_dir" resume --pr=false \
+# Its PR and host-network defaults are disabled independently, just as on the initial run.
+execute_from "$config_dir" resume --pr=false --hn=false \
   -q "read hello.txt, then create resumed.txt at the repository root containing the text resumed successfully"
-show_commit_message tmp-run-test
 show_state
 
 # --file-prompt takes the task from a regular host file. This run is kept for

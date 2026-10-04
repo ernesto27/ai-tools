@@ -35,7 +35,11 @@ No tests or coverage threshold currently exist. Add standard-library `testing` t
 
 ## Commit & Pull Request Guidelines
 
-There are no commits yet, so no established commit convention exists. Use concise, imperative subjects such as `Add configuration validation tests`. Keep changes focused. PR descriptions should explain behavior changes, list verification commands and results, and link relevant issues. Describe prompt or workflow changes explicitly.
+Use concise, imperative commit subjects such as `Add configuration validation tests`. Keep changes focused. PR descriptions should explain behavior changes, list verification commands and results, and link relevant issues. Describe prompt or workflow changes explicitly.
+
+## Release Tags
+
+Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. Select the latest stable tag with this exact prefix and increment its patch version. Do not use unprefixed `vMAJOR.MINOR.PATCH` tags for this CLI. GitHub release workflows run for tags matching `software-factory-v*`.
 
 ## Configuration & Reports
 

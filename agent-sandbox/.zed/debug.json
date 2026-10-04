@@ -1,0 +1,11 @@
+[
+  {
+    "label": "agent-sandbox run",
+    "adapter": "Delve",
+    "request": "launch",
+    "mode": "debug",
+    "program": "./cmd/agent-sandbox",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["run"]
+  }
+]

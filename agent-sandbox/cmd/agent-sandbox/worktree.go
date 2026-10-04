@@ -12,10 +12,7 @@ import (
 // branch. The run command keeps creating worktrees, so reuse remains an
 // explicit operation and cannot happen by accident on a normal run.
 func newResumeCmd(state *commandState) *cobra.Command {
-	var (
-		branchName string
-		flags      runFlags
-	)
+	var flags runFlags
 
 	cmd := &cobra.Command{
 		Use:   "resume -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)",
@@ -25,12 +22,12 @@ func newResumeCmd(state *commandState) *cobra.Command {
 			"work stays in place for the new session.",
 		Example: "  agent-sandbox resume -b fix-login -a codex -q \"add a regression test\"\n" +
 			"  agent-sandbox resume -b fix-login -a claude --push -f next-task.md",
-		Args: configRunArgs("resume", &branchName, &flags),
+		Args: configRunArgs("resume", &flags),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if branchName == "" {
+			if flags.Branch == "" {
 				return sandbox.NewUsageError(errors.New("-b <branch-name> is required"))
 			}
-			opts, err := flags.options(branchName)
+			opts, err := sandbox.NewOptions(flags.Options)
 			if err != nil {
 				return err
 			}
@@ -40,10 +37,10 @@ func newResumeCmd(state *commandState) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&branchName, "branch", "b", "", "recorded worktree branch name to resume")
+	cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "recorded worktree branch name to resume")
 	flags.bind(cmd)
 
-	completeFlag(cmd, "branch", func(string) ([]string, error) {
+	completeFlag(cmd, flagBranch, func(string) ([]string, error) {
 		return sandbox.WorktreeBranches()
 	})
 	return cmd
@@ -82,10 +79,10 @@ func newWorktreeDeleteCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&branch, "branch", "b", "", "branch whose worktree to delete")
+	cmd.Flags().StringVarP(&branch, flagBranch, "b", "", "branch whose worktree to delete")
 	cmd.Flags().BoolVar(&force, "force", false, "delete even if the worktree has uncommitted changes")
 
-	completeFlag(cmd, "branch", func(string) ([]string, error) {
+	completeFlag(cmd, flagBranch, func(string) ([]string, error) {
 		return sandbox.WorktreeBranches()
 	})
 
@@ -126,7 +123,7 @@ func newWorktreeEditorOpenCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&branch, "branch", "b", "", "branch whose worktree to open")
+	cmd.Flags().StringVarP(&branch, flagBranch, "b", "", "branch whose worktree to open")
 
 	return cmd
 }

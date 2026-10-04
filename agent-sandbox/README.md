@@ -82,27 +82,32 @@ El branch es el nombre mostrado por `worktree-list`. Si se combina con
 `--push` o `--pr`, el agente debe commitear los cambios antes de terminar la sesión.
 
 `run` y `resume` leen `./agent-sandbox.json` si existe en el directorio desde
-el que se ejecutan. Cada sección admite los nombres largos de las opciones
+el que se ejecutan. En la raíz del JSON se admiten `agent`, `model`,
+`base-image`, `push`, `pr` y `hn` como valores compartidos por ambos comandos.
+Cada sección admite los nombres largos de las opciones
 `branch`, `agent`, `model`, `base-image`, `query`, `push`, `pr`, `hn`, `commit-message`,
 `file-prompt` e `image`, además del campo `api-key`. `api-key` solo existe en
-el JSON: no hay una opción de línea de comandos equivalente. Las opciones
-explícitas de la línea de comandos prevalecen sobre los demás valores del JSON.
+el JSON: no hay una opción de línea de comandos equivalente. Para cada campo,
+prevalece la opción explícita de la línea de comandos, luego el valor de la
+sección y finalmente el valor de la raíz. Un `false` o una cadena vacía en la
+sección también reemplaza el valor compartido.
 
 ```json
 {
+  "agent": "codex",
+  "model": "gpt-6.1-sol",
+  "base-image": "golang:1.26-alpine",
+  "push": false,
+  "pr": false,
+  "hn": false,
   "run": {
-    "agent": "codex",
-    "base-image": "golang:1.26-alpine",
+    "model": "gpt-5.6-sol",
     "query": "run go version and do not change any files",
-    "push": false,
-    "pr": false,
-    "hn": false
+    "push": false
   },
   "resume": {
     "branch": "fix-login",
-    "agent": "codex",
-    "query": "add a regression test",
-    "hn": false
+    "query": "add a regression test"
   }
 }
 ```

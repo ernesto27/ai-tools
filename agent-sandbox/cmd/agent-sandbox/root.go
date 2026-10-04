@@ -16,6 +16,20 @@ type commandState struct {
 	status int
 }
 
+const (
+	flagAgent         = "agent"
+	flagModel         = "model"
+	flagBaseImage     = "base-image"
+	flagPush          = "push"
+	flagPR            = "pr"
+	flagHostNetwork   = "hn"
+	flagBranch        = "branch"
+	flagQuery         = "query"
+	flagFilePrompt    = "file-prompt"
+	flagCommitMessage = "commit-message"
+	flagImage         = "image"
+)
+
 func newRootCmd() (*cobra.Command, *commandState) {
 	state := &commandState{}
 
@@ -60,10 +74,7 @@ func newRootCmd() (*cobra.Command, *commandState) {
 // newRunCmd creates a fresh sandbox worktree. The root only dispatches verbs,
 // so a session cannot start accidentally through the old implicit syntax.
 func newRunCmd(state *commandState) *cobra.Command {
-	var (
-		branchName string
-		flags      runFlags
-	)
+	var flags runFlags
 
 	cmd := &cobra.Command{
 		Use:   "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
@@ -75,9 +86,9 @@ func newRunCmd(state *commandState) *cobra.Command {
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
 			"  agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
 			"  agent-sandbox run -a codex -f prompt.md",
-		Args: configRunArgs("run", &branchName, &flags),
+		Args: configRunArgs("run", &flags),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := flags.options(branchName)
+			opts, err := sandbox.NewOptions(flags.Options)
 			if err != nil {
 				return err
 			}
@@ -87,7 +98,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&branchName, "branch", "b", "", "worktree branch name (default: generated)")
+	cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "worktree branch name (default: generated)")
 	flags.bind(cmd)
 	return cmd
 }
@@ -103,28 +114,20 @@ type runFlags struct {
 // a new run and a resumed run cannot silently grow different container or
 // publish behavior.
 func (f *runFlags) bind(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&f.AgentName, "agent", "a", "", "agent to run ("+strings.Join(sandbox.AgentNames(), "|")+")")
-	cmd.Flags().StringVarP(&f.Model, "model", "m", "", "model to use (default: the agent's own)")
-	cmd.Flags().StringVarP(&f.BaseImage, "base-image", "i", "", "Alpine base image for the agent sandbox (for example golang:1.26-alpine)")
-	cmd.Flags().StringVarP(&f.Prompt, "query", "q", "", "instruction for the agent")
-	cmd.Flags().BoolVarP(&f.Push, "push", "p", false, "commit the agent's work and push the branch")
-	cmd.Flags().BoolVar(&f.PR, "pr", false, "commit, push to origin, and create or reuse a GitHub pull request")
-	cmd.Flags().StringVarP(&f.CommitMessage, "commit-message", "c", "", "commit message (default: resolved prompt)")
-	cmd.Flags().StringVarP(&f.FilePrompt, "file-prompt", "f", "", "path to a file containing the agent prompt")
-	cmd.Flags().StringArrayVar(&f.Images, "image", nil, "image to attach to the initial Codex prompt (repeatable)")
-	cmd.Flags().BoolVar(&f.HostNetwork, "hn", false, "access to host services from container")
+	cmd.Flags().StringVarP(&f.AgentName, flagAgent, "a", "", "agent to run ("+strings.Join(sandbox.AgentNames(), "|")+")")
+	cmd.Flags().StringVarP(&f.Model, flagModel, "m", "", "model to use (default: the agent's own)")
+	cmd.Flags().StringVarP(&f.BaseImage, flagBaseImage, "i", "", "Alpine base image for the agent sandbox (for example golang:1.26-alpine)")
+	cmd.Flags().StringVarP(&f.Prompt, flagQuery, "q", "", "instruction for the agent")
+	cmd.Flags().BoolVarP(&f.Push, flagPush, "p", false, "commit the agent's work and push the branch")
+	cmd.Flags().BoolVar(&f.PR, flagPR, false, "commit, push to origin, and create or reuse a GitHub pull request")
+	cmd.Flags().StringVarP(&f.CommitMessage, flagCommitMessage, "c", "", "commit message (default: resolved prompt)")
+	cmd.Flags().StringVarP(&f.FilePrompt, flagFilePrompt, "f", "", "path to a file containing the agent prompt")
+	cmd.Flags().StringArrayVar(&f.Images, flagImage, nil, "image to attach to the initial Codex prompt (repeatable)")
+	cmd.Flags().BoolVar(&f.HostNetwork, flagHostNetwork, false, "access to host services from container")
 
-	completeFlag(cmd, "agent", func(string) ([]string, error) {
+	completeFlag(cmd, flagAgent, func(string) ([]string, error) {
 		return sandbox.AgentNames(), nil
 	})
-}
-
-// options resolves a copy so agent lookup, model defaults and prompt loading
-// cannot overwrite the raw values bound to Cobra's flags.
-func (f runFlags) options(branch string) (sandbox.Options, error) {
-	opts := f.Options
-	opts.Branch = branch
-	return sandbox.NewOptions(opts)
 }
 
 // runArgs requires exactly one prompt source and rejects positional text.
@@ -134,11 +137,11 @@ func runArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return sandbox.NewUsageError(errors.New("positional prompts are not supported; use -q or --query"))
 	}
-	filePrompt, err := cmd.Flags().GetString("file-prompt")
+	filePrompt, err := cmd.Flags().GetString(flagFilePrompt)
 	if err != nil {
 		return sandbox.NewUsageError(err)
 	}
-	query, err := cmd.Flags().GetString("query")
+	query, err := cmd.Flags().GetString(flagQuery)
 	if err != nil {
 		return sandbox.NewUsageError(err)
 	}

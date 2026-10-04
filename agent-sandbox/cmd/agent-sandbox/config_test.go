@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"agent-sandbox/internal/sandbox"
 )
 
 func TestRunAndResumeHostNetworkConfig(t *testing.T) {
@@ -45,15 +47,14 @@ func TestRunAndResumeHostNetworkConfig(t *testing.T) {
 					if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
 						t.Fatal(err)
 					}
-					var branch string
 					var flags runFlags
 					cmd := &cobra.Command{}
-					cmd.Flags().StringVarP(&branch, "branch", "b", "", "")
+					cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 					flags.bind(cmd)
 					if err := cmd.Flags().Parse(tt.args); err != nil {
 						t.Fatal(err)
 					}
-					err := configRunArgs(section, &branch, &flags)(cmd, cmd.Flags().Args())
+					err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args())
 					if tt.wantError {
 						assertUsageError(t, err)
 						if !strings.Contains(err.Error(), section+".hn must be a JSON boolean") {
@@ -64,7 +65,7 @@ func TestRunAndResumeHostNetworkConfig(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					opts, err := flags.options(branch)
+					opts, err := sandbox.NewOptions(flags.Options)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -162,16 +163,15 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var branch string
 			var flags runFlags
 			cmd := &cobra.Command{}
-			cmd.Flags().StringVarP(&branch, "branch", "b", "", "")
+			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 			flags.bind(cmd)
 			if err := cmd.Flags().Parse(tt.args); err != nil {
 				t.Fatal(err)
 			}
 			promptArgs := cmd.Flags().Args()
-			err := configRunArgs(section, &branch, &flags)(cmd, promptArgs)
+			err := configRunArgs(section, &flags)(cmd, promptArgs)
 			if tt.wantUsage {
 				assertUsageError(t, err)
 				return
@@ -180,7 +180,7 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 				t.Fatalf("run args: %v", err)
 			}
 
-			opts, err := flags.options(branch)
+			opts, err := sandbox.NewOptions(flags.Options)
 			if err != nil {
 				t.Fatalf("resolve options: %v", err)
 			}
@@ -222,20 +222,206 @@ func TestRunAndResumeAPIKeysStayInTheirSections(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var branch string
 			var flags runFlags
 			cmd := &cobra.Command{}
-			cmd.Flags().StringVarP(&branch, "branch", "b", "", "")
+			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 			flags.bind(cmd)
-			if err := configRunArgs(tc.section, &branch, &flags)(cmd, nil); err != nil {
+			if err := configRunArgs(tc.section, &flags)(cmd, nil); err != nil {
 				t.Fatal(err)
 			}
-			opts, err := flags.options(branch)
+			opts, err := sandbox.NewOptions(flags.Options)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if opts.APIKey != tc.wantKey {
 				t.Errorf("APIKey = %q, want selected section key", opts.APIKey)
+			}
+		})
+	}
+}
+
+func TestLocalConfigFieldsAndValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  string
+		wantErr string
+	}{
+		{name: "all typed fields", config: `{"run":{"branch":"fix","agent":"codex","api-key":"key","model":"model","base-image":"alpine:latest","query":"task","push":false,"pr":true,"hn":false,"commit-message":"commit","file-prompt":"prompt.md","image":["one.png","two.png"]}}`},
+		{name: "unknown section", config: `{"other":{}}`, wantErr: `unknown section "other"`},
+		{name: "unknown field", config: `{"resume":{"typo":true}}`, wantErr: `unknown field resume.typo`},
+		{name: "null section", config: `{"run":null}`, wantErr: `run must be a JSON object`},
+		{name: "null string", config: `{"run":{"agent":null}}`, wantErr: `run.agent must be a JSON string`},
+		{name: "null boolean", config: `{"resume":{"push":null}}`, wantErr: `resume.push must be a JSON boolean`},
+		{name: "null image", config: `{"run":{"image":null}}`, wantErr: `run.image must be an array of JSON strings`},
+		{name: "non-string image", config: `{"run":{"image":["one.png",false]}}`, wantErr: `run.image[1] must be a JSON string`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile(localConfigFile, []byte(tt.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			config, err := readLocalConfig()
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("readLocalConfig error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			section := config.Run
+			if section == nil || section.Branch == nil || *section.Branch != "fix" ||
+				section.Agent == nil || *section.Agent != "codex" ||
+				section.APIKey == nil || *section.APIKey != "key" ||
+				section.Model == nil || *section.Model != "model" ||
+				section.BaseImage == nil || *section.BaseImage != "alpine:latest" ||
+				section.Query == nil || *section.Query != "task" ||
+				section.Push == nil || *section.Push ||
+				section.PR == nil || !*section.PR ||
+				section.HostNetwork == nil || *section.HostNetwork ||
+				section.CommitMessage == nil || *section.CommitMessage != "commit" ||
+				section.FilePrompt == nil || *section.FilePrompt != "prompt.md" ||
+				section.Image == nil || len(*section.Image) != 2 || (*section.Image)[1] != "two.png" {
+				t.Fatalf("decoded config = %+v", section)
+			}
+		})
+	}
+}
+
+func TestRunAndResumeBranchPrecedence(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		section string
+		args    []string
+		want    string
+	}{
+		{name: "run uses JSON branch", section: "run", want: "json-branch"},
+		{name: "run CLI branch wins", section: "run", args: []string{"--branch", "cli-branch"}, want: "cli-branch"},
+		{name: "resume uses JSON branch", section: "resume", want: "json-branch"},
+		{name: "resume CLI branch wins", section: "resume", args: []string{"-b", "cli-branch"}, want: "cli-branch"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			config := `{"run":{"branch":"json-branch","agent":"codex","query":"task"},` +
+				`"resume":{"branch":"json-branch","agent":"codex","query":"task"}}`
+			if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var flags runFlags
+			cmd := &cobra.Command{}
+			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
+			flags.bind(cmd)
+			if err := cmd.Flags().Parse(tt.args); err != nil {
+				t.Fatal(err)
+			}
+			if err := configRunArgs(tt.section, &flags)(cmd, cmd.Flags().Args()); err != nil {
+				t.Fatal(err)
+			}
+			opts, err := sandbox.NewOptions(flags.Options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if opts.Branch != tt.want {
+				t.Fatalf("branch = %q, want %q", opts.Branch, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
+	sectionOverrides := `,"model":"section-model","agent":"claude","base-image":"section-image","push":false,"pr":false,"hn":false`
+	tests := []struct {
+		name          string
+		sectionFields string
+		args          []string
+		want          sandbox.Options
+	}{
+		{
+			name: "top-level defaults",
+			want: sandbox.Options{Model: "shared-model", AgentName: "codex", BaseImage: "shared-image", Push: true, PR: true, HostNetwork: true},
+		},
+		{
+			name:          "section overrides top-level defaults",
+			sectionFields: sectionOverrides,
+			want:          sandbox.Options{Model: "section-model", AgentName: "claude", BaseImage: "section-image"},
+		},
+		{
+			name:          "CLI overrides both JSON levels",
+			sectionFields: sectionOverrides,
+			args:          []string{"--model", "cli-model", "--agent", "pi", "--base-image", "cli-image", "--push=true", "--pr=true", "--hn=true"},
+			want:          sandbox.Options{Model: "cli-model", AgentName: "pi", BaseImage: "cli-image", Push: true, PR: true, HostNetwork: true},
+		},
+		{
+			name:          "explicit empty and false section values override top-level defaults",
+			sectionFields: `,"model":"","base-image":"","push":false,"pr":false,"hn":false`,
+			want:          sandbox.Options{AgentName: "codex"},
+		},
+		{
+			name: "explicit false CLI flags override top-level true",
+			args: []string{"--push=false", "--pr=false", "--hn=false"},
+			want: sandbox.Options{Model: "shared-model", AgentName: "codex", BaseImage: "shared-image"},
+		},
+	}
+
+	for _, section := range []string{"run", "resume"} {
+		for _, tt := range tests {
+			t.Run(section+"/"+tt.name, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				config := fmt.Sprintf(`{"model":"shared-model","agent":"codex","base-image":"shared-image","push":true,"pr":true,"hn":true,"%s":{"branch":"existing","query":"task"%s}}`, section, tt.sectionFields)
+				if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				var flags runFlags
+				cmd := &cobra.Command{}
+				cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "")
+				flags.bind(cmd)
+				if err := cmd.Flags().Parse(tt.args); err != nil {
+					t.Fatal(err)
+				}
+				if err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args()); err != nil {
+					t.Fatal(err)
+				}
+				got := flags.Options
+				if got.Model != tt.want.Model || got.AgentName != tt.want.AgentName ||
+					got.BaseImage != tt.want.BaseImage || got.Push != tt.want.Push ||
+					got.PR != tt.want.PR || got.HostNetwork != tt.want.HostNetwork {
+					t.Errorf("merged options = %+v, want model=%q agent=%q base-image=%q push=%t pr=%t hn=%t",
+						got, tt.want.Model, tt.want.AgentName, tt.want.BaseImage, tt.want.Push, tt.want.PR, tt.want.HostNetwork)
+				}
+			})
+		}
+	}
+}
+
+func TestTopLevelConfigTypes(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		field   string
+		wantErr string
+	}{
+		{name: "model null", field: `"model":null`, wantErr: "model must be a JSON string"},
+		{name: "agent number", field: `"agent":1`, wantErr: "agent must be a JSON string"},
+		{name: "base-image boolean", field: `"base-image":false`, wantErr: "base-image must be a JSON string"},
+		{name: "push string", field: `"push":"yes"`, wantErr: "push must be a JSON boolean"},
+		{name: "pr null", field: `"pr":null`, wantErr: "pr must be a JSON boolean"},
+		{name: "hn number", field: `"hn":1`, wantErr: "hn must be a JSON boolean"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			config := `{` + tt.field + `,"run":{"agent":"codex","query":"task"}}`
+			if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var flags runFlags
+			cmd := &cobra.Command{}
+			cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "")
+			flags.bind(cmd)
+			err := configRunArgs("run", &flags)(cmd, nil)
+			assertUsageError(t, err)
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("config error = %v, want %q", err, tt.wantErr)
 			}
 		})
 	}

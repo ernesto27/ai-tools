@@ -12,7 +12,7 @@ import (
 func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "software-factory",
-		Short:         "Implement a task, review the changes, and classify the risk.",
+		Short:         "Implement a task, review it, classify risk, and explain the final changes.",
 		Version:       version,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,

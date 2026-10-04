@@ -1,6 +1,6 @@
 # Soft Factory
 
-Soft Factory is a command-line tool that uses `agent-sandbox` to implement a task, review the changes, apply corrections, and assess the final risk.
+Soft Factory is a command-line tool that uses `agent-sandbox` to implement a task, review the changes, apply corrections, assess the final risk, and explain the final changes.
 
 You can provide a task from a local file or a Jira issue, and include supporting documents from local files or Google Drive.
 
@@ -73,7 +73,7 @@ Only Google Docs directly inside the selected folders are included. See [Google 
 
 ### `agent-sandbox.json`: agent and task
 
-The `run` section controls implementation. The `resume` section controls code review, security review, and risk classification. Set the same branch in both sections so all stages use the same sandbox worktree.
+The `run` section controls implementation. The `resume` section controls code review, security review, risk classification, and the final change walkthrough. Set the same branch in both sections so all stages use the same sandbox worktree.
 
 Example for a local task:
 
@@ -202,17 +202,21 @@ Soft Factory runs these stages in order:
 2. Review the code and apply corrections.
 3. Review security and apply corrections.
 4. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
+5. Write a read-only walkthrough of the final changes, including diff lines and flow diagrams.
 
 The default workflow saves logs in `logs/<branch>-<UTC-datetime>/`, using the
 sandbox worktree branch from `agent-sandbox.json` (`run.branch`). Branch slashes
 become hyphens, so `feature/logs` appears as `feature-logs`. Each
-stage has its own position-prefixed file (`01-implementation.log`,
+first four stages have position-prefixed files (`01-implementation.log`,
 `02-code-review.log`, `03-security-review.log`, and
 `04-risk-classification.log`); another attempt at a stage uses a numbered file
 such as `01-implementation-2.log`. Each stage file includes the run details
 and that stage's result. A stage that never starts has no file. The CLI prints
 the directory path when the run starts and continues to show stage output
-live. The standalone `review` command does not create these logs.
+live. The final stage writes `05-review-changes.md` as the only Markdown file
+in the default run directory. The code review, security review, and risk classification
+output stays in their stage logs. The standalone `review` command does not run
+the final stage or create these logs; its three reports remain in `docs/`.
 
 Each review stage allows up to three rounds. Reviews require reviewer and fixer subagents; unavailable subagents or incomplete necessary verification are reported as **BLOCKED**.
 
@@ -227,10 +231,12 @@ flowchart TD
     Implement --> Code
     Code --> Security[Security review and corrections]
     Security --> Risk[Classify final risk]
-    Risk --> Reports[Reports in terminal and docs/]
+    Risk -->|Default workflow| Changes[Explain final changes]
+    Risk -->|review command| ReviewReports[Reports in terminal and docs/]
+    Changes --> DefaultReports[Reports in terminal and logs/]
 ```
 
-Each review follows **review → corrections when needed → verification**, with up to three rounds. A command failure stops the workflow.
+Each code or security review follows **review → corrections when needed → verification**, with up to three rounds. Failures before the final walkthrough stop the workflow. A walkthrough failure warns and does not change the exit status.
 
 ## Review existing changes
 
@@ -289,7 +295,24 @@ See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions
 
 ## Reports
 
-Code review, security review, and risk classification output appears in the terminal and is saved as timestamped Markdown files in `docs/`.
+Reports appear in the terminal. The default workflow saves the code review,
+security review, and risk classification output in their `.log` files, and
+only the final walkthrough as `logs/<run>/05-review-changes.md`.
+The standalone `review` command saves its three reports as timestamped
+Markdown files in `docs/` because it has no run log directory.
+
+The default workflow's `05-review-changes.md` shows the changed code lines,
+file-by-file explanations, findings, and flow diagrams. Terminal setup and
+command output from that final stage are shown live but are not saved in the
+Markdown file. The agent writes the report in its sandbox worktree; Soft Factory
+copies it to the run logs and removes the worktree copy.
+Findings in this report are informational. If the report cannot be generated
+or saved, Soft Factory prints a warning and keeps the result of the earlier
+stages.
+
+Run `./test-factory` from the repository root to execute the full implementation
+workflow using `config.json`, then check its new report. The script requires a
+plain text flow diagram in the Markdown file and rejects Mermaid code fences.
 
 Review reports include their status (**PASS**, **UNRESOLVED**, or **BLOCKED**), corrections, remaining findings, and verification gaps. Read the reports before accepting the changes: a successful command exit does not guarantee that every finding was resolved.
 

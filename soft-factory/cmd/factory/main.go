@@ -111,9 +111,25 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
-	return runStage(input, "risk-classification", "\nStarting risk classification...", func() error {
+	if err := runStage(input, "risk-classification", "\nStarting risk classification...", func() error {
 		return sandbox.RiskClassification(input, []string{codeReport, securityReport})
-	})
+	}); err != nil {
+		return err
+	}
+	if !opts.Implement {
+		return nil
+	}
+	if err := input.Context.Err(); err != nil {
+		return err
+	}
+	fmt.Println("\nStarting final change walkthrough...")
+	if err := sandbox.ReviewChanges(input); err != nil {
+		if input.Context.Err() != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "Warning: final change walkthrough unavailable: %v; continuing execution.\n", err)
+	}
+	return nil
 }
 
 func runStage(input sandbox.TaskContext, name, message string, execute func() error) error {

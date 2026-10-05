@@ -50,28 +50,55 @@ type Client struct {
 	image      string
 	dockerfile string
 
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
+	stdin            io.Reader
+	stdout           io.Writer
+	stderr           io.Writer
+	viewOwnsTerminal bool
+	sizes            <-chan TerminalSize
+}
+
+type TerminalSize struct {
+	Width, Height int
+}
+
+type Option func(*Client)
+
+// WithStreams gives the caller ownership of the host terminal. Docker still
+// allocates the agent's requested TTY, but never reads the view's keyboard or
+// changes its raw mode. An output-only attachment must remain open: sending
+// EOF to attached TTY stdin would also detach Docker's output streams.
+func WithStreams(out io.Writer, sizes <-chan TerminalSize) Option {
+	return func(c *Client) {
+		if out == nil {
+			out = io.Discard
+		}
+		c.stdin = nil
+		c.stdout, c.stderr = out, out
+		c.viewOwnsTerminal, c.sizes = true, sizes
+	}
 }
 
 // New connects to the Docker daemon described by the environment and negotiates
 // an API version with it. dockerfile is the image definition Build sends to the
 // daemon; it may be the embedded default or a generated definition.
-func New(image, dockerfile string) (*Client, error) {
+func New(image, dockerfile string, options ...Option) (*Client, error) {
 	api, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("connecting to Docker: %w", err)
 	}
 
-	return &Client{
+	c := &Client{
 		api:        api,
 		image:      image,
 		dockerfile: dockerfile,
 		stdin:      os.Stdin,
 		stdout:     os.Stdout,
 		stderr:     os.Stderr,
-	}, nil
+	}
+	for _, option := range options {
+		option(c)
+	}
+	return c, nil
 }
 
 // Close releases the connection to the daemon.

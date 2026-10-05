@@ -79,6 +79,9 @@ func (c *Client) buildContext() (io.Reader, error) {
 // as an HTTP error.
 func (c *Client) displayProgress(body io.Reader) error {
 	fd, isTerminal := terminal(c.stderr)
+	if c.viewOwnsTerminal {
+		fd, isTerminal = 0, false
+	}
 	return jsonmessage.DisplayJSONMessagesStream(body, c.stderr, fd, isTerminal, nil)
 }
 

@@ -44,7 +44,12 @@ var semver = regexp.MustCompile(`[0-9]+\.[0-9]+\.[0-9]+`)
 
 // Run creates the worktree, runs the agent on it and optionally publishes the
 // result. It returns the agent's own exit code.
-func Run(ctx context.Context, opts Options, out io.Writer) (int, error) {
+func Run(ctx context.Context, opts Options, runtime Runtime) (int, error) {
+	runtime = runtime.withDefaults()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	runtime.emit(Event{Phase: "Preparing"})
 	executionDir, err := os.Getwd()
 	if err != nil {
 		return 0, err
@@ -54,32 +59,30 @@ func Run(ctx context.Context, opts Options, out io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	runtime.route(repo)
 	baseBranch, err := repo.CurrentBranch(ctx)
 	if err != nil {
 		return 0, err
 	}
+	runtime.emit(Event{Repository: repo.Dir, BaseBranch: baseBranch})
 	githubClient, err := preparePullRequest(ctx, opts, repo, baseBranch)
 	if err != nil {
 		return 0, err
 	}
 
-	client, err := imageClient(opts)
+	client, err := runtime.prepareImage(ctx, opts)
 	if err != nil {
 		return 0, err
 	}
 	defer client.Close()
 
-	if err := ensureImage(ctx, client, opts, out); err != nil {
-		return 0, err
-	}
-	if err := ensureCommitGit(ctx, client, opts, out); err != nil {
-		return 0, err
-	}
-
 	if err := git.CheckBranchName(opts.Branch); err != nil {
 		// A bad branch name is a bad argument, so it exits like one, but git's
 		// message needs no usage synopsis after it.
 		return 0, StatusError{Status: ExitUsage, err: err}
+	}
+	if err := ctx.Err(); err != nil {
+		return 0, err
 	}
 
 	config, err := configPaths()
@@ -93,6 +96,7 @@ func Run(ctx context.Context, opts Options, out io.Writer) (int, error) {
 	if _, err := os.Stat(worktreeDir); err == nil {
 		return 0, fmt.Errorf("worktree path already exists: %s", worktreeDir)
 	}
+	runtime.emit(Event{Phase: "Creating worktree"})
 	newBranch := !repo.BranchExists(opts.Branch)
 	if err := repo.AddWorktree(worktreeDir, opts.Branch, newBranch); err != nil {
 		return 0, err
@@ -113,31 +117,26 @@ func Run(ctx context.Context, opts Options, out io.Writer) (int, error) {
 		return 0, errors.Join(err, undoWorktree(repo, worktreeDir, opts.Branch, newBranch))
 	}
 
-	runOpts, err := containerOptions(opts, worktreeDir)
-	if err != nil {
-		return 0, err
-	}
-
-	status, err := client.Run(ctx, runOpts)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := publishResult(ctx, opts, record, repo, client, githubClient, status, out); err != nil {
-		return 0, err
-	}
-	return status, nil
+	runtime.emit(Event{Worktree: worktreeDir})
+	return runtime.execute(ctx, opts, record, repo, client, githubClient)
 }
 
 // Resume runs an agent in an existing sandbox worktree. It deliberately does
 // not share Run's creation path: a recorded worktree is the authorization to
 // reuse a directory, while a missing or stale record must never turn into a
 // fresh worktree that only happens to have the same branch name.
-func Resume(ctx context.Context, opts Options, out io.Writer) (int, error) {
+func Resume(ctx context.Context, opts Options, runtime Runtime) (int, error) {
+	runtime = runtime.withDefaults()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	runtime.emit(Event{Phase: "Finding worktree"})
 	found, worktree, err := resumableWorktree(opts.Branch)
 	if err != nil {
 		return 0, err
 	}
+	runtime.route(found.repo)
+	runtime.emit(Event{Repository: found.repo.Dir, BaseBranch: worktree.BaseBranch, Worktree: worktree.Path})
 	githubClient, err := preparePullRequest(ctx, opts, found.repo, worktree.BaseBranch)
 	if err != nil {
 		return 0, err
@@ -152,37 +151,19 @@ func Resume(ctx context.Context, opts Options, out io.Writer) (int, error) {
 		}
 	}
 
-	client, err := imageClient(opts)
+	client, err := runtime.prepareImage(ctx, opts)
 	if err != nil {
 		return 0, err
 	}
 	defer client.Close()
 
-	if err := ensureImage(ctx, client, opts, out); err != nil {
-		return 0, err
-	}
-	if err := ensureCommitGit(ctx, client, opts, out); err != nil {
-		return 0, err
-	}
-
-	runOpts, err := containerOptions(opts, worktree.Path)
-	if err != nil {
-		return 0, err
-	}
 	lock, err := lockWorktree(worktree)
 	if err != nil {
 		return 0, err
 	}
 	defer lock.Close()
 
-	status, err := client.Run(ctx, runOpts)
-	if err != nil {
-		return 0, err
-	}
-	if err := publishResult(ctx, opts, worktree, found.repo, client, githubClient, status, out); err != nil {
-		return 0, err
-	}
-	return status, nil
+	return runtime.execute(ctx, opts, worktree, found.repo, client, githubClient)
 }
 
 // resumableWorktree resolves a recorded target before any image work. The
@@ -332,7 +313,7 @@ func imageAttachmentName(index int, image string) string {
 }
 
 // publish pushes an agent-committed branch unless --push was left out.
-func publish(opts Options, worktreeDir string, repo *git.Repo, out io.Writer) error {
+func publish(ctx context.Context, opts Options, worktreeDir string, repo *git.Repo, out io.Writer) error {
 	if !opts.Push {
 		fmt.Fprintf(out, "Skipping commit and push. Changes left in %s\n", worktreeDir)
 		return nil
@@ -342,7 +323,7 @@ func publish(opts Options, worktreeDir string, repo *git.Repo, out io.Writer) er
 	if err := requireCommittedWorktree(worktree); err != nil {
 		return err
 	}
-	return worktree.Push(opts.Branch)
+	return worktree.PushContext(ctx, opts.Branch)
 }
 
 // ensureCommitGit upgrades a cached default image built before Git was installed.
@@ -372,7 +353,8 @@ func ensureCommitGit(ctx context.Context, client *docker.Client, opts Options, o
 
 // ensureImageLatest builds the image when it is missing and rebuilds it when
 // npm has a newer release of the agent than the one baked in.
-func ensureImageLatest(ctx context.Context, client *docker.Client, target agent.Agent, out io.Writer) error {
+func ensureImageLatest(ctx context.Context, client *docker.Client, target agent.Agent, runtime Runtime) error {
+	out := runtime.Output
 	exists, err := client.ImageExists(ctx)
 	if err != nil {
 		return err
@@ -384,18 +366,20 @@ func ensureImageLatest(ctx context.Context, client *docker.Client, target agent.
 		}
 	}
 
-	return refreshAgentVersion(ctx, client, target, imageName, nil, out)
+	return refreshAgentVersion(ctx, client, target, imageName, nil, runtime)
 }
 
 // refreshAgentVersion shares the freshness policy across embedded and derived
 // images. Rebuild arguments retain the external base while pinning the selected
 // agent, so Docker invalidates its npm installation layer even when the image
 // definition has not changed.
-func refreshAgentVersion(ctx context.Context, client *docker.Client, target agent.Agent, name string, baseArgs map[string]string, out io.Writer) error {
+func refreshAgentVersion(ctx context.Context, client *docker.Client, target agent.Agent, name string, baseArgs map[string]string, runtime Runtime) error {
+	out := runtime.Output
 	installed, err := installedVersion(ctx, client, target)
 	if err != nil {
 		return err
 	}
+	runtime.emit(Event{Version: installed})
 	latest, err := latestVersion(ctx, client, target)
 	if err != nil {
 		return err
@@ -426,6 +410,7 @@ func refreshAgentVersion(ctx context.Context, client *docker.Client, target agen
 	if rebuilt != latest {
 		return fmt.Errorf("rebuilt %s is %s; expected %s", target.Name(), rebuilt, latest)
 	}
+	runtime.emit(Event{Version: rebuilt})
 
 	fmt.Fprintf(out, "%s rebuilt at version %s.\n", target.Name(), rebuilt)
 	return nil

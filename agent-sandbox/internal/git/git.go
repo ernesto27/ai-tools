@@ -151,7 +151,16 @@ func (r *Repo) Commit(message string) error {
 
 // Push pushes the branch and sets its upstream to origin.
 func (r *Repo) Push(branch string) error {
-	if err := r.run("push", "--set-upstream", "origin", branch); err != nil {
+	return r.PushContext(context.Background(), branch)
+}
+
+// PushContext shares publication with the plain Push entry point while
+// allowing a cancelled sandbox to stop and wait for the Git subprocess too.
+func (r *Repo) PushContext(ctx context.Context, branch string) error {
+	if err := r.runContext(ctx, "push", "--set-upstream", "origin", branch); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("git push: %w", err)
 	}
 	return nil

@@ -61,7 +61,7 @@ func publishResult(ctx context.Context, opts Options, record worktreeRecord, rep
 		return nil
 	}
 	if !opts.PR {
-		return publish(opts, record.Path, repo, out)
+		return publish(ctx, opts, record.Path, repo, out)
 	}
 	return publishPullRequest(ctx, opts, record, repo, dockerClient, githubClient, out)
 }

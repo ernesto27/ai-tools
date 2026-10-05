@@ -78,14 +78,31 @@ func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
 	}
 	opts.Env = env
 
-	created, err := c.api.ContainerCreate(ctx, containerConfig(c.image, opts), hostConfig(opts), nil, nil, "")
+	config := containerConfig(c.image, opts)
+	if c.viewOwnsTerminal {
+		config.AttachStdin = false
+		// The view never forwards input to the agent. Non-TTY agents such as
+		// Claude in print mode need immediate EOF rather than an idle input
+		// pipe, which makes them wait for piped instructions. Keep TTY input
+		// open because closing it can detach the container's output stream.
+		if !opts.TTY {
+			config.OpenStdin = false
+			config.StdinOnce = false
+		}
+	}
+
+	created, err := c.api.ContainerCreate(ctx, config, hostConfig(opts), nil, nil, "")
 	if err != nil {
 		return 0, fmt.Errorf("creating container: %w", err)
 	}
+	// Register removal before attaching, so an attach failure cannot leave a
+	// never-started container behind. On an unexpected wait failure this also
+	// prevents a live agent from continuing to hold its worktree open.
+	defer c.remove(context.WithoutCancel(ctx), created.ID)
 
 	attach, err := c.api.ContainerAttach(ctx, created.ID, container.AttachOptions{
 		Stream: true,
-		Stdin:  opts.attachStdin(),
+		Stdin:  opts.attachStdin() && !c.viewOwnsTerminal,
 		Stdout: true,
 		Stderr: true,
 	})
@@ -93,16 +110,6 @@ func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
 		return 0, fmt.Errorf("attaching to container: %w", err)
 	}
 	defer attach.Close()
-
-	// AutoRemove only fires when a container exits, so until this one is
-	// started nothing will ever clean it up. Give up before then and it has to
-	// be removed here.
-	started := false
-	defer func() {
-		if !started {
-			c.remove(context.WithoutCancel(ctx), created.ID)
-		}
-	}()
 
 	if opts.TTY {
 		restore, err := c.rawTerminal()
@@ -112,23 +119,28 @@ func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
 		defer restore()
 	}
 
-	// The wait is registered before the start: AutoRemove can delete the
-	// container the moment it exits, before a wait registered afterwards
-	// would ever see it.
-	waitCh, waitErrCh := c.api.ContainerWait(ctx, created.ID, container.WaitConditionNotRunning)
+	// A created container is already "not running", so that condition reports
+	// status zero before the agent starts. Register the next exit before start
+	// to avoid both that false success and an AutoRemove race. Cancellation
+	// keeps this request alive until stop has waited for the actual exit.
+	waitCtx, cancelWait := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelWait()
+	waitCh, waitErrCh := c.api.ContainerWait(waitCtx, created.ID, container.WaitConditionNextExit)
 
 	if err := c.api.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
 		return 0, fmt.Errorf("starting container: %w", err)
 	}
-	started = true
-
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
 	outputDone := c.pump(attach, opts)
 	if opts.TTY {
-		c.watchResize(ctx, created.ID)
+		c.watchResize(runCtx, created.ID)
 	}
 
 	status, err := c.awaitExit(ctx, created.ID, waitCh, waitErrCh)
 	if err != nil {
+		attach.Close()
+		<-outputDone
 		return 0, err
 	}
 
@@ -230,7 +242,9 @@ func hostConfig(opts RunOptions) *container.HostConfig {
 
 // wait blocks until the container stops and returns its exit status.
 func (c *Client) wait(ctx context.Context, id string) (int, error) {
-	waitCh, errCh := c.api.ContainerWait(ctx, id, container.WaitConditionNotRunning)
+	waitCtx, cancelWait := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelWait()
+	waitCh, errCh := c.api.ContainerWait(waitCtx, id, container.WaitConditionNotRunning)
 	return c.awaitExit(ctx, id, waitCh, errCh)
 }
 

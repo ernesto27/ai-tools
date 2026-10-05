@@ -17,7 +17,7 @@ import (
 // pump wires the process streams to the attached container and returns a
 // channel that yields once the container's output has been fully drained.
 func (c *Client) pump(attach types.HijackedResponse, opts RunOptions) <-chan error {
-	if opts.attachStdin() {
+	if opts.attachStdin() && !c.viewOwnsTerminal {
 		go func() {
 			defer attach.CloseWrite()
 			_, _ = io.Copy(attach.Conn, c.stdin)
@@ -45,6 +45,9 @@ func (c *Client) pump(attach types.HijackedResponse, opts RunOptions) <-chan err
 // returns the function that restores the terminal, which is a no-op when stdin
 // is not a terminal.
 func (c *Client) rawTerminal() (func(), error) {
+	if c.viewOwnsTerminal {
+		return func() {}, nil
+	}
 	file, ok := c.stdin.(*os.File)
 	if !ok || !term.IsTerminal(int(file.Fd())) {
 		return func() {}, nil
@@ -62,6 +65,24 @@ func (c *Client) rawTerminal() (func(), error) {
 // watchResize matches the container's TTY to the local terminal, now and on
 // every window change, so full-screen agents lay out correctly.
 func (c *Client) watchResize(ctx context.Context, id string) {
+	if c.viewOwnsTerminal {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case size, ok := <-c.sizes:
+					if !ok {
+						return
+					}
+					if size.Width > 0 && size.Height > 0 {
+						c.resizeTo(ctx, id, size.Width, size.Height)
+					}
+				}
+			}
+		}()
+		return
+	}
 	file, ok := c.stdout.(*os.File)
 	if !ok || !term.IsTerminal(int(file.Fd())) {
 		return
@@ -95,6 +116,10 @@ func (c *Client) resize(ctx context.Context, id string, fd int) {
 		return
 	}
 
+	c.resizeTo(ctx, id, width, height)
+}
+
+func (c *Client) resizeTo(ctx context.Context, id string, width, height int) {
 	_ = c.api.ContainerResize(ctx, id, container.ResizeOptions{
 		Height: uint(height),
 		Width:  uint(width),

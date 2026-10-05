@@ -8,20 +8,20 @@ import (
 	"agent-sandbox/internal/sandbox"
 )
 
-// newResumeCmd runs another agent session in a sandbox worktree named by its
+// newResumeCmdOld runs another agent session in a sandbox worktree named by its
 // branch. The run command keeps creating worktrees, so reuse remains an
 // explicit operation and cannot happen by accident on a normal run.
-func newResumeCmd(state *commandState) *cobra.Command {
+func newResumeCmdOld(state *commandState) *cobra.Command {
 	var flags runFlags
 
 	cmd := &cobra.Command{
-		Use:   "resume -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)",
-		Short: "Run a coding agent again in a sandbox worktree",
-		Long: "Run a coding agent in a sandbox worktree recorded for this repository.\n" +
+		Use:   "resume-old -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)",
+		Short: "Resume a sandbox worktree with the previous plain terminal output",
+		Long: "Run a coding agent with plain output in a worktree recorded for this repository.\n" +
 			"The branch name is shown by worktree-list; its committed and uncommitted\n" +
 			"work stays in place for the new session.",
-		Example: "  agent-sandbox resume -b fix-login -a codex -q \"add a regression test\"\n" +
-			"  agent-sandbox resume -b fix-login -a claude --push -f next-task.md",
+		Example: "  agent-sandbox resume-old -b fix-login -a codex -q \"add a regression test\"\n" +
+			"  agent-sandbox resume-old -b fix-login -a claude --push -f next-task.md",
 		Args: configRunArgs("resume", &flags),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if flags.Branch == "" {
@@ -32,7 +32,7 @@ func newResumeCmd(state *commandState) *cobra.Command {
 				return err
 			}
 
-			state.status, err = sandbox.Resume(cmd.Context(), opts, cmd.OutOrStdout())
+			state.status, err = sandbox.Resume(cmd.Context(), opts, sandbox.Runtime{Output: cmd.OutOrStdout()})
 			return err
 		},
 	}

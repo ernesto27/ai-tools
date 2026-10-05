@@ -37,8 +37,9 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		Use:   "agent-sandbox <command>",
 		Short: "Run a coding agent in a container, on a git worktree of its own",
 		Long: "Run a coding agent inside the agent-sandbox container, on a git worktree of\n" +
-			"its own, so it never touches the current working copy. Use run to create\n" +
-			"a worktree or resume to continue one already recorded.\n\n" +
+			"its own, so it never touches the current working copy. Use run and resume\n" +
+			"for the terminal view, or run-old and resume-old for plain output. Run\n" +
+			"creates a worktree; resume continues one already recorded.\n\n" +
 			"Authentication comes from the agent's configuration directory on the host,\n" +
 			"or from api-key in agent-sandbox.json for Codex or Claude.",
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
@@ -67,25 +68,25 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		return sandbox.NewUsageError(err)
 	})
 
-	cmd.AddCommand(newRunCmd(state), newResumeCmd(state), newWorktreeListCmd(), newWorktreeDeleteCmd(), newWorktreeDeleteAllCmd(), newWorktreeEditorOpenCmd())
+	cmd.AddCommand(newRunCmd(state), newResumeCmd(state), newRunCmdOld(state), newResumeCmdOld(state), newWorktreeListCmd(), newWorktreeDeleteCmd(), newWorktreeDeleteAllCmd(), newWorktreeEditorOpenCmd())
 	return cmd, state
 }
 
-// newRunCmd creates a fresh sandbox worktree. The root only dispatches verbs,
+// newRunCmdOld creates a fresh sandbox worktree. The root only dispatches verbs,
 // so a session cannot start accidentally through the old implicit syntax.
-func newRunCmd(state *commandState) *cobra.Command {
+func newRunCmdOld(state *commandState) *cobra.Command {
 	var flags runFlags
 
 	cmd := &cobra.Command{
-		Use:   "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
-		Short: "Run a coding agent in a new sandbox worktree",
-		Long: "Run a coding agent in a new sandbox worktree. Optionally supply the\n" +
+		Use:   "run-old [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
+		Short: "Run a coding agent with the previous plain terminal output",
+		Long: "Run a coding agent in a new sandbox worktree with plain output. Supply the\n" +
 			"branch with -b or --branch; otherwise one is generated. Supply the\n" +
 			"instruction with -q or --query, or -f or --file-prompt. Defaults\n" +
 			"may be set in ./agent-sandbox.json.",
-		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
-			"  agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
-			"  agent-sandbox run -a codex -f prompt.md",
+		Example: "  agent-sandbox run-old -a codex -q \"fix the login redirect loop\"\n" +
+			"  agent-sandbox run-old -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
+			"  agent-sandbox run-old -a codex -f prompt.md",
 		Args: configRunArgs("run", &flags),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			opts, err := sandbox.NewOptions(flags.Options)
@@ -93,7 +94,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 				return err
 			}
 
-			state.status, err = sandbox.Run(cmd.Context(), opts, cmd.OutOrStdout())
+			state.status, err = sandbox.Run(cmd.Context(), opts, sandbox.Runtime{Output: cmd.OutOrStdout()})
 			return err
 		},
 	}

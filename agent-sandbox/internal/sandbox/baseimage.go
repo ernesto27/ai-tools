@@ -90,11 +90,11 @@ const externalImagePrefix = "agent-sandbox-base-"
 // be affected by registry slashes, ports, or arbitrary valid image-reference
 // punctuation, and a changed bootstrap definition cannot reuse an older image
 // that lacks its new runtime requirements.
-func imageClient(opts Options) (*docker.Client, error) {
+func imageClient(opts Options, options ...docker.Option) (*docker.Client, error) {
 	if opts.BaseImage == "" {
-		return docker.New(imageName, agentsandbox.Dockerfile)
+		return docker.New(imageName, agentsandbox.Dockerfile, options...)
 	}
-	return docker.New(externalImageName(opts.BaseImage), baseSandboxDockerfile)
+	return docker.New(externalImageName(opts.BaseImage), baseSandboxDockerfile, options...)
 }
 
 func externalImageName(baseImage string) string {
@@ -105,16 +105,16 @@ func externalImageName(baseImage string) string {
 // ensureImage checks the selected agent on both image paths. Reusing a derived
 // image must not leave its agent indefinitely pinned to the first build, even
 // though the user-selected base reference and cache tag remain the same.
-func ensureImage(ctx context.Context, client *docker.Client, opts Options, out io.Writer) error {
+func ensureImage(ctx context.Context, client *docker.Client, opts Options, runtime Runtime) error {
 	if opts.BaseImage == "" {
-		return ensureImageLatest(ctx, client, opts.Agent, out)
+		return ensureImageLatest(ctx, client, opts.Agent, runtime)
 	}
-	if err := ensureBaseSandboxImage(ctx, client, opts.BaseImage, out); err != nil {
+	if err := ensureBaseSandboxImage(ctx, client, opts.BaseImage, runtime.Output); err != nil {
 		return err
 	}
 	return refreshAgentVersion(ctx, client, opts.Agent,
 		externalImageName(opts.BaseImage),
-		map[string]string{"BASE_IMAGE": opts.BaseImage}, out)
+		map[string]string{"BASE_IMAGE": opts.BaseImage}, runtime)
 }
 
 func ensureBaseSandboxImage(ctx context.Context, client *docker.Client, baseImage string, out io.Writer) error {

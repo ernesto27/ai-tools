@@ -102,15 +102,19 @@ func externalImageName(baseImage string) string {
 	return externalImagePrefix + hex.EncodeToString(digest[:])
 }
 
-// ensureImage keeps the established npm freshness check for the image the tool
-// owns. An external base is explicitly caller-owned: once derived, it is reused
-// until the user removes its cache image, so this path neither pulls a mutable
-// base tag nor checks npm for a newer Codex release.
+// ensureImage checks the selected agent on both image paths. Reusing a derived
+// image must not leave its agent indefinitely pinned to the first build, even
+// though the user-selected base reference and cache tag remain the same.
 func ensureImage(ctx context.Context, client *docker.Client, opts Options, out io.Writer) error {
 	if opts.BaseImage == "" {
 		return ensureImageLatest(ctx, client, opts.Agent, out)
 	}
-	return ensureBaseSandboxImage(ctx, client, opts.BaseImage, out)
+	if err := ensureBaseSandboxImage(ctx, client, opts.BaseImage, out); err != nil {
+		return err
+	}
+	return refreshAgentVersion(ctx, client, opts.Agent,
+		externalImageName(opts.BaseImage),
+		map[string]string{"BASE_IMAGE": opts.BaseImage}, out)
 }
 
 func ensureBaseSandboxImage(ctx context.Context, client *docker.Client, baseImage string, out io.Writer) error {

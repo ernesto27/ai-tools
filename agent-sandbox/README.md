@@ -220,7 +220,9 @@ agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q "run gofmt a
 La primera ejecución crea una imagen local derivada e instala lo necesario para
 ejecutar los agentes: Node.js, npm, Bash, Codex, Claude Code, opencode, pi,
 ripgrep, certificados CA, curl y Git. Las siguientes reutilizan esa imagen para
-la misma base.
+la misma base y comprueban en npm la versión del agente seleccionado. Si difiere
+de la instalada, reconstruyen la imagen con esa versión y conservan la referencia
+de la base elegida.
 
 La base debe ofrecer `apk` (Alpine), `apt-get` (Debian/Ubuntu), `dnf`
 (Fedora/RHEL/UBI/Amazon Linux) o `microdnf` (UBI minimal). Las demás fallan
@@ -232,8 +234,6 @@ suscripción válida: el sandbox no monta credenciales del host. No habilita
 EPEL ni CRB/CodeReady Builder, ni soporta `yum`; si falta un paquete como
 `ripgrep`, el build falla con el error del gestor de paquetes.
 
-La imagen derivada no se actualiza sola. Para reconstruirla, eliminá la imagen
-correspondiente:
 
 ```bash
 docker image ls 'agent-sandbox-base-*'

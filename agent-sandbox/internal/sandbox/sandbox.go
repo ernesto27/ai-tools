@@ -384,6 +384,14 @@ func ensureImageLatest(ctx context.Context, client *docker.Client, target agent.
 		}
 	}
 
+	return refreshAgentVersion(ctx, client, target, imageName, nil, out)
+}
+
+// refreshAgentVersion shares the freshness policy across embedded and derived
+// images. Rebuild arguments retain the external base while pinning the selected
+// agent, so Docker invalidates its npm installation layer even when the image
+// definition has not changed.
+func refreshAgentVersion(ctx context.Context, client *docker.Client, target agent.Agent, name string, baseArgs map[string]string, out io.Writer) error {
 	installed, err := installedVersion(ctx, client, target)
 	if err != nil {
 		return err
@@ -401,8 +409,13 @@ func ensureImageLatest(ctx context.Context, client *docker.Client, target agent.
 		return nil
 	}
 
-	fmt.Fprintf(out, "Update available. Rebuilding %s with %s %s.\n", imageName, target.Name(), latest)
-	if err := client.Build(ctx, map[string]string{target.BuildArg(): latest}); err != nil {
+	fmt.Fprintf(out, "Update available. Rebuilding %s with %s %s.\n", name, target.Name(), latest)
+	buildArgs := make(map[string]string, len(baseArgs)+1)
+	for key, value := range baseArgs {
+		buildArgs[key] = value
+	}
+	buildArgs[target.BuildArg()] = latest
+	if err := client.Build(ctx, buildArgs); err != nil {
 		return err
 	}
 

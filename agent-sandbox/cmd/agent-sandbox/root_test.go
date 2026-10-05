@@ -17,7 +17,7 @@ func TestRunArgsAcceptsFilePromptWithoutPositionalPrompt(t *testing.T) {
 		t.Fatalf("write prompt file: %v", err)
 	}
 
-	cmd := newRunCmdOld(&commandState{})
+	cmd := newRunCmd(&commandState{})
 	if err := cmd.Flags().Set("file-prompt", path); err != nil {
 		t.Fatalf("set file-prompt: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestRunArgsAcceptsFilePromptWithoutPositionalPrompt(t *testing.T) {
 }
 
 func TestImageFlagIsRepeatableWithQuery(t *testing.T) {
-	cmd := newRunCmdOld(&commandState{})
+	cmd := newRunCmd(&commandState{})
 	if err := cmd.Flags().Parse([]string{"--image", "first.png", "--image", "second.png", "-q", "describe them"}); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestImageFlagIsRepeatableWithQuery(t *testing.T) {
 }
 
 func TestRunArgsRejectsBothFlagPromptSources(t *testing.T) {
-	cmd := newRunCmdOld(&commandState{})
+	cmd := newRunCmd(&commandState{})
 	if err := cmd.Flags().Set("file-prompt", "prompt.md"); err != nil {
 		t.Fatalf("set file-prompt: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestRunArgsRejectsBothFlagPromptSources(t *testing.T) {
 }
 
 func TestRunArgsRejectsMissingPromptSource(t *testing.T) {
-	cmd := newRunCmdOld(&commandState{})
+	cmd := newRunCmd(&commandState{})
 	assertUsageError(t, runArgs(cmd, nil))
 }
 

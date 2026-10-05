@@ -26,6 +26,19 @@ There is no Makefile and no linter config. Releases are cut by pushing a tag mat
 `agent-sandbox-v*`; `.github/workflows/agent-sandbox-release.yml` at the repo root builds the Linux amd64
 archive that `install.sh` downloads.
 
+### Release tags
+
+Use `agent-sandbox-vMAJOR.MINOR.PATCH` for this project's release tags, for example
+`agent-sandbox-v0.0.3`. When using the `push-github-tag` skill, this project-specific
+format overrides its generic `vMAJOR.MINOR.PATCH` format.
+
+Fetch tags from `origin` and consider only stable tags that exactly match
+`agent-sandbox-vMAJOR.MINOR.PATCH`. Compare the version components numerically and
+increment only the patch component. Ignore bare `v*` tags, other projects' tags,
+prereleases, and build metadata. If no matching tag exists, propose
+`agent-sandbox-v0.0.1`. Keep the skill's confirmation and safety checks, including
+never overwriting an existing tag.
+
 Running the tool requires Docker and a real git repo, and it will build/rebuild the
 `agent-sandbox` image on first use, so a manual run is not a cheap smoke test.
 

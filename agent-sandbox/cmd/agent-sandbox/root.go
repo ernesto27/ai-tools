@@ -37,8 +37,8 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		Use:   "agent-sandbox <command>",
 		Short: "Run a coding agent in a container, on a git worktree of its own",
 		Long: "Run a coding agent inside the agent-sandbox container, on a git worktree of\n" +
-			"its own, so it never touches the current working copy. Use run and resume\n" +
-			"for the terminal view, or run-old and resume-old for plain output. Run\n" +
+			"its own, so it never touches the current working copy. Use run-tui and resume-tui\n" +
+			"for the terminal view, or run and resume for plain output. Run\n" +
 			"creates a worktree; resume continues one already recorded.\n\n" +
 			"Authentication comes from the agent's configuration directory on the host,\n" +
 			"or from api-key in agent-sandbox.json for Codex or Claude.",
@@ -68,25 +68,25 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		return sandbox.NewUsageError(err)
 	})
 
-	cmd.AddCommand(newRunCmd(state), newResumeCmd(state), newRunCmdOld(state), newResumeCmdOld(state), newWorktreeListCmd(), newWorktreeDeleteCmd(), newWorktreeDeleteAllCmd(), newWorktreeEditorOpenCmd())
+	cmd.AddCommand(newRunCmd(state), newResumeCmd(state), newRunTUICmd(state), newResumeTUICmd(state), newWorktreeListCmd(), newWorktreeDeleteCmd(), newWorktreeDeleteAllCmd(), newWorktreeEditorOpenCmd())
 	return cmd, state
 }
 
-// newRunCmdOld creates a fresh sandbox worktree. The root only dispatches verbs,
+// newRunCmd creates a fresh sandbox worktree. The root only dispatches verbs,
 // so a session cannot start accidentally through the old implicit syntax.
-func newRunCmdOld(state *commandState) *cobra.Command {
+func newRunCmd(state *commandState) *cobra.Command {
 	var flags runFlags
 
 	cmd := &cobra.Command{
-		Use:   "run-old [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
-		Short: "Run a coding agent with the previous plain terminal output",
+		Use:   "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
+		Short: "Run a coding agent with plain terminal output",
 		Long: "Run a coding agent in a new sandbox worktree with plain output. Supply the\n" +
 			"branch with -b or --branch; otherwise one is generated. Supply the\n" +
 			"instruction with -q or --query, or -f or --file-prompt. Defaults\n" +
 			"may be set in ./agent-sandbox.json.",
-		Example: "  agent-sandbox run-old -a codex -q \"fix the login redirect loop\"\n" +
-			"  agent-sandbox run-old -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
-			"  agent-sandbox run-old -a codex -f prompt.md",
+		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
+			"  agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
+			"  agent-sandbox run -a codex -f prompt.md",
 		Args: configRunArgs("run", &flags),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			opts, err := sandbox.NewOptions(flags.Options)

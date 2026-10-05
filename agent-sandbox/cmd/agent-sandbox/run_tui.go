@@ -15,11 +15,11 @@ import (
 	"agent-sandbox/internal/sandbox"
 )
 
-func newRunCmd(state *commandState) *cobra.Command {
+func newRunTUICmd(state *commandState) *cobra.Command {
 	return newLiveCommand(state, "run")
 }
 
-func newResumeCmd(state *commandState) *cobra.Command {
+func newResumeTUICmd(state *commandState) *cobra.Command {
 	return newLiveCommand(state, "resume")
 }
 
@@ -27,12 +27,12 @@ func newResumeCmd(state *commandState) *cobra.Command {
 // branch selection, and the worker's sandbox entry point depend on the mode.
 func newLiveCommand(state *commandState, mode string) *cobra.Command {
 	var flags runFlags
-	use := "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)"
+	use := "run-tui [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)"
 	short := "Run a real agent with live output and details in a terminal view"
 	lead := "Run a coding agent in a new sandbox worktree with a two-panel terminal view.\n"
 	branchHelp := "worktree branch name (default: generated)"
 	if mode == "resume" {
-		use = "resume -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)"
+		use = "resume-tui -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)"
 		short = "Resume a sandbox worktree with live output and details in a terminal view"
 		lead = "Run a coding agent in an existing, recorded sandbox worktree with a terminal view.\n" +
 			"The branch is shown by worktree-list; committed and uncommitted work stays in place.\n"
@@ -42,7 +42,7 @@ func newLiveCommand(state *commandState, mode string) *cobra.Command {
 		Use:   use,
 		Short: short,
 		Long: lead +
-			fmt.Sprintf("Uses the same flags and agent-sandbox.json %s defaults as %s-old.\n", mode, mode) +
+			fmt.Sprintf("Uses the same flags and agent-sandbox.json %s defaults as %s.\n", mode, mode) +
 			"Requires terminal input and output. Tab changes focus; arrows and PgUp/PgDn\n" +
 			"scroll; q or Ctrl+C cancels and waits for cleanup. The view closes when\n" +
 			"execution and any requested publication finish.",
@@ -76,7 +76,7 @@ func newLiveCommand(state *commandState, mode string) *cobra.Command {
 			input, inOK := cmd.InOrStdin().(*os.File)
 			output, outOK := cmd.OutOrStdout().(*os.File)
 			if !inOK || !outOK || !term.IsTerminal(int(input.Fd())) || !term.IsTerminal(int(output.Fd())) {
-				return sandbox.NewUsageError(fmt.Errorf("%s requires an interactive terminal for stdin and stdout; use %s-old for plain output", mode, mode))
+				return sandbox.NewUsageError(fmt.Errorf("%s-tui requires an interactive terminal for stdin and stdout; use %s for plain output", mode, mode))
 			}
 			opts, err := sandbox.NewOptions(flags.Options)
 			if err != nil {

@@ -1,5 +1,5 @@
 [] - option to run skills in specific state (review, security, etc)
-[] - add new stage for get a explanation of code changes, diagram
+[x] - add new stage for get a explanation of code changes, diagram
 [] - save execution time of any stage and for total time
 [] - option for verbose output in terminal, default true
 [] - CTRL+C should stop execution

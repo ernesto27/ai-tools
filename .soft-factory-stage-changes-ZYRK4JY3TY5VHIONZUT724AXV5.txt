@@ -1,0 +1,2 @@
+Removed external crates and moved the Rust todo service to standard-library HTTP handling.
+Hardened JSON parsing and updates; added bounded connection workers and socket timeouts.

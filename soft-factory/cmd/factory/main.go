@@ -57,12 +57,34 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	if err != nil {
 		return err
 	}
-	var codeReviewSkill *sandbox.CodeReviewSkill
-	if cfg.CodeReviewSkill != nil {
-		codeReviewSkill, err = sandbox.LoadProjectSkill(filepath.Dir(factoryConfigFile), *cfg.CodeReviewSkill)
-		if err != nil {
-			return err
+
+	var loadedSkills sandbox.ProjectSkills
+
+	entries := []struct {
+		stage  string
+		name   string
+		target **sandbox.ProjectSkill
+	}{
+		{stage: "code-review", name: cfg.CustomSkills.CodeReview, target: &loadedSkills.CodeReview},
+		{stage: "security-review", name: cfg.CustomSkills.SecurityReview, target: &loadedSkills.SecurityReview},
+		{stage: "risk-classification", name: cfg.CustomSkills.RiskClassification, target: &loadedSkills.RiskClassification},
+		{stage: "review-changes", name: cfg.CustomSkills.ReviewChanges, target: &loadedSkills.ReviewChanges},
+	}
+
+	for _, entry := range entries {
+		if entry.name == "" {
+			continue
 		}
+
+		skill, err := sandbox.LoadProjectSkill(
+			filepath.Dir(factoryConfigFile),
+			entry.name,
+		)
+		if err != nil {
+			return fmt.Errorf("custom-skills.%s: %w", entry.stage, err)
+		}
+
+		*entry.target = skill
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -81,11 +103,11 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 	input := sandbox.TaskContext{
-		TaskOverride:    taskOverride,
-		Documents:       documents,
-		CodeReviewSkill: codeReviewSkill,
-		Context:         ctx,
-		Log:             runLog,
+		TaskOverride: taskOverride,
+		Documents:    documents,
+		CustomSkills: loadedSkills,
+		Context:      ctx,
+		Log:          runLog,
 	}
 
 	if opts.Implement {

@@ -1,10 +1,67 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestLoadCustomSkills(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		data string
+		want CustomSkills
+	}{
+		{name: "omitted", data: `{}`},
+		{name: "empty", data: `{"custom-skills":{}}`},
+		{
+			name: "all stages",
+			data: `{"custom-skills":{"code-review":"go-tui-review","security-review":"my-security","risk-classification":"my-risk","review-changes":"my-walkthrough"}}`,
+			want: CustomSkills{
+				CodeReview: "go-tui-review", SecurityReview: "my-security",
+				RiskClassification: "my-risk", ReviewChanges: "my-walkthrough",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load("software-factory.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.CustomSkills != tc.want {
+				t.Fatalf("CustomSkills = %+v; want %+v", cfg.CustomSkills, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
+	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
+		for _, name := range []string{" ", ".", "..", "nested/skill", `nested\skill`} {
+			t.Run(stage+"/"+name, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				// Marshal names to preserve backslashes in JSON.
+				data, err := json.Marshal(map[string]any{"custom-skills": map[string]string{stage: name}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile("software-factory.json", data, 0600); err != nil {
+					t.Fatal(err)
+				}
+				_, err = Load("software-factory.json")
+				if err == nil || !strings.Contains(err.Error(), "custom-skills."+stage) {
+					t.Fatalf("expected validation error for %s = %q, got %v", stage, name, err)
+				}
+			})
+		}
+	}
+}
 
 func TestLoadSandboxSettings(t *testing.T) {
 	t.Chdir(t.TempDir())

@@ -8,22 +8,23 @@ import (
 )
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
-	dir := t.TempDir()
-	t.Chdir(dir)
+	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
+		t.Run(stage, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			data := `{"custom-skills":{"` + stage + `":"missing"}}`
+			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile("config.json", []byte(`{`), 0644); err != nil {
+				t.Fatal(err)
+			}
 
-	err := os.WriteFile(factoryConfigFile, []byte(`{"code-review-skill":"missing"}`), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile("config.json", []byte(`{`), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	err = runWorkflow(workflowOptions{
-		Implement: true,
-	})
-	if err == nil || !strings.Contains(err.Error(), `code review skill "missing" not found`) {
-		t.Fatalf("expected missing-skill error first, got %v", err)
+			err := runWorkflow(workflowOptions{Implement: true})
+			want := "custom-skills." + stage + `: project skill "missing" not found`
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("expected missing-skill error %q first, got %v", want, err)
+			}
+		})
 	}
 }
 
@@ -41,7 +42,7 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
-				if err := os.WriteFile("config.json", []byte(`{"code-review-skill":"missing"}`), 0644); err != nil {
+				if err := os.WriteFile("config.json", []byte(`{"custom-skills":{"code-review":"missing"}}`), 0644); err != nil {
 					t.Fatal(err)
 				}
 				if invalid {

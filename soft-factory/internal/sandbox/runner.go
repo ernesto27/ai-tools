@@ -27,20 +27,27 @@ type ExecuteOptions struct {
 	ChangeSummaryFile string
 }
 
-// CodeReviewSkill holds a project skill loaded during workflow setup.
-type CodeReviewSkill struct {
+// ProjectSkill holds a project skill loaded during workflow setup.
+type ProjectSkill struct {
 	Name    string
 	Content string
+}
+
+type ProjectSkills struct {
+	CodeReview         *ProjectSkill
+	SecurityReview     *ProjectSkill
+	RiskClassification *ProjectSkill
+	ReviewChanges      *ProjectSkill
 }
 
 // TaskContext carries a task override and supporting documents through all stages.
 // An empty override retains the configured file-prompt behavior.
 type TaskContext struct {
-	TaskOverride    string
-	Documents       string
-	CodeReviewSkill *CodeReviewSkill
-	Context         context.Context
-	Log             *executionlog.Run
+	TaskOverride string
+	Documents    string
+	CustomSkills ProjectSkills
+	Context      context.Context
+	Log          *executionlog.Run
 }
 
 func Run(input TaskContext) error {
@@ -82,16 +89,39 @@ func Run(input TaskContext) error {
 	return err
 }
 
-func Review(input TaskContext) (string, error) {
-	var additionalSkill string
-	if input.CodeReviewSkill != nil {
-		additionalSkill = fmt.Sprintf("\n## Additional project code review skill: %s\n\nGive this skill to the reviewer after the default code review skill. It applies only to the reviewer role.\n\n%s\n", input.CodeReviewSkill.Name, input.CodeReviewSkill.Content)
+func customSkillPrompt(skill *ProjectSkill, reviewerOnly bool) string {
+	if skill == nil {
+		return ""
 	}
-	return review(input, "code-review/SKILL.md", additionalSkill)
+
+	scope := ""
+	if reviewerOnly {
+		scope = "Give this skill to the reviewer after the default review skill. " +
+			"It applies only to the reviewer role.\n\n"
+	}
+
+	return fmt.Sprintf(
+		"\n## Additional project skill: %s\n\n%s%s\n",
+		skill.Name,
+		scope,
+		skill.Content,
+	)
+}
+
+func Review(input TaskContext) (string, error) {
+	return review(
+		input,
+		"code-review/SKILL.md",
+		customSkillPrompt(input.CustomSkills.CodeReview, true),
+	)
 }
 
 func SecurityReview(input TaskContext) (string, error) {
-	return review(input, "security-review/SKILL.md", "")
+	return review(
+		input,
+		"security-review/SKILL.md",
+		customSkillPrompt(input.CustomSkills.SecurityReview, true),
+	)
 }
 
 // ReviewChanges asks the sandbox agent to write the walkthrough, then archives it.
@@ -148,6 +178,7 @@ notes. In your final answer, briefly state whether you wrote the file.
 
 %s
 
+%s
 ## Original task and supporting context
 
 %s
@@ -155,7 +186,13 @@ notes. In your final answer, briefly state whether you wrote the file.
 ## Host Git evidence
 
 %s
-`, filepath.Base(source), string(skill), task, snapshot.Text)
+`,
+		filepath.Base(source),
+		string(skill),
+		customSkillPrompt(input.CustomSkills.ReviewChanges, false),
+		task,
+		snapshot.Text,
+	)
 	path, err := writePrompt(prompt)
 	if err != nil {
 		return err
@@ -177,19 +214,19 @@ notes. In your final answer, briefly state whether you wrote the file.
 }
 
 // LoadProjectSkill resolves and reads a named skill before a workflow starts.
-func LoadProjectSkill(projectDir, name string) (*CodeReviewSkill, error) {
+func LoadProjectSkill(projectDir, name string) (*ProjectSkill, error) {
 	first := filepath.Join(projectDir, ".agents", "skills", name, "SKILL.md")
 	second := filepath.Join(projectDir, ".claude", "skills", name, "SKILL.md")
 	for _, path := range []string{first, second} {
 		data, err := os.ReadFile(path)
 		if err == nil {
-			return &CodeReviewSkill{Name: name, Content: string(data)}, nil
+			return &ProjectSkill{Name: name, Content: string(data)}, nil
 		}
 		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("read code review skill %q: %w", path, err)
+			return nil, fmt.Errorf("read project skill %q: %w", path, err)
 		}
 	}
-	return nil, fmt.Errorf("code review skill %q not found; searched %q and %q", name, first, second)
+	return nil, fmt.Errorf("project skill %q not found; searched %q and %q", name, first, second)
 }
 
 func review(input TaskContext, skillPath, additionalSkill string) (string, error) {
@@ -585,6 +622,7 @@ Do not modify files, apply corrections, or publish changes.
 
 %s
 
+%s
 ## Original task and supporting context
 
 %s
@@ -594,6 +632,7 @@ Do not modify files, apply corrections, or publish changes.
 %s
 `,
 		string(skill),
+		customSkillPrompt(input.CustomSkills.RiskClassification, false),
 		task,
 		reportReferences.String(),
 	)

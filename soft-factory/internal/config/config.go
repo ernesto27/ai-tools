@@ -9,9 +9,16 @@ import (
 )
 
 type Config struct {
-	Documents       []string           `json:"documents"`
-	GoogleDrive     *GoogleDriveConfig `json:"google_drive,omitempty"`
-	CodeReviewSkill *string            `json:"code-review-skill,omitempty"`
+	Documents    []string           `json:"documents"`
+	GoogleDrive  *GoogleDriveConfig `json:"google_drive,omitempty"`
+	CustomSkills CustomSkills       `json:"custom-skills"`
+}
+
+type CustomSkills struct {
+	CodeReview         string `json:"code-review,omitempty"`
+	SecurityReview     string `json:"security-review,omitempty"`
+	RiskClassification string `json:"risk-classification,omitempty"`
+	ReviewChanges      string `json:"review-changes,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -87,12 +94,29 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
-	if c.CodeReviewSkill != nil {
-		name := *c.CodeReviewSkill
-		if strings.TrimSpace(name) == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
-			return fmt.Errorf("code-review-skill must be a single nonempty skill name")
+	skillNames := map[string]string{
+		"code-review":         c.CustomSkills.CodeReview,
+		"security-review":     c.CustomSkills.SecurityReview,
+		"risk-classification": c.CustomSkills.RiskClassification,
+		"review-changes":      c.CustomSkills.ReviewChanges,
+	}
+
+	for stage, name := range skillNames {
+		if name == "" {
+			continue
+		}
+
+		if strings.TrimSpace(name) == "" ||
+			name == "." ||
+			name == ".." ||
+			strings.ContainsAny(name, `/\`) {
+			return fmt.Errorf(
+				"custom-skills.%s must be a single nonempty skill name",
+				stage,
+			)
 		}
 	}
+
 	for i, path := range c.Documents {
 		if strings.TrimSpace(path) == "" {
 			return fmt.Errorf("documents[%d] must not be empty", i)

@@ -12,4 +12,8 @@ drive-token*.json
 task.txt
 .env
 .agents/skills/mynameskill/
+.agents/skills/test-code-review/
+.agents/skills/test-security-review/
+.agents/skills/test-risk-classification/
+.agents/skills/test-review-changes/
 .claude/skills/claude-review/

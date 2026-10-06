@@ -181,44 +181,74 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 fn json_string_field(input: &str, field: &str) -> Option<String> {
-    let key = format!("\"{field}\"");
-    let mut rest = input.get(input.find(&key)? + key.len()..)?.trim_start();
-    rest = rest.strip_prefix(':')?.trim_start();
-    let mut chars = rest.chars();
-    if chars.next()? != '"' {
+    let value = root_json_field(input, field)?;
+    let bytes = value.as_bytes();
+    if *bytes.first()? != b'"' {
         return None;
     }
     let mut value = String::new();
-    let mut escaped = false;
-    for character in chars {
-        if escaped {
-            value.push(match character {
-                '"' => '"',
-                '\\' => '\\',
-                '/' => '/',
-                'b' => '\u{0008}',
-                'f' => '\u{000c}',
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                other => other,
-            });
-            escaped = false;
-        } else if character == '\\' {
-            escaped = true;
-        } else if character == '"' {
-            return Some(value);
-        } else {
-            value.push(character);
+    let mut index = 1;
+    while let Some(&byte) = bytes.get(index) {
+        match byte {
+            b'"' => return Some(value),
+            b'\\' => {
+                index += 1;
+                match *bytes.get(index)? {
+                    b'"' => value.push('"'),
+                    b'\\' => value.push('\\'),
+                    b'/' => value.push('/'),
+                    b'b' => value.push('\u{0008}'),
+                    b'f' => value.push('\u{000c}'),
+                    b'n' => value.push('\n'),
+                    b'r' => value.push('\r'),
+                    b't' => value.push('\t'),
+                    b'u' => {
+                        let first = parse_json_hex_quad(bytes, index + 1)?;
+                        index += 4;
+                        let code_point = if (0xD800..=0xDBFF).contains(&first) {
+                            if bytes.get(index + 1..index + 3)? != b"\\u" {
+                                return None;
+                            }
+                            let second = parse_json_hex_quad(bytes, index + 3)?;
+                            if !(0xDC00..=0xDFFF).contains(&second) {
+                                return None;
+                            }
+                            index += 6;
+                            0x10000 + (((first - 0xD800) as u32) << 10)
+                                + (second - 0xDC00) as u32
+                        } else if (0xDC00..=0xDFFF).contains(&first) {
+                            return None;
+                        } else {
+                            first as u32
+                        };
+                        value.push(char::from_u32(code_point)?);
+                    }
+                    _ => return None,
+                }
+                index += 1;
+            }
+            0..=31 => return None,
+            _ => {
+                let character = std::str::from_utf8(&bytes[index..]).ok()?.chars().next()?;
+                value.push(character);
+                index += character.len_utf8();
+            }
         }
     }
     None
 }
 
+fn parse_json_hex_quad(bytes: &[u8], start: usize) -> Option<u16> {
+    let digits = bytes.get(start..start + 4)?;
+    let mut value = 0u16;
+    for &digit in digits {
+        value = value.checked_mul(16)? + (digit as char).to_digit(16)? as u16;
+    }
+    Some(value)
+}
+
 fn json_bool_field(input: &str, field: &str) -> Option<bool> {
-    let key = format!("\"{field}\"");
-    let rest = input.get(input.find(&key)? + key.len()..)?.trim_start();
-    let rest = rest.strip_prefix(':')?.trim_start();
+    let rest = root_json_field(input, field)?.trim_start();
     if rest.starts_with("true") {
         Some(true)
     } else if rest.starts_with("false") {
@@ -226,6 +256,205 @@ fn json_bool_field(input: &str, field: &str) -> Option<bool> {
     } else {
         None
     }
+}
+
+// Return the raw value for a member of the root object. Walking each value
+// structurally prevents matching a similarly named member inside a nested
+// object or inside a string.
+fn root_json_field<'a>(input: &'a str, field: &str) -> Option<&'a str> {
+    let bytes = input.as_bytes();
+    let mut index = skip_json_whitespace(bytes, 0);
+    if *bytes.get(index)? != b'{' {
+        return None;
+    }
+    index += 1;
+    let mut matched_value = None;
+    let mut after_comma = false;
+
+    loop {
+        index = skip_json_whitespace(bytes, index);
+        if *bytes.get(index)? == b'}' {
+            if after_comma {
+                return None;
+            }
+            index = skip_json_whitespace(bytes, index + 1);
+            if index != bytes.len() {
+                return None;
+            }
+            return matched_value;
+        }
+        if *bytes.get(index)? != b'"' {
+            return None;
+        }
+        let key_end = json_string_end(bytes, index)?;
+        let key = std::str::from_utf8(&bytes[index + 1..key_end - 1]).ok()?;
+        index = skip_json_whitespace(bytes, key_end);
+        if *bytes.get(index)? != b':' {
+            return None;
+        }
+        index = skip_json_whitespace(bytes, index + 1);
+        let value_start = index;
+        let value_end = json_value_end(bytes, value_start)?;
+        if key == field && matched_value.is_none() {
+            matched_value = Some(std::str::from_utf8(&bytes[value_start..value_end]).ok()?);
+        }
+        after_comma = false;
+        index = skip_json_whitespace(bytes, value_end);
+        match *bytes.get(index)? {
+            b',' => {
+                index += 1;
+                after_comma = true;
+            }
+            b'}' => {}
+            _ => return None,
+        }
+    }
+}
+
+fn skip_json_whitespace(bytes: &[u8], mut index: usize) -> usize {
+    while matches!(bytes.get(index), Some(b' ' | b'\n' | b'\r' | b'\t')) {
+        index += 1;
+    }
+    index
+}
+
+fn json_string_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if *bytes.get(start)? != b'"' {
+        return None;
+    }
+    let mut index = start + 1;
+    while let Some(&byte) = bytes.get(index) {
+        match byte {
+            b'"' => return Some(index + 1),
+            b'\\' => {
+                index += 1;
+                match *bytes.get(index)? {
+                    b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => index += 1,
+                    b'u' => {
+                        let first = parse_json_hex_quad(bytes, index + 1)?;
+                        index += 4;
+                        if (0xD800..=0xDBFF).contains(&first) {
+                            if bytes.get(index + 1..index + 3)? != b"\\u" {
+                                return None;
+                            }
+                            let second = parse_json_hex_quad(bytes, index + 3)?;
+                            if !(0xDC00..=0xDFFF).contains(&second) {
+                                return None;
+                            }
+                            index += 6;
+                        } else if (0xDC00..=0xDFFF).contains(&first) {
+                            return None;
+                        }
+                        index += 1;
+                    }
+                    _ => return None,
+                }
+            }
+            0..=31 => return None,
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+fn json_value_end(bytes: &[u8], start: usize) -> Option<usize> {
+    let start = skip_json_whitespace(bytes, start);
+    match *bytes.get(start)? {
+        b'"' => json_string_end(bytes, start),
+        b'{' => {
+            let mut index = skip_json_whitespace(bytes, start + 1);
+            if *bytes.get(index)? == b'}' {
+                return Some(index + 1);
+            }
+            loop {
+                let key_end = json_string_end(bytes, index)?;
+                index = skip_json_whitespace(bytes, key_end);
+                if *bytes.get(index)? != b':' {
+                    return None;
+                }
+                index = json_value_end(bytes, index + 1)?;
+                index = skip_json_whitespace(bytes, index);
+                match *bytes.get(index)? {
+                    b',' => index = skip_json_whitespace(bytes, index + 1),
+                    b'}' => return Some(index + 1),
+                    _ => return None,
+                }
+            }
+        }
+        b'[' => {
+            let mut index = skip_json_whitespace(bytes, start + 1);
+            if *bytes.get(index)? == b']' {
+                return Some(index + 1);
+            }
+            loop {
+                index = json_value_end(bytes, index)?;
+                index = skip_json_whitespace(bytes, index);
+                match *bytes.get(index)? {
+                    b',' => index = skip_json_whitespace(bytes, index + 1),
+                    b']' => return Some(index + 1),
+                    _ => return None,
+                }
+            }
+        }
+        _ => {
+            let mut index = start;
+            while let Some(&byte) = bytes.get(index) {
+                if matches!(byte, b',' | b']' | b'}' | b' ' | b'\n' | b'\r' | b'\t') {
+                    break;
+                }
+                index += 1;
+            }
+            let literal = bytes.get(start..index)?;
+            if matches!(literal, b"true" | b"false" | b"null")
+                || valid_json_number(literal)
+            {
+                Some(index)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn valid_json_number(bytes: &[u8]) -> bool {
+    let mut index = 0;
+    if bytes.get(index) == Some(&b'-') {
+        index += 1;
+    }
+    match bytes.get(index) {
+        Some(b'0') => index += 1,
+        Some(b'1'..=b'9') => {
+            index += 1;
+            while matches!(bytes.get(index), Some(b'0'..=b'9')) {
+                index += 1;
+            }
+        }
+        _ => return false,
+    }
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let fraction_start = index;
+        while matches!(bytes.get(index), Some(b'0'..=b'9')) {
+            index += 1;
+        }
+        if index == fraction_start {
+            return false;
+        }
+    }
+    if matches!(bytes.get(index), Some(b'e' | b'E')) {
+        index += 1;
+        if matches!(bytes.get(index), Some(b'+' | b'-')) {
+            index += 1;
+        }
+        let exponent_start = index;
+        while matches!(bytes.get(index), Some(b'0'..=b'9')) {
+            index += 1;
+        }
+        if index == exponent_start {
+            return false;
+        }
+    }
+    index == bytes.len()
 }
 
 fn escape_json(value: &str) -> String {

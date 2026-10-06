@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	_ "modernc.org/sqlite"
 )
 
@@ -44,8 +44,8 @@ func main() {
 		log.Fatalf("initialize database: %v", err)
 	}
 
-	router := newRouter(db)
-	if err := router.Run(":8080"); err != nil {
+	log.Printf("listening on :8080")
+	if err := http.ListenAndServe(":8080", newRouter(db)); err != nil {
 		log.Fatalf("start server: %v", err)
 	}
 }
@@ -63,28 +63,27 @@ func initializeDatabase(db *sql.DB) error {
 	return err
 }
 
-func newRouter(db *sql.DB) *gin.Engine {
-	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+func newRouter(db *sql.DB) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	router.GET("/posts", listPosts(db))
-	router.POST("/posts", createPost(db))
-	router.GET("/posts/:id", getPost(db))
-	router.PUT("/posts/:id", updatePost(db))
-	router.DELETE("/posts/:id", deletePost(db))
-	return router
+	mux.HandleFunc("GET /posts", listPosts(db))
+	mux.HandleFunc("POST /posts", createPost(db))
+	mux.HandleFunc("GET /posts/{id}", getPost(db))
+	mux.HandleFunc("PUT /posts/{id}", updatePost(db))
+	mux.HandleFunc("DELETE /posts/{id}", deletePost(db))
+	return mux
 }
 
-func listPosts(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		rows, err := db.QueryContext(c.Request.Context(), `
+func listPosts(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.QueryContext(r.Context(), `
 			SELECT id, title, content, created_at, updated_at
 			FROM posts ORDER BY created_at DESC, id DESC
 		`)
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		defer rows.Close()
@@ -93,125 +92,125 @@ func listPosts(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			post, err := scanPost(rows)
 			if err != nil {
-				writeDatabaseError(c, err)
+				writeDatabaseError(w, err)
 				return
 			}
 			posts = append(posts, post)
 		}
 		if err := rows.Err(); err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
-		c.JSON(http.StatusOK, posts)
+		writeJSON(w, http.StatusOK, posts)
 	}
 }
 
-func createPost(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func createPost(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var input postInput
-		if err := c.ShouldBindJSON(&input); err != nil || !validPost(input) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "title and content are required"})
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || !validPost(input) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
 			return
 		}
 
 		now := time.Now().UTC()
-		result, err := db.ExecContext(c.Request.Context(), `
+		result, err := db.ExecContext(r.Context(), `
 			INSERT INTO posts (title, content, created_at, updated_at)
 			VALUES (?, ?, ?, ?)
 		`, strings.TrimSpace(input.Title), strings.TrimSpace(input.Content), now, now)
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		id, err := result.LastInsertId()
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
-		c.JSON(http.StatusCreated, Post{
+		writeJSON(w, http.StatusCreated, Post{
 			ID: id, Title: strings.TrimSpace(input.Title), Content: strings.TrimSpace(input.Content),
 			CreatedAt: now, UpdatedAt: now,
 		})
 	}
 }
 
-func getPost(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, ok := postID(c)
+func getPost(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := postID(w, r)
 		if !ok {
 			return
 		}
-		post, err := findPost(c, db, id)
+		post, err := findPost(r, db, id)
 		if errors.Is(err, sql.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
 			return
 		}
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
-		c.JSON(http.StatusOK, post)
+		writeJSON(w, http.StatusOK, post)
 	}
 }
 
-func updatePost(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, ok := postID(c)
+func updatePost(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := postID(w, r)
 		if !ok {
 			return
 		}
 		var input postInput
-		if err := c.ShouldBindJSON(&input); err != nil || !validPost(input) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "title and content are required"})
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || !validPost(input) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
 			return
 		}
 
-		result, err := db.ExecContext(c.Request.Context(), `
+		result, err := db.ExecContext(r.Context(), `
 			UPDATE posts SET title = ?, content = ?, updated_at = ? WHERE id = ?
 		`, strings.TrimSpace(input.Title), strings.TrimSpace(input.Content), time.Now().UTC(), id)
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		count, err := result.RowsAffected()
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		if count == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
 			return
 		}
-		post, err := findPost(c, db, id)
+		post, err := findPost(r, db, id)
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
-		c.JSON(http.StatusOK, post)
+		writeJSON(w, http.StatusOK, post)
 	}
 }
 
-func deletePost(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, ok := postID(c)
+func deletePost(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := postID(w, r)
 		if !ok {
 			return
 		}
-		result, err := db.ExecContext(c.Request.Context(), `DELETE FROM posts WHERE id = ?`, id)
+		result, err := db.ExecContext(r.Context(), `DELETE FROM posts WHERE id = ?`, id)
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		count, err := result.RowsAffected()
 		if err != nil {
-			writeDatabaseError(c, err)
+			writeDatabaseError(w, err)
 			return
 		}
 		if count == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "post not found"})
 			return
 		}
-		c.Status(http.StatusNoContent)
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
@@ -225,16 +224,16 @@ func scanPost(row rowScanner) (Post, error) {
 	return post, err
 }
 
-func findPost(c *gin.Context, db *sql.DB, id int64) (Post, error) {
-	return scanPost(db.QueryRowContext(c.Request.Context(), `
+func findPost(r *http.Request, db *sql.DB, id int64) (Post, error) {
+	return scanPost(db.QueryRowContext(r.Context(), `
 		SELECT id, title, content, created_at, updated_at FROM posts WHERE id = ?
 	`, id))
 }
 
-func postID(c *gin.Context) (int64, bool) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+func postID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post id"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid post id"})
 		return 0, false
 	}
 	return id, true
@@ -244,7 +243,15 @@ func validPost(input postInput) bool {
 	return strings.TrimSpace(input.Title) != "" && strings.TrimSpace(input.Content) != ""
 }
 
-func writeDatabaseError(c *gin.Context, err error) {
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		log.Printf("write JSON response: %v", err)
+	}
+}
+
+func writeDatabaseError(w http.ResponseWriter, err error) {
 	log.Printf("database request failed: %v", err)
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 }

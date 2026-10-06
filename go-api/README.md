@@ -1,17 +1,16 @@
 # Blog API
 
-A small Go HTTP API for blog posts. The service uses Gin for HTTP routing and stores posts in a local SQLite database.
+A small Go HTTP API for blog posts. The service uses Go's standard `net/http` package and stores posts in a local SQLite database.
 
 ## Start the service
 
 From this directory, run:
 
 ```sh
-go mod tidy
 go run .
 ```
 
-The server listens on port `8080` and creates `blog.db` in the current directory. Set `DATABASE_PATH` to use a different database file.
+The server listens on port `8080` and creates `blog.db` in the current directory. The SQLite driver is the sole Go module dependency. Set `DATABASE_PATH` to use a different database file.
 
 ## Check health
 

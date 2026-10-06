@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"agent-sandbox/internal/docker"
 	"agent-sandbox/internal/git"
 	"agent-sandbox/internal/github"
 )
@@ -52,7 +51,7 @@ func preparePullRequest(ctx context.Context, opts Options, repo *git.Repo, base 
 
 // publishResult only publishes a completed agent session. Both publishing
 // modes require the agent to commit first; PR mode additionally creates a PR.
-func publishResult(ctx context.Context, opts Options, record worktreeRecord, repo *git.Repo, dockerClient *docker.Client, githubClient *github.Client, status int, out io.Writer) error {
+func publishResult(ctx context.Context, opts Options, record worktreeRecord, repo *git.Repo, githubClient *github.Client, status int, out io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -63,10 +62,10 @@ func publishResult(ctx context.Context, opts Options, record worktreeRecord, rep
 	if !opts.PR {
 		return publish(ctx, opts, record.Path, repo, out)
 	}
-	return publishPullRequest(ctx, opts, record, repo, dockerClient, githubClient, out)
+	return publishPullRequest(ctx, opts, record, repo, githubClient, out)
 }
 
-func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord, repo *git.Repo, dockerClient *docker.Client, githubClient *github.Client, out io.Writer) error {
+func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord, repo *git.Repo, githubClient *github.Client, out io.Writer) error {
 	worktree := repo.At(record.Path)
 	branch, err := worktree.CurrentBranch(ctx)
 	if err != nil {
@@ -75,14 +74,20 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 	if branch != opts.Branch {
 		return fmt.Errorf("PR worktree must remain on branch %s, found %q; branch has not been pushed", opts.Branch, branch)
 	}
+	content, err := consumePRContent(ctx, worktree)
+	if err != nil {
+		return fmt.Errorf("reading agent PR text; branch has not been pushed: %w", err)
+	}
 	if err := requireCommittedWorktree(worktree); err != nil {
 		return err
 	}
-	base, err := worktree.FetchBase(ctx, record.BaseBranch)
-	if err != nil {
-		return fmt.Errorf("fetching PR base; branch has not been pushed: %w", err)
+	// Execution fetched this snapshot before the agent started so its summary
+	// and the host comparison use the same base even if origin advances.
+	base := opts.prBase
+	if base == "" {
+		return fmt.Errorf("missing PR base snapshot; branch has not been pushed")
 	}
-	comparison, changed, err := worktree.ReviewComparison(ctx, base)
+	_, changed, err := worktree.ReviewComparison(ctx, base)
 	if err != nil {
 		return fmt.Errorf("comparing PR changes; branch has not been pushed: %w", err)
 	}
@@ -100,10 +105,6 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 	if pr != nil {
 		printExistingPR(out, pr)
 		return nil
-	}
-	content, err := generatePRContent(ctx, opts, comparison, dockerClient, out)
-	if err != nil {
-		return fmt.Errorf("generating PR text after successful push: %w", err)
 	}
 	prURL, createErr := githubClient.Create(ctx, opts.Branch, record.BaseBranch, content.Title, content.Body)
 	if createErr == nil {

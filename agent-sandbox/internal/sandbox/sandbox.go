@@ -238,30 +238,30 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	}
 	runOpts.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: worktreeDir, Container: workspace})
-	if opts.PR || opts.Push {
-		worktree := &git.Repo{Dir: worktreeDir}
-		gitDir, commonDir, err := worktree.WorktreeGitDirs()
-		if err != nil {
-			return docker.RunOptions{}, err
-		}
-		name, email, err := worktree.CommitIdentity()
-		if err != nil {
-			return docker.RunOptions{}, err
-		}
-		// Linked worktrees keep their Git administration under the repository's
-		// common directory. Mounting it at its original absolute path keeps the
-		// worktree metadata valid without exposing the caller's working files.
-		runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: commonDir, Container: commonDir})
-		runOpts.Env = append(runOpts.Env,
-			"GIT_DIR="+gitDir,
-			"GIT_COMMON_DIR="+commonDir,
-			"GIT_WORK_TREE="+workspace,
-			"GIT_AUTHOR_NAME="+name,
-			"GIT_AUTHOR_EMAIL="+email,
-			"GIT_COMMITTER_NAME="+name,
-			"GIT_COMMITTER_EMAIL="+email,
-		)
+
+	worktree := &git.Repo{Dir: worktreeDir}
+	gitDir, commonDir, err := worktree.WorktreeGitDirs()
+	if err != nil {
+		return docker.RunOptions{}, err
 	}
+	name, email, err := worktree.CommitIdentity()
+	if err != nil {
+		return docker.RunOptions{}, err
+	}
+	// Linked worktrees keep their Git administration under the repository's
+	// common directory. Mounting it at its original absolute path keeps the
+	// worktree metadata valid without exposing the caller's working files.
+	runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: commonDir, Container: commonDir})
+	runOpts.Env = append(runOpts.Env,
+		"GIT_DIR="+gitDir,
+		"GIT_COMMON_DIR="+commonDir,
+		"GIT_WORK_TREE="+workspace,
+		"GIT_AUTHOR_NAME="+name,
+		"GIT_AUTHOR_EMAIL="+email,
+		"GIT_COMMITTER_NAME="+name,
+		"GIT_COMMITTER_EMAIL="+email,
+	)
+
 	runOpts.HostNetwork = opts.HostNetwork
 	if opts.BaseImage != "" {
 		// An arbitrary Alpine base may leave a numeric host UID trying to create

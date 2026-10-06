@@ -92,6 +92,17 @@ func (r *Repo) PushHead(ctx context.Context) error {
 	return r.runContext(ctx, "push", "-u", "origin", "HEAD")
 }
 
+// IsTracked checks both the index and HEAD because a staged deletion still
+// belongs to the branch. Publication must not remove tracked source files.
+func (r *Repo) IsTracked(ctx context.Context, path string) (bool, error) {
+	output, err := r.outputContext(ctx, "ls-files", "-z", "--", path)
+	if err != nil || output != "" {
+		return output != "", err
+	}
+	output, err = r.outputContext(ctx, "ls-tree", "--name-only", "-z", "HEAD", "--", path)
+	return output != "", err
+}
+
 // Comparison contains the complete PR input, with binary changes represented
 // by Git's path/status and binary markers rather than decoded file contents.
 type Comparison struct {

@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 
@@ -77,6 +78,17 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
+	if opts.PR {
+		worktree := repo.At(record.Path)
+		if err := checkPRContentPath(ctx, worktree); err != nil {
+			return 0, err
+		}
+		base, err := worktree.FetchBase(ctx, record.BaseBranch)
+		if err != nil {
+			return 0, fmt.Errorf("fetching PR base before agent execution: %w", err)
+		}
+		opts.prBase = base
+	}
 	runOpts, err := containerOptions(opts, record.Path)
 	if err != nil {
 		return 0, err
@@ -92,7 +104,7 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 	if opts.PR || opts.Push {
 		r.emit(Event{Phase: "Publishing"})
 	}
-	if err := publishResult(ctx, opts, record, repo, client, githubClient, status, r.Output); err != nil {
+	if err := publishResult(ctx, opts, record, repo, githubClient, status, r.Output); err != nil {
 		return 0, err
 	}
 	phase := "Completed"

@@ -20,13 +20,13 @@ func TestFullPromptCommitRules(t *testing.T) {
 		want     []string
 		unwanted []string
 	}{
-		{name: "ordinary run", want: []string{"Do not stage, commit, or push"}, unwanted: []string{"Before finishing, stage and commit"}},
-		{name: "push commits in container", push: true, want: []string{"Before finishing, stage and commit", "Do not push or create a pull request", "Do not change Git configuration, hooks, refs", "Inspect the staged diff"}, unwanted: []string{"Do not stage, commit, or push"}},
-		{name: "PR chooses message", pr: true, want: []string{"Before finishing, stage and commit", "Choose one short commit message", "Do not push or create a pull request"}, unwanted: []string{"Do not stage, commit, or push"}},
+		{name: "ordinary run", want: []string{"Do not stage, commit, or push"}, unwanted: []string{"Before finishing, stage and commit", prContentFile}},
+		{name: "push commits in container", push: true, want: []string{"Before finishing, stage and commit", "Do not push or create a pull request", "Do not change Git configuration, hooks, refs", "Inspect the staged diff", "Leave no uncommitted changes"}, unwanted: []string{"Do not stage, commit, or push", prContentFile}},
+		{name: "PR chooses message", pr: true, want: []string{"Before finishing, stage and commit", "Choose one short commit message", "Do not push or create a pull request", "/workspace/" + prContentFile, "Do not stage or commit this file", "Leave no other uncommitted changes", "including earlier sessions", "abc123...HEAD", "abc123..HEAD", "status, diff, log, add, and commit"}, unwanted: []string{"Do not stage, commit, or push", "Leave no uncommitted changes"}},
 		{name: "PR uses explicit message", pr: true, message: "fix login", want: []string{"Use this exact commit message: \"fix login\""}, unwanted: []string{"Choose one short commit message"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			prompt := (Options{Prompt: "implement this", PR: tc.pr, Push: tc.push, CommitMessage: tc.message}).FullPrompt()
+			prompt := (Options{Prompt: "implement this", PR: tc.pr, Push: tc.push, CommitMessage: tc.message, prBase: "abc123"}).FullPrompt()
 			for _, value := range tc.want {
 				if !strings.Contains(prompt, value) {
 					t.Errorf("prompt does not contain %q", value)
@@ -100,6 +100,10 @@ func TestCodexCredentialSelection(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			repoDir := setupDeleteTestRepo(t)
+			worktree := addDeleteTestWorktree(t, repoDir, "feature")
+			runGit(t, repoDir, "config", "user.name", "Test User")
+			runGit(t, repoDir, "config", "user.email", "test@example.com")
 			home := t.TempDir()
 			t.Setenv("HOME", home)
 			if tc.createHostDir {
@@ -117,7 +121,7 @@ func TestCodexCredentialSelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := containerOptions(opts, t.TempDir())
+			got, err := containerOptions(opts, worktree.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -164,10 +168,14 @@ func TestClaudeCredentialSelection(t *testing.T) {
 		wantMounts    int
 		wantKeyEnv    bool
 	}{
-		{name: "host login", createHostDir: true, wantMounts: 3},
-		{name: "API key without host login", apiKey: key, wantMounts: 1, wantKeyEnv: true},
+		{name: "host login", createHostDir: true, wantMounts: 4},
+		{name: "API key without host login", apiKey: key, wantMounts: 2, wantKeyEnv: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			repoDir := setupDeleteTestRepo(t)
+			worktree := addDeleteTestWorktree(t, repoDir, "feature")
+			runGit(t, repoDir, "config", "user.name", "Test User")
+			runGit(t, repoDir, "config", "user.email", "test@example.com")
 			home := t.TempDir()
 			t.Setenv("HOME", home)
 			if tc.createHostDir {
@@ -183,7 +191,7 @@ func TestClaudeCredentialSelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := containerOptions(opts, t.TempDir())
+			got, err := containerOptions(opts, worktree.Path)
 			if err != nil {
 				t.Fatal(err)
 			}

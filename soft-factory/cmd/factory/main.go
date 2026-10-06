@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 
 	"github.com/joho/godotenv"
 
@@ -141,12 +142,20 @@ func runStage(input sandbox.TaskContext, name, message string, execute func() er
 		input.Log.Message(message)
 	}
 	fmt.Println(message)
+
+	started := time.Now()
 	err := execute()
+	elapsed := time.Since(started)
+
 	if input.Context.Err() != nil {
 		err = errors.Join(err, input.Context.Err())
 	}
 	if input.Log != nil {
 		input.Log.FinishStage(err)
+
+		if logErr := input.Log.RecordStageResult(name, elapsed, err); logErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: save stage summary: %v\n", logErr)
+		}
 	}
 	return err
 }

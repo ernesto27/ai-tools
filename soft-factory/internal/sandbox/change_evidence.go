@@ -2,13 +2,14 @@ package sandbox
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"soft-factory/internal/config"
+	"soft-factory/internal/executionlog"
 )
 
 // changeEvidence gathers Git facts on the host. A non-publishing agent-sandbox
@@ -19,11 +20,15 @@ type changeSnapshot struct {
 }
 
 func changeEvidence(ctx context.Context) (changeSnapshot, error) {
-	branch, err := resumeBranch()
+	settings, err := config.LoadSandbox()
+	if err != nil {
+		return changeSnapshot{}, fmt.Errorf("load configuration for change evidence: %w", err)
+	}
+	branch, err := settings.Branch("resume")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	worktree, err := worktreeForBranch(ctx, branch)
+	worktree, err := executionlog.WorktreeForBranch(ctx, branch)
 	if err != nil {
 		return changeSnapshot{}, err
 	}
@@ -67,47 +72,6 @@ func changeEvidence(ctx context.Context) (changeSnapshot, error) {
 	fmt.Fprintf(&evidence, "Tracked file patch against base:\n%s\n", emptyLabel(patch))
 	snapshot.Text = evidence.String()
 	return snapshot, nil
-}
-
-func resumeBranch() (string, error) {
-	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
-		return "", fmt.Errorf("read sandbox configuration for change evidence: %w", err)
-	}
-	var settings struct {
-		Resume struct {
-			Branch string `json:"branch"`
-		} `json:"resume"`
-	}
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return "", fmt.Errorf("parse sandbox configuration for change evidence: %w", err)
-	}
-	if strings.TrimSpace(settings.Resume.Branch) == "" {
-		return "", fmt.Errorf("resume.branch is required to locate the sandbox worktree")
-	}
-	return settings.Resume.Branch, nil
-}
-
-func worktreeForBranch(ctx context.Context, branch string) (string, error) {
-	out, err := gitOutput(ctx, ".", "worktree", "list", "--porcelain")
-	if err != nil {
-		return "", err
-	}
-	for _, record := range strings.Split(string(out), "\n\n") {
-		var path, currentBranch string
-		for _, line := range strings.Split(record, "\n") {
-			if value, ok := strings.CutPrefix(line, "worktree "); ok {
-				path = value
-			}
-			if value, ok := strings.CutPrefix(line, "branch refs/heads/"); ok {
-				currentBranch = value
-			}
-		}
-		if currentBranch == branch && path != "" {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("sandbox worktree for branch %q not found in Git worktree list", branch)
 }
 
 func comparisonBase(ctx context.Context, worktree, branch string) (string, string) {

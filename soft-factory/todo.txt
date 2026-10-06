@@ -1,9 +1,9 @@
 [] - option to run skills in specific state (review, security, etc)
 [x] - add new stage for get a explanation of code changes, diagram
-[] - save execution time of any stage and for total time
+[x] - save execution time of any stage and for total time
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
-[] - CTRL+C should stop execution
+[x] - CTRL+C should stop execution
 [] - change file config.json to software-factory.json
 [x] - integration with Jira to get task content from task
 [x] - save logs
@@ -12,3 +12,4 @@
 [] - config file should not be required, now return an error
 [] - list of stages disables in config.json
 [] - update logs ,  use folder with name branch and one file for stage
+[] - add code-changes new skill

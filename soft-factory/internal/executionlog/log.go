@@ -3,20 +3,24 @@ package executionlog
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"soft-factory/internal/config"
 )
 
 const (
 	logDirectory = "logs"
 	separator    = "=================================================="
+	summaryFile  = "summary.log"
 )
 
 var stageNames = []string{"implementation", "code-review", "security-review", "risk-classification"}
@@ -24,17 +28,20 @@ var stageNames = []string{"implementation", "code-review", "security-review", "r
 // Run owns one directory of log files. Writes are serialized and best effort: after creation,
 // logging failures warn once and never become workflow errors.
 type Run struct {
-	mu       sync.Mutex
-	file     *os.File
-	path     string
-	header   string
-	err      error
-	attempts map[string]int
-	active   string
-	stream   string
-	newline  bool
-	closed   bool
-	ready    bool
+	mu                sync.Mutex
+	file              *os.File
+	summary           *os.File
+	summaryEntries    int
+	changeSummaryPath string
+	path              string
+	header            string
+	err               error
+	attempts          map[string]int
+	active            string
+	stream            string
+	newline           bool
+	closed            bool
+	ready             bool
 }
 
 // NewRun initializes a private run directory before any workflow work starts.
@@ -42,6 +49,9 @@ func NewRun() (*Run, error) {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("resolve working directory: %w", err)
+	}
+	if err := IgnoreStageReports(); err != nil {
+		return nil, fmt.Errorf("ignore stage change reports: %w", err)
 	}
 	if err := os.MkdirAll(logDirectory, 0700); err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
@@ -58,7 +68,49 @@ func NewRun() (*Run, error) {
 	} else {
 		header += "Branch note: " + branchNote + "\n"
 	}
-	return &Run{path: path, header: header, attempts: make(map[string]int), newline: true, ready: true}, nil
+
+	// Create summary
+	pathSummary := filepath.Join(path, summaryFile)
+	file, err := os.Create(pathSummary)
+	if err != nil {
+		return nil, fmt.Errorf("create summary: %w", err)
+	}
+
+	_, writeErr := fmt.Fprintf(file, "SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator)
+	if writeErr != nil {
+		file.Close()
+		return nil, fmt.Errorf("write summary header: %w", writeErr)
+	}
+
+	return &Run{
+			path:     path,
+			header:   header,
+			summary:  file,
+			attempts: make(map[string]int),
+			newline:  true,
+			ready:    true},
+		nil
+}
+
+// IgnoreStageReports excludes temporary reports before sandbox publication checks.
+func IgnoreStageReports() error {
+	output, err := exec.Command("git", "rev-parse", "--git-path", "info/exclude").Output()
+	if err != nil {
+		return fmt.Errorf("locate Git exclude file: %w", err)
+	}
+	path := strings.TrimSpace(string(output))
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return fmt.Errorf("create Git exclude directory: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("open Git exclude file: %w", err)
+	}
+	_, writeErr := fmt.Fprintln(file, "\n.soft-factory-stage-changes-*.txt")
+	if err := errors.Join(writeErr, file.Close()); err != nil {
+		return fmt.Errorf("write Git exclude rule: %w", err)
+	}
+	return nil
 }
 
 // createRunDirectory reserves a unique name without replacing an existing run.
@@ -79,19 +131,15 @@ func createRunDirectory(branch string, started time.Time) (string, error) {
 }
 
 func sandboxBranch() (string, string) {
-	data, err := os.ReadFile("agent-sandbox.json")
+	settings, err := config.LoadSandbox()
 	if err != nil {
-		return "no-branch", "agent-sandbox.json unavailable"
+		return "no-branch", "agent-sandbox.json unavailable or invalid"
 	}
-	var settings struct {
-		Run struct {
-			Branch string `json:"branch"`
-		} `json:"run"`
-	}
-	if json.Unmarshal(data, &settings) != nil || strings.TrimSpace(settings.Run.Branch) == "" {
+	branch, err := settings.Branch("run")
+	if err != nil {
 		return "no-branch", "run.branch unavailable in agent-sandbox.json"
 	}
-	return settings.Run.Branch, "agent-sandbox.json: run.branch"
+	return branch, "agent-sandbox.json: run.branch"
 }
 
 func sanitizeBranch(branch string) string {
@@ -128,6 +176,7 @@ func (r *Run) StartStage(name string) {
 		return
 	}
 	r.attempts[name]++
+	r.changeSummaryPath = ""
 	filename := fmt.Sprintf("%02d-%s.log", index, name)
 	if r.attempts[name] > 1 {
 		filename = fmt.Sprintf("%02d-%s-%d.log", index, name, r.attempts[name])
@@ -223,6 +272,15 @@ func (r *Run) Finish(err error) {
 		return
 	}
 	r.finishStageLocked(err)
+	if r.summary != nil {
+		if _, writeErr := fmt.Fprintln(r.summary, separator); writeErr != nil {
+			r.failLocked(fmt.Errorf("write summary footer: %w", writeErr))
+		}
+		if closeErr := r.summary.Close(); closeErr != nil {
+			r.failLocked(fmt.Errorf("close summary: %w", closeErr))
+		}
+		r.summary = nil
+	}
 	r.closed = true
 }
 
@@ -294,6 +352,176 @@ func (r *Run) failLocked(err error) {
 	if r.ready {
 		fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 	}
+}
+
+// StageChangesPrompt asks for a short report without changing logging-disabled runs.
+func (r *Run) StageChangesPrompt(prompt string) (string, string) {
+	if r == nil {
+		return prompt, ""
+	}
+	filename := ".soft-factory-stage-changes-" + rand.Text() + ".txt"
+	prompt += fmt.Sprintf(`
+
+## Stage change summary
+
+As your final action, write a short plain-text summary to %q in the
+worktree root. Use at most two short lines, without headings or bullets.
+Do not exceed two lines; do not write a full report in this file.
+Describe only implementation changes made during this stage execution,
+including corrections made by fixer subagents. Do not repeat earlier stages'
+changes. If no code changes were made, write "No code changes made."
+This temporary reporting file is explicitly allowed even for read-only
+assessment stages; it is not an implementation change. Do not include it
+or other factory report files in your change description. Preserve the
+stage's normal final report and output; this file supplements them.
+`, filename)
+	return prompt, filename
+}
+
+// RegisterStageChanges locates the report after the sandbox creates its worktree.
+// Collection still runs on interruption so partial change reports can be saved.
+func (r *Run) RegisterStageChanges(ctx context.Context, mode, filename string) {
+	path, err := StageReportPath(ctx, mode, filename)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: locate stage change summary: %v\n", err)
+		return
+	}
+	r.SetChangeSummaryPath(path)
+}
+
+// StageReportPath resolves an agent report's host path, even after interruption.
+func StageReportPath(ctx context.Context, mode, filename string) (string, error) {
+	settings, err := config.LoadSandbox()
+	if err != nil {
+		return "", err
+	}
+	branch, err := settings.Branch(mode)
+	if err != nil {
+		return "", err
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	collectionCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	worktree, err := WorktreeForBranch(collectionCtx, branch)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(worktree, filename), nil
+}
+
+// WorktreeForBranch resolves a branch's host worktree for reports and Git evidence.
+func WorktreeForBranch(ctx context.Context, branch string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, "git", "-C", ".", "worktree", "list", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return "", fmt.Errorf("list Git worktrees: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return "", fmt.Errorf("list Git worktrees: %w", err)
+	}
+	for _, record := range strings.Split(string(out), "\n\n") {
+		var path, currentBranch string
+		for _, line := range strings.Split(record, "\n") {
+			if value, ok := strings.CutPrefix(line, "worktree "); ok {
+				path = value
+			}
+			if value, ok := strings.CutPrefix(line, "branch refs/heads/"); ok {
+				currentBranch = value
+			}
+		}
+		if currentBranch == branch && path != "" {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("sandbox worktree for branch %q not found in Git worktree list", branch)
+}
+
+// SetChangeSummaryPath registers the host path of the agent's stage report.
+func (r *Run) SetChangeSummaryPath(path string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.changeSummaryPath = path
+}
+
+// RecordStageResult reads the stage report and appends a numbered execution result.
+// The report is removed only after its text has been saved successfully.
+func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed || r.summary == nil {
+		return fmt.Errorf("summary file is closed or unavailable")
+	}
+
+	entry := fmt.Sprintf(
+		"%d. %s\n   Status:    %s\n   Duration:  %s\n",
+		r.summaryEntries+1,
+		strings.ToUpper(strings.ReplaceAll(name, "-", " ")),
+		outcome(stageErr), formatDuration(elapsed),
+	)
+	changes := "Change summary unavailable."
+	readReport := false
+	if r.changeSummaryPath != "" {
+		info, err := os.Lstat(r.changeSummaryPath)
+		if err == nil && !info.Mode().IsRegular() {
+			err = fmt.Errorf("stage change summary must be a regular file")
+		}
+		if err == nil {
+			var data []byte
+			data, err = os.ReadFile(r.changeSummaryPath)
+			if err == nil {
+				if text := strings.TrimSpace(strings.ReplaceAll(string(data), "\r\n", "\n")); text != "" {
+					changes = text
+				}
+				readReport = true
+			}
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: read stage change summary: %v\n", err)
+		}
+	}
+	entry += "   Changes:   " + strings.ReplaceAll(changes, "\n", "\n              ") + "\n"
+	if stageErr != nil {
+		message := strings.ReplaceAll(stageErr.Error(), "\r\n", "\n")
+		entry += "   Error:     " + strings.ReplaceAll(message, "\n", "\n              ") + "\n"
+	}
+	if _, err := io.WriteString(r.summary, entry+"\n"); err != nil {
+		return fmt.Errorf("write stage summary: %w", err)
+	}
+	r.summaryEntries++
+	if readReport {
+		if err := os.Remove(r.changeSummaryPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: remove stage change summary: %v\n", err)
+		}
+		r.changeSummaryPath = ""
+	}
+	return nil
+}
+
+// formatDuration rounds elapsed time to whole seconds and omits zero units.
+func formatDuration(elapsed time.Duration) string {
+	totalSeconds := int64(elapsed.Round(time.Second) / time.Second)
+	hours := totalSeconds / 3600
+	minutes := (totalSeconds % 3600) / 60
+	seconds := totalSeconds % 60
+
+	var parts []string
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%d hr", hours))
+	}
+	if minutes > 0 {
+		parts = append(parts, fmt.Sprintf("%d min", minutes))
+	}
+	if seconds > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%d sec", seconds))
+	}
+	return strings.Join(parts, " ")
 }
 
 func timestamp() string { return time.Now().UTC().Format(time.RFC3339Nano) }

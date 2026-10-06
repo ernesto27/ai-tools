@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -26,6 +27,8 @@ type postInput struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
 }
+
+const maxPostRequestBodyBytes = 1 << 20
 
 func main() {
 	dbPath := os.Getenv("DATABASE_PATH")
@@ -107,8 +110,11 @@ func listPosts(db *sql.DB) http.HandlerFunc {
 
 func createPost(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var input postInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || !validPost(input) {
+		input, ok := decodePostInput(w, r)
+		if !ok {
+			return
+		}
+		if !validPost(input) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
 			return
 		}
@@ -159,8 +165,11 @@ func updatePost(db *sql.DB) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		var input postInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || !validPost(input) {
+		input, ok := decodePostInput(w, r)
+		if !ok {
+			return
+		}
+		if !validPost(input) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
 			return
 		}
@@ -188,6 +197,26 @@ func updatePost(db *sql.DB) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, post)
 	}
+}
+
+func decodePostInput(w http.ResponseWriter, r *http.Request) (postInput, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPostRequestBodyBytes))
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+			return postInput{}, false
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
+		return postInput{}, false
+	}
+
+	var input postInput
+	if err := json.Unmarshal(body, &input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "title and content are required"})
+		return postInput{}, false
+	}
+	return input, true
 }
 
 func deletePost(db *sql.DB) http.HandlerFunc {

@@ -1,7 +1,13 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{atomic::{AtomicU64, Ordering}, mpsc::sync_channel, Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+const MAX_REQUEST_DURATION: Duration = Duration::from_secs(2);
+const MAX_TODO_COUNT: usize = 10_000;
+const MAX_TODO_TITLE_BYTES: usize = 512;
+const MAX_JSON_DEPTH: usize = 64;
 
 #[derive(Clone)]
 struct Todo {
@@ -84,7 +90,7 @@ fn serve_connection(mut stream: TcpStream, state: AppState) {
 }
 
 fn read_request(stream: &mut TcpStream) -> Result<Request, ()> {
-    const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+    let deadline = Instant::now() + MAX_REQUEST_DURATION;
     let mut bytes = Vec::new();
     let mut chunk = [0u8; 4096];
     let header_end = loop {
@@ -94,7 +100,7 @@ fn read_request(stream: &mut TcpStream) -> Result<Request, ()> {
         if bytes.len() >= MAX_REQUEST_BYTES {
             return Err(());
         }
-        let count = stream.read(&mut chunk).map_err(|_| ())?;
+        let count = read_before_deadline(stream, &mut chunk, deadline)?;
         if count == 0 {
             return Err(());
         }
@@ -122,7 +128,7 @@ fn read_request(stream: &mut TcpStream) -> Result<Request, ()> {
     while bytes.len() < total_length {
         let remaining = total_length - bytes.len();
         let read_length = remaining.min(chunk.len());
-        let count = stream.read(&mut chunk[..read_length]).map_err(|_| ())?;
+        let count = read_before_deadline(stream, &mut chunk[..read_length], deadline)?;
         if count == 0 {
             return Err(());
         }
@@ -132,6 +138,12 @@ fn read_request(stream: &mut TcpStream) -> Result<Request, ()> {
         .map_err(|_| ())?
         .to_owned();
     Ok(Request { method, path, body })
+}
+
+fn read_before_deadline(stream: &mut TcpStream, buffer: &mut [u8], deadline: Instant) -> Result<usize, ()> {
+    let remaining = deadline.checked_duration_since(Instant::now()).ok_or(())?;
+    stream.set_read_timeout(Some(remaining)).map_err(|_| ())?;
+    stream.read(buffer).map_err(|_| ())
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -163,21 +175,29 @@ fn route(request: Request, state: &AppState) -> Response {
 
 fn create_todo(body: &str, state: &AppState) -> Response {
     let title = match json_string_field(body, "title") {
-        Some(title) if !title.trim().is_empty() => title.trim().to_owned(),
+        Some(title) if !title.trim().is_empty() && title.trim().len() <= MAX_TODO_TITLE_BYTES => title.trim().to_owned(),
+        Some(title) if title.trim().len() > MAX_TODO_TITLE_BYTES => {
+            return json_response(400, "Bad Request", "{\"error\":\"title is too long\"}".to_owned());
+        }
         _ => return json_response(400, "Bad Request", "{\"error\":\"title is required\"}".to_owned()),
     };
+    let mut todos = state.todos.lock().expect("todo list lock poisoned");
+    if todos.len() >= MAX_TODO_COUNT {
+        return json_response(503, "Service Unavailable", "{\"error\":\"todo limit reached\"}".to_owned());
+    }
     let todo = Todo {
         id: state.next_id.fetch_add(1, Ordering::Relaxed),
         title,
         completed: false,
     };
-    state.todos.lock().expect("todo list lock poisoned").push(todo.clone());
+    todos.push(todo.clone());
     json_response(201, "Created", todo_json(&todo))
 }
 
 fn update_todo(id: u64, body: &str, state: &AppState) -> Response {
     let title = match json_field_value(body, "title") {
-        Some(JsonField::String(value)) => Some(value),
+        Some(JsonField::String(value)) if value.trim().len() <= MAX_TODO_TITLE_BYTES => Some(value),
+        Some(JsonField::String(_)) => return json_response(400, "Bad Request", "{\"error\":\"title is too long\"}".to_owned()),
         Some(_) => return json_response(400, "Bad Request", "{\"error\":\"title must be a string\"}".to_owned()),
         None => None,
     };
@@ -372,13 +392,20 @@ fn parse_hex4(bytes: &[u8], start: usize) -> Option<u16> {
 }
 
 fn valid_json(bytes: &[u8]) -> bool {
-    let Some(end) = parse_json_value(bytes, skip_ws(bytes, 0)) else {
+    let Some(end) = parse_json_value_at_depth(bytes, skip_ws(bytes, 0), 0) else {
         return false;
     };
     skip_ws(bytes, end) == bytes.len()
 }
 
 fn parse_json_value(bytes: &[u8], start: usize) -> Option<usize> {
+    parse_json_value_at_depth(bytes, start, 0)
+}
+
+fn parse_json_value_at_depth(bytes: &[u8], start: usize, depth: usize) -> Option<usize> {
+    if depth > MAX_JSON_DEPTH {
+        return None;
+    }
     match *bytes.get(start)? {
         b'"' => parse_json_string(bytes, start).map(|(_, end)| end),
         b'{' => {
@@ -393,7 +420,7 @@ fn parse_json_value(bytes: &[u8], start: usize) -> Option<usize> {
                     return None;
                 }
                 index = skip_ws(bytes, index + 1);
-                index = parse_json_value(bytes, index)?;
+                index = parse_json_value_at_depth(bytes, index, depth + 1)?;
                 index = skip_ws(bytes, index);
                 match bytes.get(index) {
                     Some(b',') => index = skip_ws(bytes, index + 1),
@@ -408,7 +435,7 @@ fn parse_json_value(bytes: &[u8], start: usize) -> Option<usize> {
                 return Some(index + 1);
             }
             loop {
-                index = parse_json_value(bytes, index)?;
+                index = parse_json_value_at_depth(bytes, index, depth + 1)?;
                 index = skip_ws(bytes, index);
                 match bytes.get(index) {
                     Some(b',') => index = skip_ws(bytes, index + 1),

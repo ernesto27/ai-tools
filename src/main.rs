@@ -1,7 +1,15 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use std::thread;
+
+const MAX_HEADER_BYTES: usize = 64 * 1024;
+const MAX_BODY_BYTES: usize = 1024 * 1024;
+const MAX_TODO_COUNT: usize = 100;
+const WORKER_COUNT: usize = 16;
+const CONNECTION_QUEUE_CAPACITY: usize = 64;
+const READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 struct Todo {
@@ -29,15 +37,32 @@ fn main() -> std::io::Result<()> {
     }));
     println!("Todo service listening on http://0.0.0.0:8080");
 
+    let (sender, receiver) = mpsc::sync_channel::<TcpStream>(CONNECTION_QUEUE_CAPACITY);
+    let receiver = Arc::new(Mutex::new(receiver));
+    for _ in 0..WORKER_COUNT {
+        let receiver = Arc::clone(&receiver);
+        let state = Arc::clone(&state);
+        thread::spawn(move || loop {
+            let stream = {
+                let receiver = receiver.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                receiver.recv()
+            };
+            let Ok(stream) = stream else {
+                break;
+            };
+            if let Err(error) = handle_connection(stream, state.clone()) {
+                eprintln!("request failed: {error}");
+            }
+        });
+    }
+
     for connection in listener.incoming() {
         match connection {
             Ok(stream) => {
-                let state = Arc::clone(&state);
-                thread::spawn(move || {
-                    if let Err(error) = handle_connection(stream, state) {
-                        eprintln!("request failed: {error}");
-                    }
-                });
+                if let Err(error) = sender.send(stream) {
+                    eprintln!("connection queue failed: {error}");
+                    break;
+                }
             }
             Err(error) => eprintln!("connection failed: {error}"),
         }
@@ -54,6 +79,7 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<AppState>>) -> std:
         200 => "OK",
         201 => "Created",
         400 => "Bad Request",
+        503 => "Service Unavailable",
         404 => "Not Found",
         _ => "Internal Server Error",
     };
@@ -66,20 +92,24 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<AppState>>) -> std:
 }
 
 fn read_request(stream: &mut TcpStream) -> std::io::Result<Option<Request>> {
+    let deadline = Instant::now() + READ_TIMEOUT;
     let mut bytes = Vec::new();
     let mut chunk = [0; 4096];
     let header_end;
     loop {
-        let count = stream.read(&mut chunk)?;
+        let count = read_before_deadline(stream, &mut chunk, deadline)?;
         if count == 0 {
             return Ok(None);
         }
         bytes.extend_from_slice(&chunk[..count]);
         if let Some(index) = find_bytes(&bytes, b"\r\n\r\n") {
             header_end = index + 4;
+            if header_end > MAX_HEADER_BYTES {
+                return Ok(None);
+            }
             break;
         }
-        if bytes.len() > 64 * 1024 {
+        if bytes.len() > MAX_HEADER_BYTES {
             return Ok(None);
         }
     }
@@ -102,16 +132,46 @@ fn read_request(stream: &mut TcpStream) -> std::io::Result<Option<Request>> {
         .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
         .and_then(|(_, value)| value.trim().parse::<usize>().ok())
         .unwrap_or(0);
-    while bytes.len() < header_end + content_length {
-        let count = stream.read(&mut chunk)?;
+    if content_length > MAX_BODY_BYTES {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "request body exceeds configured limit",
+        ));
+    }
+    let request_end = header_end.checked_add(content_length).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "request length overflow")
+    })?;
+    while bytes.len() < request_end {
+        let count = read_before_deadline(stream, &mut chunk, deadline)?;
         if count == 0 {
+            break;
+        }
+        let remaining = request_end - bytes.len();
+        if count > remaining {
+            bytes.extend_from_slice(&chunk[..remaining]);
             break;
         }
         bytes.extend_from_slice(&chunk[..count]);
     }
-    let body_end = bytes.len().min(header_end + content_length);
+    let body_end = bytes.len().min(request_end);
     let body = String::from_utf8_lossy(&bytes[header_end..body_end]).into_owned();
     Ok(Some(Request { method, path, body }))
+}
+
+fn read_before_deadline(
+    stream: &mut TcpStream,
+    buffer: &mut [u8],
+    deadline: Instant,
+) -> std::io::Result<usize> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "request read deadline exceeded",
+        ));
+    }
+    stream.set_read_timeout(Some(remaining))?;
+    stream.read(buffer)
 }
 
 fn route(request: &Request, state: &Arc<Mutex<AppState>>) -> (u16, String) {
@@ -129,6 +189,9 @@ fn route(request: &Request, state: &Arc<Mutex<AppState>>) -> (u16, String) {
                 };
                 if title.trim().is_empty() {
                     return (400, error_json("title must be a non-empty string"));
+                }
+                if state.todos.len() >= MAX_TODO_COUNT {
+                    return (503, error_json("todo capacity reached"));
                 }
                 let todo = Todo {
                     id: state.next_id,

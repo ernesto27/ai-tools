@@ -39,7 +39,7 @@ func TestDoctorCommand(t *testing.T) {
 			})
 			var out bytes.Buffer
 			cmd.SetOut(&out)
-			cmd.SetArgs([]string{"doctor", "--config", "nonexistent.json", "--jira", ""})
+			cmd.SetArgs([]string{"doctor", "--jira", ""})
 			err := cmd.Execute()
 			if (err != nil) != (missing != "") {
 				t.Fatalf("error = %v, missing = %q", err, missing)

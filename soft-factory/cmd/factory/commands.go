@@ -27,7 +27,6 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().StringP("config", "c", "config.json", "Path to the factory configuration")
 	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of run.file-prompt")
 
 	root.AddCommand(&cobra.Command{
@@ -49,10 +48,6 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 
 func optionsFrom(cmd *cobra.Command, implement bool) (workflowOptions, error) {
 	flags := cmd.Flags()
-	configPath, err := flags.GetString("config")
-	if err != nil {
-		return workflowOptions{}, err
-	}
 	issueURL, err := flags.GetString("jira")
 	if err != nil {
 		return workflowOptions{}, err
@@ -60,5 +55,5 @@ func optionsFrom(cmd *cobra.Command, implement bool) (workflowOptions, error) {
 	if flags.Changed("jira") && strings.TrimSpace(issueURL) == "" {
 		return workflowOptions{}, fmt.Errorf("--jira requires a non-empty issue URL")
 	}
-	return workflowOptions{ConfigPath: configPath, IssueURL: issueURL, Implement: implement}, nil
+	return workflowOptions{IssueURL: issueURL, Implement: implement}, nil
 }

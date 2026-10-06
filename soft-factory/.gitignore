@@ -3,6 +3,7 @@ agent-sandbox.json
 docs
 logs/
 config.json
+software-factory.json
 data.txt
 credentials.json
 service_account*.json

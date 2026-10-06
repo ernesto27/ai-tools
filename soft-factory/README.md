@@ -8,7 +8,11 @@ You can provide a task from a local file or a Jira issue, and include supporting
 
 Create these two files in the project folder before running Soft Factory.
 
-### `config.json`: supporting documents and code review skill
+### `software-factory.json`: supporting documents and code review skill
+
+The CLI always reads `software-factory.json` from the current working directory.
+Rename an existing `config.json` to `software-factory.json`; there is no fallback
+to the old filename, and `--config` / `-c` are no longer supported.
 
 These are all the options currently supported:
 
@@ -36,7 +40,7 @@ To add project-specific code review instructions, set the skill name:
 ```
 
 Soft Factory searches for `.agents/skills/mynameskill/SKILL.md` first, then
-`.claude/skills/mynameskill/SKILL.md`, relative to `config.json`. The first
+`.claude/skills/mynameskill/SKILL.md`, relative to `software-factory.json`. The first
 matching skill is given to the code reviewer after the default code review
 skill. A configured skill that is missing or cannot be read stops the workflow
 before implementation with an error. Security review and risk classification
@@ -53,7 +57,7 @@ Example using both local documents and Google Drive:
 }
 ```
 
-Google Drive requires a separate credentials JSON file named **`service_account.json`** in the project folder. This is the service-account key downloaded from Google Cloud, not `config.json`. The filename and location are fixed in the current version.
+Google Drive requires a separate credentials JSON file named **`service_account.json`** in the project folder. This is the service-account key downloaded from Google Cloud, not `software-factory.json`. The filename and location are fixed in the current version.
 
 The downloaded file must contain service-account credentials, including:
 
@@ -174,7 +178,7 @@ go build -o /tmp/software-factory ./cmd/factory
 install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
 ```
 
-Run `software-factory --config config.json` or `software-factory --config config.json review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
+Run `software-factory` or `software-factory review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
 
 Run `software-factory -v` or `software-factory --version` to print the binary's release tag. Binaries built locally without an injected release tag print `dev`. These flags do not require configuration files.
 
@@ -184,7 +188,7 @@ The repository-root GitHub workflows run tests, vet, formatting checks, and a CL
 
 1. Write your task in `task.txt`.
 2. Create `agent-sandbox.json` using the local-task example above.
-3. Create `config.json`. If you do not need supporting documents, use:
+3. Create `software-factory.json`. If you do not need supporting documents, use:
 
    ```json
    {"documents": []}
@@ -193,7 +197,7 @@ The repository-root GitHub workflows run tests, vet, formatting checks, and a CL
 4. Start the workflow:
 
    ```bash
-   go run ./cmd/factory --config config.json
+   go run ./cmd/factory
    ```
 
 Soft Factory runs these stages in order:
@@ -243,7 +247,7 @@ Each code or security review follows **review → corrections when needed → ve
 Skip implementation and review the changes in the sandbox worktree selected by `resume.branch`:
 
 ```bash
-go run ./cmd/factory --config config.json review
+go run ./cmd/factory review
 ```
 
 This command can modify files to correct review findings.
@@ -262,13 +266,13 @@ To review existing changes against a Jira task:
 go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123' review
 ```
 
-The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `config.json` is still required.
+The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `software-factory.json` is still required.
 
 See [Jira setup](JIRA_SETUP.md) for supported credentials and configuration.
 
 ## Add supporting documents
 
-List local documents in `config.json`:
+List local documents in `software-factory.json`:
 
 ```json
 {
@@ -311,7 +315,7 @@ or saved, Soft Factory prints a warning and keeps the result of the earlier
 stages.
 
 Run `./test-factory` from the repository root to execute the full implementation
-workflow using `config.json`, then check its new report. The script requires a
+workflow using `software-factory.json`, then check its new report. The script requires a
 plain text flow diagram in the Markdown file and rejects Mermaid code fences.
 
 Review reports include their status (**PASS**, **UNRESOLVED**, or **BLOCKED**), corrections, remaining findings, and verification gaps. Read the reports before accepting the changes: a successful command exit does not guarantee that every finding was resolved.

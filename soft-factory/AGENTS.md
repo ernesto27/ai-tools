@@ -20,8 +20,8 @@ Use Go 1.25.3 or later. Run commands from the repository root so relative skill 
 - `go test ./...`: run all package tests.
 - `go vet ./...`: check for common Go mistakes.
 - `gofmt -w cmd internal`: format Go source.
-- `go run ./cmd/factory --config config.json`: run implementation and all review stages.
-- `go run ./cmd/factory --config config.json review`: run reviews and risk classification on existing changes; reviews can apply corrections.
+- `go run ./cmd/factory`: run implementation and all review stages.
+- `go run ./cmd/factory review`: run reviews and risk classification on existing changes; reviews can apply corrections.
 
 Workflow commands require `agent-sandbox` on `PATH` and local configuration.
 
@@ -43,4 +43,4 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 ## Configuration & Reports
 
-Create local `config.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.file-prompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.
+Create local `software-factory.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.file-prompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.

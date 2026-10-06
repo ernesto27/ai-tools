@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -15,12 +16,14 @@ func TestRootCmdRouting(t *testing.T) {
 		wantRun bool
 		wantErr bool
 	}{
-		{name: "full workflow", args: nil, want: workflowOptions{ConfigPath: "config.json", Implement: true}, wantRun: true},
-		{name: "long config", args: []string{"--config", "x.json"}, want: workflowOptions{ConfigPath: "x.json", Implement: true}, wantRun: true},
-		{name: "short config", args: []string{"-c", "x.json"}, want: workflowOptions{ConfigPath: "x.json", Implement: true}, wantRun: true},
-		{name: "review", args: []string{"review"}, want: workflowOptions{ConfigPath: "config.json"}, wantRun: true},
-		{name: "jira before review", args: []string{"--jira", issue, "review"}, want: workflowOptions{ConfigPath: "config.json", IssueURL: issue}, wantRun: true},
-		{name: "flags after review", args: []string{"review", "--jira", issue, "-c", "x.json"}, want: workflowOptions{ConfigPath: "x.json", IssueURL: issue}, wantRun: true},
+		{name: "full workflow", args: nil, want: workflowOptions{Implement: true}, wantRun: true},
+		{name: "long config", args: []string{"--config", "x.json"}, wantErr: true},
+		{name: "short config", args: []string{"-c", "x.json"}, wantErr: true},
+		{name: "review", args: []string{"review"}, want: workflowOptions{}, wantRun: true},
+		{name: "jira before review", args: []string{"--jira", issue, "review"}, want: workflowOptions{IssueURL: issue}, wantRun: true},
+		{name: "flags after review", args: []string{"review", "--jira", issue}, want: workflowOptions{IssueURL: issue}, wantRun: true},
+		{name: "review long config", args: []string{"review", "--config", "x.json"}, wantErr: true},
+		{name: "review short config", args: []string{"review", "-c", "x.json"}, wantErr: true},
 		{name: "empty jira", args: []string{"--jira", ""}, wantErr: true},
 		{name: "blank jira on review", args: []string{"review", "--jira", " "}, wantErr: true},
 		{name: "unknown command", args: []string{"extra"}, wantErr: true},
@@ -50,6 +53,27 @@ func TestRootCmdRouting(t *testing.T) {
 			}
 			if ran && got != tt.want {
 				t.Errorf("options = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHelpOmitsConfigFlags(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"review", "--help"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			var output bytes.Buffer
+			cmd := newRootCmd(func(workflowOptions) error {
+				t.Fatal("help invoked the workflow")
+				return nil
+			})
+			cmd.SetArgs(args)
+			cmd.SetOut(&output)
+			cmd.SetErr(io.Discard)
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(output.String(), "--config") || strings.Contains(output.String(), "-c,") {
+				t.Fatalf("help advertises removed config flags: %s", output.String())
 			}
 		})
 	}

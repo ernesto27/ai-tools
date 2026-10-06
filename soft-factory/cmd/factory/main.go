@@ -21,6 +21,8 @@ import (
 // version is set to the release tag when building a release binary.
 var version = "dev"
 
+const factoryConfigFile = "software-factory.json"
+
 func main() {
 	if err := newRootCmd(runWorkflow).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -30,8 +32,7 @@ func main() {
 
 // workflowOptions holds the parsed command-line inputs for one workflow run.
 type workflowOptions struct {
-	ConfigPath string
-	IssueURL   string
+	IssueURL string
 	// Implement runs the implementation stage before the reviews.
 	Implement bool
 }
@@ -52,13 +53,13 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
-	cfg, err := config.Load(opts.ConfigPath)
+	cfg, err := config.Load(factoryConfigFile)
 	if err != nil {
 		return err
 	}
 	var codeReviewSkill *sandbox.CodeReviewSkill
 	if cfg.CodeReviewSkill != nil {
-		codeReviewSkill, err = sandbox.LoadProjectSkill(filepath.Dir(opts.ConfigPath), *cfg.CodeReviewSkill)
+		codeReviewSkill, err = sandbox.LoadProjectSkill(filepath.Dir(factoryConfigFile), *cfg.CodeReviewSkill)
 		if err != nil {
 			return err
 		}
@@ -75,7 +76,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		}
 	}
 
-	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(opts.ConfigPath))
+	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(factoryConfigFile))
 	if err != nil {
 		return err
 	}

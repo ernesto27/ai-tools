@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,12 +53,16 @@ func TestDoctorInstallationReport(t *testing.T) {
 				t.Fatalf("status = %d, want 0", state.status)
 			}
 			var want strings.Builder
-			for i, label := range []string{"git", "docker", "gh (optional: PRs)", "code (optional: worktree-editor)"} {
+			want.WriteString("Dependency checks:\n\nDependency  Status         Usage\n----------  -------------  -----\n")
+			for i, name := range []string{"git", "docker", "gh", "code"} {
 				status := "\x1b[31mnot installed\x1b[0m"
+				padding := ""
 				if tt.wantStatus[i] {
 					status = "\x1b[32minstalled\x1b[0m"
+					padding = "    "
 				}
-				want.WriteString(label + ": " + status + "\n")
+				usage := []string{"Required", "Required", "Optional: PRs", "Optional: worktree-editor"}[i]
+				fmt.Fprintf(&want, "%-10s  %s%s  %s\n", name, status, padding, usage)
 			}
 			if output.String() != want.String() {
 				t.Fatalf("output = %q, want %q", output.String(), want.String())

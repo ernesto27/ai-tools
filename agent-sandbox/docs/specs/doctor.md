@@ -49,7 +49,7 @@ the list and statuses; it does not execute the tools or change the system.
 - Discover executable availability through Go's standard PATH lookup. Do not invoke version commands, probe services, or perform network requests.
 - Always list git, docker, gh, and code, in that order, independently of installed state or project configuration.
 - Label gh as optional for PRs and code as optional for worktree-editor.
-- Emit only dependency names, optional-feature labels, and statuses. Do not add versions, paths, remediation instructions, or a diagnostic summary.
+- Present the list under a Dependency checks heading with aligned Dependency, Status, and Usage columns. Mark core tools as Required and optional tools with their feature names. Do not add versions, paths, remediation instructions, or a diagnostic summary.
 - Emit green/red ANSI status colors unconditionally, including when redirected or NO_COLOR is set. Reset the color after each status.
 - Missing dependencies do not cause a nonzero exit status. Preserve normal error handling for invalid invocations or output failures.
 - Do not load project configuration, resolve a Git repository, construct a Docker client, inspect images, or access agent credentials.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -18,20 +19,25 @@ func newDoctorCmd() *cobra.Command {
 			"Installation statuses always use green/red ANSI colors.",
 		Args: usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			var report strings.Builder
+			report.WriteString("Dependency checks:\n\n")
+			report.WriteString("Dependency  Status         Usage\n")
+			report.WriteString("----------  -------------  -----\n")
 			for _, dependency := range sandbox.Dependencies() {
-				name := dependency.Name
+				usage := "Required"
 				if dependency.Optional != "" {
-					name += " (optional: " + dependency.Optional + ")"
+					usage = "Optional: " + dependency.Optional
 				}
 				status, color := "not installed", "\x1b[31m"
 				if dependency.Installed {
 					status, color = "installed", "\x1b[32m"
 				}
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s: %s%s\x1b[0m\n", name, color, status); err != nil {
-					return err
-				}
+				// Pad the visible text separately so ANSI escapes do not shift columns.
+				padding := strings.Repeat(" ", len("not installed")-len(status))
+				fmt.Fprintf(&report, "%-10s  %s%s\x1b[0m%s  %s\n", dependency.Name, color, status, padding, usage)
 			}
-			return nil
+			_, err := fmt.Fprint(cmd.OutOrStdout(), report.String())
+			return err
 		},
 	}
 }

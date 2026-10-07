@@ -59,16 +59,7 @@ agent-sandbox doctor
 ```
 
 Comprueba si `git`, `docker`, `gh` (opcional, para PRs) y `code` (opcional,
-para `worktree-editor`) están en `PATH`. Muestra `installed` en verde o
-`not installed` en rojo. Los colores ANSI se emiten siempre, incluso con
-salida redirigida o `NO_COLOR`. No ejecuta las herramientas ni comprueba
-servicios o autenticación. La presencia de `docker` es solo un indicador de
-instalación: el sandbox usa la API de Docker, por lo que este chequeo no
-determina si el daemon está disponible. Node.js, npm y los agentes se
-ejecutan en el contenedor y no se comprueban en el host.
-
-`doctor` funciona desde cualquier directorio, no lee `agent-sandbox.json`
-y termina con estado 0 aunque falten herramientas.
+para `worktree-editor`) están en `PATH`.
 
 ```text
 agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <modelo>] [-i <imagen>] [--image <archivo>]... [--hn] [-p] [--pr] [-c <mensaje-commit>] (-q <consulta> | -f <archivo-prompt>)

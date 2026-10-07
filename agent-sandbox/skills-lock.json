@@ -31,11 +31,29 @@
       "skillPath": "skills/deep-research/SKILL.md",
       "computedHash": "59a9a850fb0e77692c24605360a9ee76a13f6636a9c8c7ee01598c175d606d9f"
     },
+    "diagnosing-bugs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "computedHash": "ede7254edbd22fcab97a0941511f7d440d8f9a249348fea97c50987ad5501674"
+    },
     "explain-changes": {
       "source": "PigmalionSoftware/skill-library",
       "sourceType": "github",
       "skillPath": "skills/explain-changes/SKILL.md",
       "computedHash": "5fda90606862811c27f643a905430418887b986ecc3940831bc45d32554f3231"
+    },
+    "grill-with-docs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "computedHash": "35e62aa423aaeab6a414bcac273f56dfb17802ef2334b41b6a3b00f28196c8cf"
+    },
+    "implement-spec": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/implement-spec/SKILL.md",
+      "computedHash": "f0db7dafd236fff9dc40da566cb72bbad6802674f64617b06959b00a436c7d5b"
     },
     "interview-me": {
       "source": "addyosmani/agent-skills",
@@ -55,6 +73,12 @@
       "skillPath": "skills/push-github-tag/SKILL.md",
       "computedHash": "57b50eca6b57ebc0c9baa18e6f234e450fe7e64170d952395fa8d446a71731d4"
     },
+    "retro": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/retro/SKILL.md",
+      "computedHash": "b8d55851a2909e26c2dbb2e8563719c87b3b700559f604e4df344f8c27e21047"
+    },
     "show-me": {
       "source": "humanlayer/skills",
       "sourceType": "github",
@@ -66,6 +90,18 @@
       "sourceType": "github",
       "skillPath": "skills/spec-driven-development/SKILL.md",
       "computedHash": "a6cdfed42f757f84d3d6968fbea5b257b28c08ff9aa52de6f12fe78a5fb1393b"
+    },
+    "teach": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/teach/SKILL.md",
+      "computedHash": "81c196426808c270a9d4688be291405c038bba11f020b9fe10098ad0f1d8c132"
+    },
+    "to-spec": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "computedHash": "3fa1a0695d4ea242fae9e569e4d22aa1788623197abb33bfadafae7315789bbf"
     },
     "update-readme": {
       "source": "PigmalionSoftware/skill-library",

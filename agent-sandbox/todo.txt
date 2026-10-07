@@ -1,4 +1,6 @@
 [x] - should be able to add in json global values as model,  branch, etc, hn
 [x] - container sandbox should commit changes
-[] - should docker have .git folder always
+[x] - should docker have .git folder always
 [] - add a command to get json sandobox-config
+[] - Check if branch in run exists in remote repo 
+[] - i want to add reviewer in PR githug

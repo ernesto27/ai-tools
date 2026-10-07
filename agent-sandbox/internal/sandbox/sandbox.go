@@ -59,6 +59,19 @@ func Run(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	if opts.PR {
+		remoteExists, err := repo.RemoteBranchExists(opts.Branch)
+		if err != nil {
+			return 0, err
+		}
+
+		if remoteExists {
+			return 0, errors.New("remote branch already exists: " + opts.Branch)
+		}
+
+	}
+
 	runtime.route(repo)
 	baseBranch, err := repo.CurrentBranch(ctx)
 	if err != nil {
@@ -75,15 +88,6 @@ func Run(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 		return 0, err
 	}
 	defer client.Close()
-
-	if err := git.CheckBranchName(opts.Branch); err != nil {
-		// A bad branch name is a bad argument, so it exits like one, but git's
-		// message needs no usage synopsis after it.
-		return 0, StatusError{Status: ExitUsage, err: err}
-	}
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
 
 	config, err := configPaths()
 	if err != nil {

@@ -18,6 +18,17 @@
 
   "configurations": [
     {
+      // Reads the run defaults from agent-sandbox.json in the workspace root.
+      "name": "run: agent-sandbox.json",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": ["run"]
+    },
+    {
       // Needs Docker and an authenticated agent on the host. On first use it
       // builds the image, and every run checks the image against
       // `npm view <package> version`, so expect a slow start.

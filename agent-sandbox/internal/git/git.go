@@ -4,6 +4,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -164,6 +165,23 @@ func (r *Repo) PushContext(ctx context.Context, branch string) error {
 		return fmt.Errorf("git push: %w", err)
 	}
 	return nil
+}
+
+func (r *Repo) RemoteBranchExists(branch string) (bool, error) {
+	_, err := r.output(
+		"ls-remote", "--exit-code", "--heads",
+		"origin", "refs/heads/"+branch,
+	)
+	if err == nil {
+		return true, nil
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("checking remote branch %q: %w", branch, err)
 }
 
 func (r *Repo) run(args ...string) error {

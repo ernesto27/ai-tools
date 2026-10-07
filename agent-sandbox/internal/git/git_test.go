@@ -90,6 +90,70 @@ func TestBranchExistsAndDeleteBranch(t *testing.T) {
 	}
 }
 
+func TestRemoteBranchExists(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteRef  string
+		localOnly  bool
+		noOrigin   bool
+		wantExists bool
+		wantErr    bool
+	}{
+		{
+			name:       "remote branch exists",
+			remoteRef:  "refs/heads/feature",
+			wantExists: true,
+		},
+		{
+			name: "remote branch missing",
+		},
+		{
+			name:      "local branch alone does not count",
+			localOnly: true,
+		},
+		{
+			name:      "tag alone does not count",
+			remoteRef: "refs/tags/feature",
+		},
+		{
+			name:     "missing origin returns error",
+			noOrigin: true,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := openTestRepo(t)
+
+			if !tt.noOrigin {
+				remoteDir := setupTestRepo(t)
+				runTestGit(t, repo.Dir, "remote", "add", "origin", remoteDir)
+
+				if tt.remoteRef != "" {
+					runTestGit(t, remoteDir, "update-ref", tt.remoteRef, "HEAD")
+				}
+			}
+
+			if tt.localOnly {
+				runTestGit(t, repo.Dir, "branch", "feature")
+			}
+
+			exists, err := repo.RemoteBranchExists("feature")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, want error: %t", err, tt.wantErr)
+			}
+			if exists != tt.wantExists {
+				t.Fatalf("exists = %t, want %t", exists, tt.wantExists)
+			}
+			if tt.wantErr &&
+				!strings.Contains(err.Error(), `checking remote branch "feature"`) {
+				t.Fatalf("error lacks branch context: %v", err)
+			}
+		})
+	}
+}
+
 func TestWorkingTreeLifecycle(t *testing.T) {
 	repo := openTestRepo(t)
 

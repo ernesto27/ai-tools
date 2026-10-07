@@ -99,7 +99,7 @@ Cada sección admite los nombres largos de las opciones
 el JSON: no hay una opción de línea de comandos equivalente. Para cada campo,
 prevalece la opción explícita de la línea de comandos, luego el valor de la
 sección y finalmente el valor de la raíz. Un `false` o una cadena vacía en la
-sección también reemplaza el valor compartido.
+sección también reemplaza el valor compartido.`.
 
 ```json
 {
@@ -112,7 +112,8 @@ sección también reemplaza el valor compartido.
   "run": {
     "model": "gpt-5.6-sol",
     "query": "run go version and do not change any files",
-    "push": false
+    "push": false,
+    "reviewers": ["alice", "bob"]
   },
   "resume": {
     "branch": "fix-login",

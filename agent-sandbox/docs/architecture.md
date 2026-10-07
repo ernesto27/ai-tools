@@ -30,7 +30,8 @@ cmd/agent-sandbox -> sandbox -> agent -> docker
 - [internal/agent](../internal/agent/agent.go) defines agent-specific commands,
   models, authentication, and container options. It depends on Docker option types.
 - [internal/github](../internal/github/github.go) wraps host-side GitHub CLI
-  authentication and pull request operations.
+  authentication and pull request operations, including creation-time reviewer
+  requests and read-only confirmation after an ambiguous create failure.
 - [internal/utils](../internal/utils/utils.go) provides prompt-file loading.
 
 ## Execution and worktree ownership
@@ -98,6 +99,14 @@ consumes that artifact before publication. The host checks for reviewable
 differences against the snapshot, pushes, and reuses an open PR for the same
 head and base or creates a PR ready for review. Combining `--push` and `--pr`
 uses this single PR publication flow.
+
+`run.reviewers` is a JSON-only list of GitHub usernames, normalized by the CLI
+configuration loader and passed through `Options` to host publication. `run-tui`
+uses the same configuration. Reviewer arguments are supplied only for new PR
+creation; existing PRs are not modified. `Resume` clears reviewer options at
+its entry point, and reviewers are not stored in worktree records or prompts.
+After a failed create call with reviewers, recovery also checks outstanding
+review requests before reporting success; missing requests remain an error.
 
 ## Image lifecycle and cleanup
 

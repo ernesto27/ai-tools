@@ -2,5 +2,5 @@
 [x] - container sandbox should commit changes
 [x] - should docker have .git folder always
 [] - add a command to get json sandobox-config
-[] - Check if branch in run exists in remote repo 
+[x] - Check if branch in run exists in remote repo 
 [] - i want to add reviewer in PR githug

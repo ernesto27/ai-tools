@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,6 +15,9 @@ import (
 
 const localConfigFile = "agent-sandbox.json"
 const configAPIKey = "api-key"
+const configReviewers = "reviewers"
+
+var reviewerUsername = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*$`)
 
 type localConfig struct {
 	Run         *configSection `json:"run"`
@@ -40,6 +45,7 @@ type configSection struct {
 	CommitMessage *string   `json:"commit-message"`
 	FilePrompt    *string   `json:"file-prompt"`
 	Image         *[]string `json:"image"`
+	Reviewers     []string  `json:"reviewers"`
 }
 
 // configRunArgs merges local defaults after Cobra has parsed the command line
@@ -67,8 +73,11 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 	}
 
 	section := config.Run
+	flags.Reviewers = nil
 	if name == "resume" {
 		section = config.Resume
+	} else if section != nil {
+		flags.Reviewers = section.Reviewers
 	}
 
 	// An explicit flag wins; a section model overrides the shared JSON model.
@@ -199,12 +208,46 @@ func readLocalConfig() (localConfig, error) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return localConfig{}, fmt.Errorf("%s: %w", localConfigFile, err)
 	}
+	if config.Run != nil {
+		config.Run.Reviewers = normalizeReviewers(config.Run.Reviewers)
+	}
 	return config, nil
+}
+
+func normalizeReviewers(reviewers []string) []string {
+	seen := make(map[string]bool)
+	var normalized []string
+	for _, reviewer := range reviewers {
+		reviewer = strings.TrimSpace(reviewer)
+		key := strings.ToLower(reviewer)
+		if !seen[key] {
+			normalized = append(normalized, reviewer)
+			seen[key] = true
+		}
+	}
+	return normalized
 }
 
 func validateConfigField(section, key string, value json.RawMessage) error {
 	fieldName := section + "." + key
 	switch key {
+	case configReviewers:
+		if section != "run" {
+			return fmt.Errorf("%s: unknown field %s", localConfigFile, fieldName)
+		}
+		var reviewers []json.RawMessage
+		if string(value) == "null" || json.Unmarshal(value, &reviewers) != nil {
+			return fmt.Errorf("%s: %s must be an array of JSON strings", localConfigFile, fieldName)
+		}
+		for i, value := range reviewers {
+			var reviewer string
+			if string(value) == "null" || json.Unmarshal(value, &reviewer) != nil {
+				return fmt.Errorf("%s: %s[%d] must be a JSON string", localConfigFile, fieldName, i)
+			}
+			if !reviewerUsername.MatchString(strings.TrimSpace(reviewer)) {
+				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", localConfigFile, fieldName, i)
+			}
+		}
 	case flagBranch, flagAgent, flagModel, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, configAPIKey:
 		var field string
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {

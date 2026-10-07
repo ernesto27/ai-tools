@@ -115,10 +115,14 @@ func (c *Client) FindOpen(ctx context.Context, head, base string) (*PullRequest,
 
 // Create supplies every interactive input explicitly and omits --draft. The
 // description is stdin data, so quotes, newlines and shell syntax stay literal.
-func (c *Client) Create(ctx context.Context, head, base, title, body string) (string, error) {
-	output, err := c.command(ctx, strings.NewReader(body), "pr", "create",
+func (c *Client) Create(ctx context.Context, head, base, title, body string, reviewers []string) (string, error) {
+	args := []string{"pr", "create",
 		"--repo", c.Repository, "--head", head, "--base", base,
-		"--title", title, "--body-file", "-")
+		"--title", title, "--body-file", "-"}
+	for _, reviewer := range reviewers {
+		args = append(args, "--reviewer", reviewer)
+	}
+	output, err := c.command(ctx, strings.NewReader(body), args...)
 	if err != nil {
 		return "", err
 	}
@@ -127,6 +131,37 @@ func (c *Client) Create(ctx context.Context, head, base, title, body string) (st
 		return "", fmt.Errorf("GitHub CLI returned no pull request URL")
 	}
 	return prURL, nil
+}
+
+// MissingReviewers checks recovery without mutating a PR that may have been
+// created by another publisher. A PR URL alone cannot prove assignment succeeded.
+func (c *Client) MissingReviewers(ctx context.Context, prURL string, reviewers []string) ([]string, error) {
+	output, err := c.command(ctx, nil, "pr", "view", prURL, "--repo", c.Repository, "--json", "reviewRequests")
+	if err != nil {
+		return nil, err
+	}
+	var pr struct {
+		ReviewRequests []struct {
+			TypeName string `json:"__typename"`
+			Login    string `json:"login"`
+		} `json:"reviewRequests"`
+	}
+	if err := json.Unmarshal(output, &pr); err != nil {
+		return nil, fmt.Errorf("reading PR review requests: %w", err)
+	}
+	requested := make(map[string]bool)
+	for _, request := range pr.ReviewRequests {
+		if request.TypeName == "User" {
+			requested[strings.ToLower(request.Login)] = true
+		}
+	}
+	var missing []string
+	for _, reviewer := range reviewers {
+		if !requested[strings.ToLower(reviewer)] {
+			missing = append(missing, reviewer)
+		}
+	}
+	return missing, nil
 }
 
 func (c *Client) command(ctx context.Context, stdin io.Reader, args ...string) ([]byte, error) {

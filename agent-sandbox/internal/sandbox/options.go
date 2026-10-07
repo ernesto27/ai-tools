@@ -22,6 +22,7 @@ type Options struct {
 	BaseImage     string
 	Push          bool
 	PR            bool
+	Reviewers     []string
 	Prompt        string
 	CommitMessage string
 	FilePrompt    string

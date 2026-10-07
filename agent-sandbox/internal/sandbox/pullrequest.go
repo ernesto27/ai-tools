@@ -106,7 +106,7 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 		printExistingPR(out, pr)
 		return nil
 	}
-	prURL, createErr := githubClient.Create(ctx, opts.Branch, record.BaseBranch, content.Title, content.Body)
+	prURL, createErr := githubClient.Create(ctx, opts.Branch, record.BaseBranch, content.Title, content.Body, opts.Reviewers)
 	if createErr == nil {
 		fmt.Fprintf(out, "Pull request ready for review: %s\n", prURL)
 		return nil
@@ -121,6 +121,15 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 		return fmt.Errorf("creating PR after successful push: %w; recovery lookup failed: %v", createErr, lookupErr)
 	}
 	if pr != nil {
+		if len(opts.Reviewers) > 0 {
+			missing, err := githubClient.MissingReviewers(ctx, pr.URL, opts.Reviewers)
+			if err != nil {
+				return fmt.Errorf("creating PR after successful push: %w; checking reviewers on %s: %w", createErr, pr.URL, err)
+			}
+			if len(missing) > 0 {
+				return fmt.Errorf("creating PR after successful push: %w; PR %s exists but review requests are missing for: %s", createErr, pr.URL, strings.Join(missing, ", "))
+			}
+		}
 		printExistingPR(out, pr)
 		return nil
 	}

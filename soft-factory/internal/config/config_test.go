@@ -4,9 +4,55 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestLoadGoogleDrive(t *testing.T) {
+	const documentURL = "https://docs.google.com/document/d/abc123/edit?tab=t.0"
+	for _, tc := range []struct {
+		name    string
+		data    string
+		want    *GoogleDriveConfig
+		wantErr string
+	}{
+		{name: "omitted", data: `{}`},
+		{name: "empty block", data: `{"google_drive":{}}`, wantErr: "at least one folder or file"},
+		{name: "empty arrays", data: `{"google_drive":{"folders":[],"files":[]}}`, wantErr: "at least one folder or file"},
+		{name: "folders only", data: `{"google_drive":{"folders":["test1"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}}},
+		{name: "files only", data: `{"google_drive":{"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Files: []string{documentURL}}},
+		{name: "files with empty folders", data: `{"google_drive":{"folders":[],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{}, Files: []string{documentURL}}},
+		{name: "both", data: `{"google_drive":{"folders":["test1"],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}, Files: []string{documentURL}}},
+		{name: "blank folder with valid file", data: `{"google_drive":{"folders":[" "],"files":["` + documentURL + `"]}}`, wantErr: "google_drive.folders[0]"},
+		{name: "blank file", data: `{"google_drive":{"files":[" "]}}`, wantErr: "google_drive.files[0]"},
+		{name: "malformed URL", data: `{"google_drive":{"files":["https://docs.google.com/document/d/%zz"]}}`, wantErr: "google_drive.files[0]"},
+		{name: "wrong host", data: `{"google_drive":{"files":["https://example.com/document/d/abc123/edit"]}}`, wantErr: "google_drive.files[0]"},
+		{name: "missing ID", data: `{"google_drive":{"files":["https://docs.google.com/document/d//edit"]}}`, wantErr: "google_drive.files[0]"},
+		{name: "invalid file with folders", data: `{"google_drive":{"folders":["test1"],"files":["not-a-url"]}}`, wantErr: "google_drive.files[0]"},
+		{name: "invalid second file", data: `{"google_drive":{"files":["` + documentURL + `","not-a-url"]}}`, wantErr: "google_drive.files[1]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load("software-factory.json")
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), "validate factory configuration:") || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected configuration validation error containing %q, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(cfg.GoogleDrive, tc.want) {
+				t.Fatalf("GoogleDrive = %+v; want %+v", cfg.GoogleDrive, tc.want)
+			}
+		})
+	}
+}
 
 func TestLoadCustomSkills(t *testing.T) {
 	for _, tc := range []struct {

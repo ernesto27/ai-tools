@@ -19,8 +19,9 @@ These are all the options currently supported:
 | Option | Purpose |
 | --- | --- |
 | `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
-| `google_drive` | Optional Google Drive settings. Omit this section when Drive is not needed. |
-| `google_drive.folders` | Required when `google_drive` is present: a nonempty list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
+| `google_drive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
+| `google_drive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
+| `google_drive.files` | Optional list of full Google Docs URLs. Documents can be outside the configured folders. URLs are validated when configuration loads, before the Drive client starts. |
 | `code-review-skill` | Optional project skill name to add after the default code review skill. The name must be one directory name, not a path. |
 
 Minimal example:
@@ -52,7 +53,8 @@ Example using both local documents and Google Drive:
 {
   "documents": ["requirements.md", "guidelines.md"],
   "google_drive": {
-    "folders": ["Project Documentation"]
+    "folders": ["Project Documentation"],
+    "files": ["https://docs.google.com/document/d/DOCUMENT_ID/edit?tab=t.0"]
   }
 }
 ```
@@ -69,11 +71,11 @@ The downloaded file must contain service-account credentials, including:
 }
 ```
 
-This is only an illustration: use the complete downloaded JSON file. Enable the Google Drive API and share the selected folders with the email in `client_email`. OAuth client credentials are not supported.
+
 
 When `google_drive` is configured, a missing or invalid credentials file stops the workflow. Without `google_drive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
 
-Only Google Docs directly inside the selected folders are included. See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for download and sharing instructions.
+Folder loading includes only Google Docs directly inside the selected folders. Individual URLs load the specified Google Docs regardless of their folder. See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for download and sharing instructions.
 
 ### `agent-sandbox.json`: agent and task
 
@@ -294,6 +296,21 @@ To also include Google Docs from shared Drive folders:
 ```
 
 Save your service-account key as `service_account.json` in the project folder and share the Drive folder with that account. Folder names must identify a single accessible folder. Only Google Docs directly inside the selected folders are included; subfolders and other file types are excluded.
+
+To load individual Google Docs without loading their folders, use `files`:
+
+```json
+{
+  "google_drive": {
+    "files": [
+      "https://docs.google.com/document/d/DOCUMENT_ID/edit?tab=t.0"
+    ]
+  }
+}
+```
+
+Replace the example URL with your document's full Google Docs URL.
+You can configure `folders` only, `files` only, or both in the same `google_drive` block. At least one array must contain an entry. Individual documents can be in different folders, provided the service account has access to them. Invalid URLs fail when configuration loads; inaccessible documents or export errors stop the workflow during context loading.
 
 See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions.
 

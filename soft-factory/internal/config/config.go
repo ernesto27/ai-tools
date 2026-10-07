@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"soft-factory/internal/googledrive"
 )
 
 type Config struct {
@@ -23,6 +25,7 @@ type CustomSkills struct {
 
 type GoogleDriveConfig struct {
 	Folders []string `json:"folders"`
+	Files   []string `json:"files"`
 }
 
 // SandboxConfig exposes only individual settings needed by the factory.
@@ -123,12 +126,17 @@ func (c Config) Validate() error {
 		}
 	}
 	if c.GoogleDrive != nil {
-		if len(c.GoogleDrive.Folders) == 0 {
-			return fmt.Errorf("google_drive.folders must not be empty")
+		if len(c.GoogleDrive.Folders) == 0 && len(c.GoogleDrive.Files) == 0 {
+			return fmt.Errorf("google_drive requires at least one folder or file")
 		}
 		for i, name := range c.GoogleDrive.Folders {
 			if strings.TrimSpace(name) == "" {
 				return fmt.Errorf("google_drive.folders[%d] must not be empty", i)
+			}
+		}
+		for i, fileURL := range c.GoogleDrive.Files {
+			if _, err := googledrive.DocumentIDFromURL(fileURL); err != nil {
+				return fmt.Errorf("google_drive.files[%d]: %w", i, err)
 			}
 		}
 	}

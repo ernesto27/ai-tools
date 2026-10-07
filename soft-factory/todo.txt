@@ -1,15 +1,38 @@
-[] - option to run skills in specific state (review, security, etc)
-[x] - add new stage for get a explanation of code changes, diagram
-[x] - save execution time of any stage and for total time
+[x] - option to run skills in specific state (review, security, etc)
+[] - load specific documento in google drive
+[] - instalar agent-sandbox si no existe en path
+[] - google file should be set in software-factory.json
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
+[] - config file should not be required, now return an error
+[] - list of stages disables in software-factory.json
+[x] - add new stage for get a explanation of code changes, diagram
+[x] - save execution time of any stage and for total time
 [x] - CTRL+C should stop execution
 [x] - change file config.json to software-factory.json
 [x] - integration with Jira to get task content from task
 [x] - save logs
 [x] - doctor command
 [x] - commit changes in all stages
-[] - config file should not be required, now return an error
-[] - list of stages disables in software-factory.json
 [x] - add code-changes new skill
 [] - integration with GitHub Issues to get task content from an issue URL
+
+
+inconsistencias en json,  use camelCase
+
+  "documents": [
+    "docs/context.txt",
+    "docs/requirement.txt"
+  ],
+  "custom-skills": {
+    "code-review": "test-code-review",
+    "security-review": "test-security-review",
+    "risk-classification": "test-risk-classification",
+    "review-changes": "test-review-changes"
+  },
+  "google_drive": {
+    "folders": [
+      "test1"
+    ]
+  }
+}

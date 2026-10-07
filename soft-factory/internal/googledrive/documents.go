@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -15,6 +16,30 @@ type Document struct {
 	Name       string
 	FolderName string
 	Text       string
+}
+
+// DocumentIDFromURL extracts a file ID from a Google Docs document URL.
+// Query parameters and fragments do not affect the extracted ID.
+func DocumentIDFromURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return "", fmt.Errorf("parse Google Docs URL: %w", err)
+	}
+	if parsed.Scheme != "https" || parsed.Host != "docs.google.com" || parsed.User != nil {
+		return "", fmt.Errorf("Google Docs URL must use https://docs.google.com/document/d/FILE_ID")
+	}
+	parts := strings.Split(parsed.Path, "/")
+	if len(parts) < 4 || parts[1] != "document" || parts[2] != "d" || parts[3] == "" {
+		return "", fmt.Errorf("Google Docs URL must contain /document/d/FILE_ID")
+	}
+	id := parts[3]
+	for _, char := range id {
+		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' ||
+			char >= '0' && char <= '9' || char == '-' || char == '_') {
+			return "", fmt.Errorf("Google Docs URL contains an invalid file ID")
+		}
+	}
+	return id, nil
 }
 
 // ReadDocuments exports direct Google Docs from folders matched by exact name.
@@ -70,7 +95,7 @@ func (c *Client) ReadDocuments(ctx context.Context, folderNames []string) ([]Doc
 				continue
 			}
 
-			text, err := c.exportText(ctx, file.Id)
+			text, err := c.ExportText(ctx, file.Id)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"read Google Doc %q (%s) in folder %q: %w",
@@ -116,7 +141,8 @@ func (c *Client) listFiles(ctx context.Context, query string) ([]*drive.File, er
 	}
 }
 
-func (c *Client) exportText(ctx context.Context, id string) (string, error) {
+// ExportText exports a Google Doc as plain text using its file ID.
+func (c *Client) ExportText(ctx context.Context, id string) (string, error) {
 	response, err := c.service.Files.Export(id, "text/plain").
 		Context(ctx).
 		Download()

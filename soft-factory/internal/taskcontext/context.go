@@ -30,21 +30,46 @@ func Build(ctx context.Context, cfg config.Config, baseDir string) (string, erro
 			return "", fmt.Errorf("initialize Google Drive context: %w", err)
 		}
 
-		documents, err := client.ReadDocuments(ctx, cfg.GoogleDrive.Folders)
-		if err != nil {
-			return "", fmt.Errorf("load Google Drive context: %w", err)
+		if len(cfg.GoogleDrive.Folders) > 0 {
+			documents, err := client.ReadDocuments(ctx, cfg.GoogleDrive.Folders)
+			if err != nil {
+				return "", fmt.Errorf("load Google Drive context: %w", err)
+			}
+
+			for _, document := range documents {
+				fmt.Fprintf(
+					&result,
+					"# Google Doc: %s\n\nFolder: %s\nSource: https://docs.google.com/document/d/%s/edit\n\n",
+					document.Name,
+					document.FolderName,
+					document.ID,
+				)
+				result.WriteString(document.Text)
+				result.WriteString("\n\n")
+			}
 		}
 
-		for _, document := range documents {
-			fmt.Fprintf(
-				&result,
-				"# Google Doc: %s\n\nFolder: %s\nSource: https://docs.google.com/document/d/%s/edit\n\n",
-				document.Name,
-				document.FolderName,
-				document.ID,
-			)
-			result.WriteString(document.Text)
-			result.WriteString("\n\n")
+		if len(cfg.GoogleDrive.Files) > 0 {
+			for _, f := range cfg.GoogleDrive.Files {
+				documentID, err := googledrive.DocumentIDFromURL(f)
+				if err != nil {
+					return "", err
+				}
+
+				fmt.Fprintf(
+					&result,
+					"# Google Doc: \nSource: https://docs.google.com/document/d/%s/edit\n\n",
+					documentID,
+				)
+
+				documentContent, err := client.ExportText(ctx, documentID)
+				if err != nil {
+					return "", err
+				}
+
+				result.WriteString(documentContent)
+				result.WriteString("\n\n")
+			}
 		}
 	}
 

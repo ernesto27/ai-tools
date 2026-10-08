@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,15 +11,15 @@ import (
 
 type Config struct {
 	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"google_drive,omitempty"`
-	CustomSkills CustomSkills       `json:"custom-skills"`
+	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills CustomSkills       `json:"customSkills"`
 }
 
 type CustomSkills struct {
-	CodeReview         string `json:"code-review,omitempty"`
-	SecurityReview     string `json:"security-review,omitempty"`
-	RiskClassification string `json:"risk-classification,omitempty"`
-	ReviewChanges      string `json:"review-changes,omitempty"`
+	CodeReview         string `json:"codeReview,omitempty"`
+	SecurityReview     string `json:"securityReview,omitempty"`
+	RiskClassification string `json:"riskClassification,omitempty"`
+	ReviewChanges      string `json:"reviewChanges,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -81,13 +80,6 @@ func Load(path string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
-	}
-	if value, ok := fields["code-review-skill"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-		return Config{}, fmt.Errorf("validate factory configuration: code-review-skill must be a skill name, not null")
-	}
 
 	if err := cfg.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
@@ -97,26 +89,23 @@ func Load(path string) (Config, error) {
 }
 
 func (c Config) Validate() error {
-	skillNames := map[string]string{
-		"code-review":         c.CustomSkills.CodeReview,
-		"security-review":     c.CustomSkills.SecurityReview,
-		"risk-classification": c.CustomSkills.RiskClassification,
-		"review-changes":      c.CustomSkills.ReviewChanges,
+	skillNames := []struct{ stage, name string }{
+		{"codeReview", c.CustomSkills.CodeReview},
+		{"securityReview", c.CustomSkills.SecurityReview},
+		{"riskClassification", c.CustomSkills.RiskClassification},
+		{"reviewChanges", c.CustomSkills.ReviewChanges},
 	}
 
-	for stage, name := range skillNames {
-		if name == "" {
+	for _, skill := range skillNames {
+		if skill.name == "" {
 			continue
 		}
 
-		if strings.TrimSpace(name) == "" ||
-			name == "." ||
-			name == ".." ||
-			strings.ContainsAny(name, `/\`) {
-			return fmt.Errorf(
-				"custom-skills.%s must be a single nonempty skill name",
-				stage,
-			)
+		if strings.TrimSpace(skill.name) == "" ||
+			skill.name == "." ||
+			skill.name == ".." ||
+			strings.ContainsAny(skill.name, `/\`) {
+			return fmt.Errorf("customSkills.%s must be a single nonempty skill name", skill.stage)
 		}
 	}
 
@@ -127,16 +116,16 @@ func (c Config) Validate() error {
 	}
 	if c.GoogleDrive != nil {
 		if len(c.GoogleDrive.Folders) == 0 && len(c.GoogleDrive.Files) == 0 {
-			return fmt.Errorf("google_drive requires at least one folder or file")
+			return fmt.Errorf("googleDrive requires at least one folder or file")
 		}
 		for i, name := range c.GoogleDrive.Folders {
 			if strings.TrimSpace(name) == "" {
-				return fmt.Errorf("google_drive.folders[%d] must not be empty", i)
+				return fmt.Errorf("googleDrive.folders[%d] must not be empty", i)
 			}
 		}
 		for i, fileURL := range c.GoogleDrive.Files {
 			if _, err := googledrive.DocumentIDFromURL(fileURL); err != nil {
-				return fmt.Errorf("google_drive.files[%d]: %w", i, err)
+				return fmt.Errorf("googleDrive.files[%d]: %w", i, err)
 			}
 		}
 	}

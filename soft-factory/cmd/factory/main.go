@@ -65,10 +65,10 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		name   string
 		target **sandbox.ProjectSkill
 	}{
-		{stage: "code-review", name: cfg.CustomSkills.CodeReview, target: &loadedSkills.CodeReview},
-		{stage: "security-review", name: cfg.CustomSkills.SecurityReview, target: &loadedSkills.SecurityReview},
-		{stage: "risk-classification", name: cfg.CustomSkills.RiskClassification, target: &loadedSkills.RiskClassification},
-		{stage: "review-changes", name: cfg.CustomSkills.ReviewChanges, target: &loadedSkills.ReviewChanges},
+		{stage: "codeReview", name: cfg.CustomSkills.CodeReview, target: &loadedSkills.CodeReview},
+		{stage: "securityReview", name: cfg.CustomSkills.SecurityReview, target: &loadedSkills.SecurityReview},
+		{stage: "riskClassification", name: cfg.CustomSkills.RiskClassification, target: &loadedSkills.RiskClassification},
+		{stage: "reviewChanges", name: cfg.CustomSkills.ReviewChanges, target: &loadedSkills.ReviewChanges},
 	}
 
 	for _, entry := range entries {
@@ -81,7 +81,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 			entry.name,
 		)
 		if err != nil {
-			return fmt.Errorf("custom-skills.%s: %w", entry.stage, err)
+			return fmt.Errorf("customSkills.%s: %w", entry.stage, err)
 		}
 
 		*entry.target = skill

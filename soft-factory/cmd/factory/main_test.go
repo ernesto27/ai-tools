@@ -8,10 +8,10 @@ import (
 )
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
-	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
-		t.Run(stage, func(t *testing.T) {
+	for _, property := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+		t.Run(property, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			data := `{"custom-skills":{"` + stage + `":"missing"}}`
+			data := `{"customSkills":{"` + property + `":"missing"}}`
 			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
 				t.Fatal(err)
 			}
@@ -20,9 +20,27 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 			}
 
 			err := runWorkflow(workflowOptions{Implement: true})
-			want := "custom-skills." + stage + `: project skill "missing" not found`
+			want := "customSkills." + property + `: project skill "missing" not found`
 			if err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("expected missing-skill error %q first, got %v", want, err)
+			}
+		})
+	}
+}
+
+func TestObsoleteConfigStopsBeforeSkillLoading(t *testing.T) {
+	for _, implement := range []bool{false, true} {
+		t.Run(map[bool]string{false: "review", true: "implementation"}[implement], func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			data := `{"custom-skills":{"code-review":"missing"},"google_drive":{"folders":["test1"]}}`
+			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			err := runWorkflow(workflowOptions{Implement: implement})
+			want := "validate factory configuration: custom-skills is unsupported; use customSkills"
+			if err == nil || err.Error() != want {
+				t.Fatalf("error = %v; want %q", err, want)
 			}
 		})
 	}
@@ -42,7 +60,7 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
-				if err := os.WriteFile("config.json", []byte(`{"custom-skills":{"code-review":"missing"}}`), 0644); err != nil {
+				if err := os.WriteFile("config.json", []byte(`{"customSkills":{"codeReview":"missing"}}`), 0644); err != nil {
 					t.Fatal(err)
 				}
 				if invalid {

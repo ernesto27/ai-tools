@@ -1,10 +1,11 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"soft-factory/internal/googledrive"
@@ -12,15 +13,15 @@ import (
 
 type Config struct {
 	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"google_drive,omitempty"`
-	CustomSkills CustomSkills       `json:"custom-skills"`
+	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills CustomSkills       `json:"customSkills"`
 }
 
 type CustomSkills struct {
-	CodeReview         string `json:"code-review,omitempty"`
-	SecurityReview     string `json:"security-review,omitempty"`
-	RiskClassification string `json:"risk-classification,omitempty"`
-	ReviewChanges      string `json:"review-changes,omitempty"`
+	CodeReview         string `json:"codeReview,omitempty"`
+	SecurityReview     string `json:"securityReview,omitempty"`
+	RiskClassification string `json:"riskClassification,omitempty"`
+	ReviewChanges      string `json:"reviewChanges,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -71,22 +72,104 @@ func (c SandboxConfig) Branch(mode string) (string, error) {
 	return branch, nil
 }
 
+// propertyNames lists the accepted property names of one configuration object.
+type propertyNames struct {
+	canonical []string
+	// renamed maps obsolete names to their canonical replacement paths.
+	renamed map[string]string
+}
+
+var (
+	topLevelNames = propertyNames{
+		canonical: []string{"documents", "googleDrive", "customSkills"},
+		renamed: map[string]string{
+			"google_drive":      "googleDrive",
+			"custom-skills":     "customSkills",
+			"code-review-skill": "customSkills.codeReview",
+		},
+	}
+	nestedNames = map[string]propertyNames{
+		"googleDrive": {canonical: []string{"folders", "files"}},
+		"customSkills": {
+			canonical: []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"},
+			renamed: map[string]string{
+				"code-review":         "customSkills.codeReview",
+				"security-review":     "customSkills.securityReview",
+				"risk-classification": "customSkills.riskClassification",
+				"review-changes":      "customSkills.reviewChanges",
+			},
+		},
+	}
+)
+
+// check rejects obsolete names and case variants of known names, which the
+// JSON decoder would otherwise ignore or match case-insensitively.
+func (n propertyNames) check(parent string, fields map[string]json.RawMessage) error {
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		if slices.Contains(n.canonical, key) {
+			continue
+		}
+		replacement := ""
+		for _, name := range n.canonical {
+			if strings.EqualFold(key, name) {
+				replacement = propertyPath(parent, name)
+			}
+		}
+		for old, path := range n.renamed {
+			if strings.EqualFold(key, old) {
+				replacement = path
+			}
+		}
+		if replacement != "" {
+			return fmt.Errorf("%s is unsupported; use %s", propertyPath(parent, key), replacement)
+		}
+	}
+	return nil
+}
+
+func propertyPath(parent, name string) string {
+	if parent == "" {
+		return name
+	}
+	return parent + "." + name
+}
+
+// checkPropertyNames runs before decoding so obsolete settings are never
+// silently dropped.
+func checkPropertyNames(fields map[string]json.RawMessage) error {
+	if err := topLevelNames.check("", fields); err != nil {
+		return err
+	}
+	for _, key := range slices.Sorted(maps.Keys(nestedNames)) {
+		var nested map[string]json.RawMessage
+		// Non-object values are left for the decoder to report.
+		if json.Unmarshal(fields[key], &nested) != nil {
+			continue
+		}
+		if err := nestedNames[key].check(key, nested); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("read factory configuration: %w", err)
 	}
 
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
-	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
-	if value, ok := fields["code-review-skill"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-		return Config{}, fmt.Errorf("validate factory configuration: code-review-skill must be a skill name, not null")
+	if err := checkPropertyNames(fields); err != nil {
+		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -98,13 +181,13 @@ func Load(path string) (Config, error) {
 
 func (c Config) Validate() error {
 	skillNames := map[string]string{
-		"code-review":         c.CustomSkills.CodeReview,
-		"security-review":     c.CustomSkills.SecurityReview,
-		"risk-classification": c.CustomSkills.RiskClassification,
-		"review-changes":      c.CustomSkills.ReviewChanges,
+		"codeReview":         c.CustomSkills.CodeReview,
+		"securityReview":     c.CustomSkills.SecurityReview,
+		"riskClassification": c.CustomSkills.RiskClassification,
+		"reviewChanges":      c.CustomSkills.ReviewChanges,
 	}
 
-	for stage, name := range skillNames {
+	for property, name := range skillNames {
 		if name == "" {
 			continue
 		}
@@ -114,8 +197,8 @@ func (c Config) Validate() error {
 			name == ".." ||
 			strings.ContainsAny(name, `/\`) {
 			return fmt.Errorf(
-				"custom-skills.%s must be a single nonempty skill name",
-				stage,
+				"customSkills.%s must be a single nonempty skill name",
+				property,
 			)
 		}
 	}
@@ -127,16 +210,16 @@ func (c Config) Validate() error {
 	}
 	if c.GoogleDrive != nil {
 		if len(c.GoogleDrive.Folders) == 0 && len(c.GoogleDrive.Files) == 0 {
-			return fmt.Errorf("google_drive requires at least one folder or file")
+			return fmt.Errorf("googleDrive requires at least one folder or file")
 		}
 		for i, name := range c.GoogleDrive.Folders {
 			if strings.TrimSpace(name) == "" {
-				return fmt.Errorf("google_drive.folders[%d] must not be empty", i)
+				return fmt.Errorf("googleDrive.folders[%d] must not be empty", i)
 			}
 		}
 		for i, fileURL := range c.GoogleDrive.Files {
 			if _, err := googledrive.DocumentIDFromURL(fileURL); err != nil {
-				return fmt.Errorf("google_drive.files[%d]: %w", i, err)
+				return fmt.Errorf("googleDrive.files[%d]: %w", i, err)
 			}
 		}
 	}

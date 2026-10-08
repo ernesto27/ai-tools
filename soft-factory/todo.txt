@@ -16,23 +16,4 @@
 [x] - commit changes in all stages
 [x] - add code-changes new skill
 [] - integration with GitHub Issues to get task content from an issue URL
-
-
-inconsistencias en json,  use camelCase
-
-  "documents": [
-    "docs/context.txt",
-    "docs/requirement.txt"
-  ],
-  "custom-skills": {
-    "code-review": "test-code-review",
-    "security-review": "test-security-review",
-    "risk-classification": "test-risk-classification",
-    "review-changes": "test-review-changes"
-  },
-  "google_drive": {
-    "folders": [
-      "test1"
-    ]
-  }
-}
+[x] - use camelCase for all software-factory.json properties

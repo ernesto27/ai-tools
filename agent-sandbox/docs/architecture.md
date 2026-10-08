@@ -73,8 +73,14 @@ of two credential modes:
 The container runs as the invoking UID/GID with the worktree at `/workspace`.
 It also mounts the repository's common Git directory at its original absolute
 path and receives Git directory settings and the host's commit identity.
-That metadata mount is writable; the separate worktree does not isolate shared
-Git metadata. Supported image attachments receive separate read-only mounts.
+That metadata mount is writable, with nested read-only mounts protecting its
+shared `config` and existing `config.worktree` files for the main and current
+worktrees. [gitconfig.go](../internal/sandbox/gitconfig.go) validates these files
+before container creation; the shared config is required. Missing optional
+worktree config files are not created or protected. Git commits and history
+remain available, but the separate worktree does not isolate other shared Git
+metadata or inherited Git environment variables. Supported image attachments
+receive separate read-only mounts.
 `HostNetwork` enables Docker host networking only when requested.
 
 ## Commit and publication flow

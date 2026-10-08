@@ -256,6 +256,11 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	// common directory. Mounting it at its original absolute path keeps the
 	// worktree metadata valid without exposing the caller's working files.
 	runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: commonDir, Container: commonDir})
+	configMounts, err := gitConfigMounts(gitDir, commonDir)
+	if err != nil {
+		return docker.RunOptions{}, err
+	}
+	runOpts.Mounts = append(runOpts.Mounts, configMounts...)
 	runOpts.Env = append(runOpts.Env,
 		"GIT_DIR="+gitDir,
 		"GIT_COMMON_DIR="+commonDir,

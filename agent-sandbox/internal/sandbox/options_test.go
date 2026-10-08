@@ -64,6 +64,16 @@ func TestPRContainerOptionsMountGitMetadata(t *testing.T) {
 	if !found {
 		t.Fatalf("Git metadata mount missing: %#v", runOpts.Mounts)
 	}
+	configProtected := false
+	for _, mount := range runOpts.Mounts {
+		path := filepath.Join(commonDir, "config")
+		if mount.Host == path && mount.Container == path && mount.ReadOnly {
+			configProtected = true
+		}
+	}
+	if !configProtected {
+		t.Fatalf("read-only Git config mount missing: %#v", runOpts.Mounts)
+	}
 	for _, value := range []string{"GIT_COMMON_DIR=" + commonDir, "GIT_WORK_TREE=/workspace", "GIT_AUTHOR_NAME=Test User", "GIT_AUTHOR_EMAIL=test@example.com"} {
 		if !slices.Contains(runOpts.Env, value) {
 			t.Errorf("environment missing %q", value)
@@ -168,8 +178,8 @@ func TestClaudeCredentialSelection(t *testing.T) {
 		wantMounts    int
 		wantKeyEnv    bool
 	}{
-		{name: "host login", createHostDir: true, wantMounts: 4},
-		{name: "API key without host login", apiKey: key, wantMounts: 2, wantKeyEnv: true},
+		{name: "host login", createHostDir: true, wantMounts: 5},
+		{name: "API key without host login", apiKey: key, wantMounts: 3, wantKeyEnv: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repoDir := setupDeleteTestRepo(t)

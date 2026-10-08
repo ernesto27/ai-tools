@@ -482,6 +482,21 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 	return nil
 }
 
+// RecordSkippedStage notes a disabled stage in the summary without numbering
+// it as an executed result or creating a stage file.
+func (r *Run) RecordSkippedStage(message string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed || r.summary == nil {
+		return fmt.Errorf("summary file is closed or unavailable")
+	}
+	if _, err := io.WriteString(r.summary, message+"\n\n"); err != nil {
+		return fmt.Errorf("write skipped stage: %w", err)
+	}
+	return nil
+}
+
 // formatDuration rounds elapsed time to whole seconds and omits zero units.
 func formatDuration(elapsed time.Duration) string {
 	totalSeconds := int64(elapsed.Round(time.Second) / time.Second)

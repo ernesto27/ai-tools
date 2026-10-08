@@ -1,10 +1,10 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"soft-factory/internal/googledrive"
@@ -12,15 +12,15 @@ import (
 
 type Config struct {
 	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"google_drive,omitempty"`
-	CustomSkills CustomSkills       `json:"custom-skills"`
+	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills CustomSkills       `json:"customSkills"`
 }
 
 type CustomSkills struct {
-	CodeReview         string `json:"code-review,omitempty"`
-	SecurityReview     string `json:"security-review,omitempty"`
-	RiskClassification string `json:"risk-classification,omitempty"`
-	ReviewChanges      string `json:"review-changes,omitempty"`
+	CodeReview         string `json:"codeReview,omitempty"`
+	SecurityReview     string `json:"securityReview,omitempty"`
+	RiskClassification string `json:"riskClassification,omitempty"`
+	ReviewChanges      string `json:"reviewChanges,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -77,16 +77,17 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("read factory configuration: %w", err)
 	}
 
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
-	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
-	if value, ok := fields["code-review-skill"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-		return Config{}, fmt.Errorf("validate factory configuration: code-review-skill must be a skill name, not null")
+	if err := checkPropertyNames(fields); err != nil {
+		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -98,13 +99,13 @@ func Load(path string) (Config, error) {
 
 func (c Config) Validate() error {
 	skillNames := map[string]string{
-		"code-review":         c.CustomSkills.CodeReview,
-		"security-review":     c.CustomSkills.SecurityReview,
-		"risk-classification": c.CustomSkills.RiskClassification,
-		"review-changes":      c.CustomSkills.ReviewChanges,
+		"codeReview":         c.CustomSkills.CodeReview,
+		"securityReview":     c.CustomSkills.SecurityReview,
+		"riskClassification": c.CustomSkills.RiskClassification,
+		"reviewChanges":      c.CustomSkills.ReviewChanges,
 	}
 
-	for stage, name := range skillNames {
+	for property, name := range skillNames {
 		if name == "" {
 			continue
 		}
@@ -114,8 +115,8 @@ func (c Config) Validate() error {
 			name == ".." ||
 			strings.ContainsAny(name, `/\`) {
 			return fmt.Errorf(
-				"custom-skills.%s must be a single nonempty skill name",
-				stage,
+				"customSkills.%s must be a single nonempty skill name",
+				property,
 			)
 		}
 	}
@@ -127,19 +128,97 @@ func (c Config) Validate() error {
 	}
 	if c.GoogleDrive != nil {
 		if len(c.GoogleDrive.Folders) == 0 && len(c.GoogleDrive.Files) == 0 {
-			return fmt.Errorf("google_drive requires at least one folder or file")
+			return fmt.Errorf("googleDrive requires at least one folder or file")
 		}
 		for i, name := range c.GoogleDrive.Folders {
 			if strings.TrimSpace(name) == "" {
-				return fmt.Errorf("google_drive.folders[%d] must not be empty", i)
+				return fmt.Errorf("googleDrive.folders[%d] must not be empty", i)
 			}
 		}
 		for i, fileURL := range c.GoogleDrive.Files {
 			if _, err := googledrive.DocumentIDFromURL(fileURL); err != nil {
-				return fmt.Errorf("google_drive.files[%d]: %w", i, err)
+				return fmt.Errorf("googleDrive.files[%d]: %w", i, err)
 			}
 		}
 	}
 
+	return nil
+}
+
+// propertyNames describes the known property names of one configuration object.
+type propertyNames struct {
+	canonical []string
+	// obsolete maps removed names to the canonical path that replaces them.
+	obsolete map[string]string
+}
+
+var (
+	topLevelProperties = propertyNames{
+		canonical: []string{"documents", "googleDrive", "customSkills"},
+		obsolete: map[string]string{
+			"google_drive":      "googleDrive",
+			"custom-skills":     "customSkills",
+			"code-review-skill": "customSkills.codeReview",
+		},
+	}
+	nestedProperties = map[string]propertyNames{
+		"googleDrive": {canonical: []string{"folders", "files"}},
+		"customSkills": {
+			canonical: []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"},
+			obsolete: map[string]string{
+				"code-review":         "customSkills.codeReview",
+				"security-review":     "customSkills.securityReview",
+				"risk-classification": "customSkills.riskClassification",
+				"review-changes":      "customSkills.reviewChanges",
+			},
+		},
+	}
+)
+
+// checkPropertyNames rejects obsolete and incorrectly cased known property
+// names, which JSON decoding would otherwise ignore or match case-insensitively.
+func checkPropertyNames(fields map[string]json.RawMessage) error {
+	if err := topLevelProperties.check("", fields); err != nil {
+		return err
+	}
+	for _, name := range topLevelProperties.canonical {
+		names, ok := nestedProperties[name]
+		if !ok {
+			continue
+		}
+		// Typed decoding reports values that are not objects.
+		var nested map[string]json.RawMessage
+		if json.Unmarshal(fields[name], &nested) != nil {
+			continue
+		}
+		if err := names.check(name+".", nested); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p propertyNames) check(prefix string, fields map[string]json.RawMessage) error {
+	keys := make([]string, 0, len(fields))
+	for key := range fields {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	for _, key := range keys {
+		if slices.Contains(p.canonical, key) {
+			continue
+		}
+		for old, replacement := range p.obsolete {
+			if strings.EqualFold(key, old) {
+				return fmt.Errorf("%s%s is unsupported; use %s", prefix, key, replacement)
+			}
+		}
+		for _, name := range p.canonical {
+			if strings.EqualFold(key, name) {
+				return fmt.Errorf("%s%s is unsupported; use %s%s", prefix, key, prefix, name)
+			}
+		}
+	}
 	return nil
 }

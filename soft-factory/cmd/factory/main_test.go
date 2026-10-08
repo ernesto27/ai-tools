@@ -8,10 +8,10 @@ import (
 )
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
-	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
-		t.Run(stage, func(t *testing.T) {
+	for _, property := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+		t.Run(property, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			data := `{"custom-skills":{"` + stage + `":"missing"}}`
+			data := `{"customSkills":{"` + property + `":"missing"}}`
 			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
 				t.Fatal(err)
 			}
@@ -20,9 +20,29 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 			}
 
 			err := runWorkflow(workflowOptions{Implement: true})
-			want := "custom-skills." + stage + `: project skill "missing" not found`
+			want := "customSkills." + property + `: project skill "missing" not found`
 			if err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("expected missing-skill error %q first, got %v", want, err)
+			}
+		})
+	}
+}
+
+func TestObsoletePropertyStopsBeforeSkillsAndDocuments(t *testing.T) {
+	for _, tc := range []struct{ data, want string }{
+		{`{"custom-skills":{"code-review":"missing"}}`, "custom-skills is unsupported; use customSkills"},
+		{`{"customSkills":{"code-review":"missing"}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{`{"customSkills":{"codeReview":"missing"},"google_drive":{"folders":["test1"]}}`, "google_drive is unsupported; use googleDrive"},
+	} {
+		t.Run(tc.want, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile(factoryConfigFile, []byte(tc.data), 0644); err != nil {
+				t.Fatal(err)
+			}
+			// Skill resolution or Drive setup would report a different error.
+			err := runWorkflow(workflowOptions{Implement: true})
+			if err == nil || err.Error() != "validate factory configuration: "+tc.want {
+				t.Fatalf("expected configuration error %q, got %v", tc.want, err)
 			}
 		})
 	}
@@ -42,7 +62,7 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
-				if err := os.WriteFile("config.json", []byte(`{"custom-skills":{"code-review":"missing"}}`), 0644); err != nil {
+				if err := os.WriteFile("config.json", []byte(`{"customSkills":{"codeReview":"missing"}}`), 0644); err != nil {
 					t.Fatal(err)
 				}
 				if invalid {

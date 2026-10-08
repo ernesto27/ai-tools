@@ -18,6 +18,13 @@ SHA-256 y deja el binario en `~/.local/bin`. Si ese directorio todavía no está
 en `PATH`, el instalador indica la línea que hay que agregar al perfil de la shell.
 Las releases se crean con tags `agent-sandbox-v*`.
 
+Para actualizar a la última release:
+
+```bash
+agent-sandbox update
+```
+
+
 Para compilarlo desde este directorio:
 
 ```bash

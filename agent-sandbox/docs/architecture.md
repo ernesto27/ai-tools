@@ -19,6 +19,9 @@ cmd/agent-sandbox -> sandbox -> agent -> docker
   override command-section values, which override shared root values.
   [run_tui.go](../cmd/agent-sandbox/run_tui.go) adds `run-tui` and `resume-tui`
   using the same execution and configuration as `run` and `resume`.
+  [update.go](../cmd/agent-sandbox/update.go) runs the embedded
+  [install.sh](../install.sh) with Bash to install the latest release, independently
+  of sandbox execution and configuration.
 - [internal/sandbox](../internal/sandbox/sandbox.go) orchestrates image preparation,
   worktree creation or reuse, container execution, and publication.
   [Runtime](../internal/sandbox/runtime.go) routes output and execution events

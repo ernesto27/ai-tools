@@ -10,3 +10,9 @@ import _ "embed"
 //
 //go:embed Dockerfile
 var Dockerfile string
+
+// InstallScript is embedded so updates use the same installer as a fresh install
+// without requiring a repository checkout.
+//
+//go:embed install.sh
+var InstallScript string

@@ -1,5 +1,4 @@
 [] - instalar agent-sandbox si no existe en path
-[] - google file should be set in software-factory.json
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
 [] - config file should not be required, now return an error

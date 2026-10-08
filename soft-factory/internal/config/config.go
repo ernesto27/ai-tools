@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -77,13 +78,14 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("read factory configuration: %w", err)
 	}
 
+	// Reject malformed and non-object configuration before checking names.
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 	// Check names before decoding because encoding/json ignores unknown
 	// fields and matches field names case-insensitively.
-	if err := checkPropertyNames(fields); err != nil {
+	if err := checkPropertyNames(data); err != nil {
 		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
 	}
 
@@ -130,28 +132,77 @@ var (
 )
 
 // checkPropertyNames rejects obsolete and incorrectly cased known property
-// names regardless of their values. Other unknown names are ignored.
-func checkPropertyNames(fields map[string]json.RawMessage) error {
+// names regardless of their values. Other unknown names are ignored. data
+// must be valid JSON.
+func checkPropertyNames(data []byte) error {
+	fields, err := objectMembers(data)
+	if err != nil {
+		return err
+	}
 	if err := checkObjectNames("", fields, topLevelProperties); err != nil {
 		return err
 	}
-	for _, parent := range []string{"googleDrive", "customSkills"} {
-		var nested map[string]json.RawMessage
-		// Non-object values are reported by the typed decode.
-		if json.Unmarshal(fields[parent], &nested) != nil {
+	// Check every occurrence of a repeated parent because the typed decode
+	// merges all of them.
+	for _, field := range fields {
+		names, ok := nestedProperties[field.name]
+		if !ok {
 			continue
 		}
-		if err := checkObjectNames(parent+".", nested, nestedProperties[parent]); err != nil {
+		// Non-object values have no members and are reported by the typed
+		// decode.
+		nested, err := objectMembers(field.value)
+		if err != nil {
+			return err
+		}
+		if err := checkObjectNames(field.name+".", nested, names); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func checkObjectNames(prefix string, fields map[string]json.RawMessage, names propertyNames) error {
+// member is one name and value of a JSON object.
+type member struct {
+	name  string
+	value json.RawMessage
+}
+
+// objectMembers returns every member of a valid JSON object in document
+// order, including repeated names, which a map keeps only once. Non-object
+// values have no members.
+func objectMembers(data []byte) ([]member, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("read object: %w", err)
+	}
+	if tok != json.Delim('{') {
+		return nil, nil
+	}
+	var members []member
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("read object name: %w", err)
+		}
+		name, ok := tok.(string)
+		if !ok {
+			return nil, fmt.Errorf("read object name: unexpected %v", tok)
+		}
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		members = append(members, member{name, value})
+	}
+	return members, nil
+}
+
+func checkObjectNames(prefix string, fields []member, names propertyNames) error {
 	keys := make([]string, 0, len(fields))
-	for key := range fields {
-		keys = append(keys, key)
+	for _, field := range fields {
+		keys = append(keys, field.name)
 	}
 	slices.Sort(keys)
 

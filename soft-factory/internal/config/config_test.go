@@ -187,6 +187,10 @@ func TestLoadRejectsObsoleteAndMiscasedNames(t *testing.T) {
 		{"miscased codeReview", `{"customSkills":{"codereview":"my-review"}}`, "customSkills.codereview is unsupported; use customSkills.codeReview"},
 		{"miscased reviewChanges", `{"customSkills":{"ReviewChanges":""}}`, "customSkills.ReviewChanges is unsupported; use customSkills.reviewChanges"},
 		{"miscased nested obsolete", `{"customSkills":{"Code-Review":"my-review"}}`, "customSkills.Code-Review is unsupported; use customSkills.codeReview"},
+		{"miscased codeReview in repeated customSkills", `{"customSkills":{"codereview":"my-review"},"customSkills":{}}`, "customSkills.codereview is unsupported; use customSkills.codeReview"},
+		{"miscased folders in repeated googleDrive", `{"googleDrive":{"Folders":["test1"]},"googleDrive":{}}`, "googleDrive.Folders is unsupported; use googleDrive.folders"},
+		{"nested old in repeated customSkills before null", `{"customSkills":{"code-review":"my-review"},"customSkills":null}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{"nested old in later repeated customSkills", `{"customSkills":{"codeReview":"my-review"},"customSkills":{"review-changes":"my-walkthrough"}}`, "customSkills.review-changes is unsupported; use customSkills.reviewChanges"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())

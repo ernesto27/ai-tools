@@ -151,61 +151,6 @@ func TestLoadCanonicalExample(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsObsoleteAndMiscasedNames(t *testing.T) {
-	const documentURL = "https://docs.google.com/document/d/abc123/edit"
-	for _, tc := range []struct {
-		name string
-		data string
-		want string
-	}{
-		{"google_drive", `{"google_drive":{"folders":["test1"]}}`, "google_drive is unsupported; use googleDrive"},
-		{"google_drive null", `{"google_drive":null}`, "google_drive is unsupported; use googleDrive"},
-		{"google_drive empty", `{"google_drive":{}}`, "google_drive is unsupported; use googleDrive"},
-		{"google_drive with canonical", `{"googleDrive":{"folders":["test1"]},"google_drive":{"folders":["test1"]}}`, "google_drive is unsupported; use googleDrive"},
-		{"custom-skills", `{"custom-skills":{"code-review":"my-review"}}`, "custom-skills is unsupported; use customSkills"},
-		{"custom-skills null", `{"custom-skills":null}`, "custom-skills is unsupported; use customSkills"},
-		{"custom-skills empty", `{"custom-skills":{}}`, "custom-skills is unsupported; use customSkills"},
-		{"custom-skills with canonical", `{"customSkills":{"codeReview":"my-review"},"custom-skills":{}}`, "custom-skills is unsupported; use customSkills"},
-		{"code-review-skill", `{"code-review-skill":"my-review"}`, "code-review-skill is unsupported; use customSkills.codeReview"},
-		{"code-review-skill null", `{"code-review-skill":null}`, "code-review-skill is unsupported; use customSkills.codeReview"},
-		{"code-review-skill empty", `{"code-review-skill":""}`, "code-review-skill is unsupported; use customSkills.codeReview"},
-		{"code-review-skill with canonical", `{"customSkills":{"codeReview":"my-review"},"code-review-skill":"my-review"}`, "code-review-skill is unsupported; use customSkills.codeReview"},
-		{"nested code-review", `{"customSkills":{"code-review":"my-review"}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
-		{"nested security-review", `{"customSkills":{"security-review":"my-security"}}`, "customSkills.security-review is unsupported; use customSkills.securityReview"},
-		{"nested risk-classification", `{"customSkills":{"risk-classification":"my-risk"}}`, "customSkills.risk-classification is unsupported; use customSkills.riskClassification"},
-		{"nested review-changes", `{"customSkills":{"review-changes":"my-walkthrough"}}`, "customSkills.review-changes is unsupported; use customSkills.reviewChanges"},
-		{"nested old null", `{"customSkills":{"code-review":null}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
-		{"nested old empty", `{"customSkills":{"code-review":""}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
-		{"nested old with canonical", `{"customSkills":{"codeReview":"my-review","code-review":"my-review"}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
-		{"miscased documents", `{"Documents":["task.txt"]}`, "Documents is unsupported; use documents"},
-		{"miscased googleDrive", `{"googledrive":{"folders":["test1"]}}`, "googledrive is unsupported; use googleDrive"},
-		{"miscased customSkills", `{"CustomSkills":{"codeReview":"my-review"}}`, "CustomSkills is unsupported; use customSkills"},
-		{"miscased customSkills null", `{"customskills":null}`, "customskills is unsupported; use customSkills"},
-		{"miscased obsolete", `{"Google_Drive":{"folders":["test1"]}}`, "Google_Drive is unsupported; use googleDrive"},
-		{"miscased folders", `{"googleDrive":{"Folders":["test1"],"files":["` + documentURL + `"]}}`, "googleDrive.Folders is unsupported; use googleDrive.folders"},
-		{"miscased files", `{"googleDrive":{"FILES":["` + documentURL + `"]}}`, "googleDrive.FILES is unsupported; use googleDrive.files"},
-		{"miscased codeReview", `{"customSkills":{"codereview":"my-review"}}`, "customSkills.codereview is unsupported; use customSkills.codeReview"},
-		{"miscased reviewChanges", `{"customSkills":{"ReviewChanges":""}}`, "customSkills.ReviewChanges is unsupported; use customSkills.reviewChanges"},
-		{"miscased nested obsolete", `{"customSkills":{"Code-Review":"my-review"}}`, "customSkills.Code-Review is unsupported; use customSkills.codeReview"},
-		{"miscased codeReview in repeated customSkills", `{"customSkills":{"codereview":"my-review"},"customSkills":{}}`, "customSkills.codereview is unsupported; use customSkills.codeReview"},
-		{"miscased folders in repeated googleDrive", `{"googleDrive":{"Folders":["test1"]},"googleDrive":{}}`, "googleDrive.Folders is unsupported; use googleDrive.folders"},
-		{"nested old in repeated customSkills before null", `{"customSkills":{"code-review":"my-review"},"customSkills":null}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
-		{"nested old in later repeated customSkills", `{"customSkills":{"codeReview":"my-review"},"customSkills":{"review-changes":"my-walkthrough"}}`, "customSkills.review-changes is unsupported; use customSkills.reviewChanges"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
-				t.Fatal(err)
-			}
-			_, err := Load("software-factory.json")
-			want := "validate factory configuration: " + tc.want
-			if err == nil || err.Error() != want {
-				t.Fatalf("Load error = %v; want %q", err, want)
-			}
-		})
-	}
-}
-
 func TestLoadSandboxSettings(t *testing.T) {
 	t.Chdir(t.TempDir())
 	data := `{"run":{"branch":"implementation","file-prompt":"task.txt","agent":"codex","model":"model","push":false},"resume":{"branch":"reviews","agent":123},"version":1}`

@@ -61,14 +61,14 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	var loadedSkills sandbox.ProjectSkills
 
 	entries := []struct {
-		path   string
+		stage  string
 		name   string
 		target **sandbox.ProjectSkill
 	}{
-		{path: "customSkills.codeReview", name: cfg.CustomSkills.CodeReview, target: &loadedSkills.CodeReview},
-		{path: "customSkills.securityReview", name: cfg.CustomSkills.SecurityReview, target: &loadedSkills.SecurityReview},
-		{path: "customSkills.riskClassification", name: cfg.CustomSkills.RiskClassification, target: &loadedSkills.RiskClassification},
-		{path: "customSkills.reviewChanges", name: cfg.CustomSkills.ReviewChanges, target: &loadedSkills.ReviewChanges},
+		{stage: "codeReview", name: cfg.CustomSkills.CodeReview, target: &loadedSkills.CodeReview},
+		{stage: "securityReview", name: cfg.CustomSkills.SecurityReview, target: &loadedSkills.SecurityReview},
+		{stage: "riskClassification", name: cfg.CustomSkills.RiskClassification, target: &loadedSkills.RiskClassification},
+		{stage: "reviewChanges", name: cfg.CustomSkills.ReviewChanges, target: &loadedSkills.ReviewChanges},
 	}
 
 	for _, entry := range entries {
@@ -81,7 +81,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 			entry.name,
 		)
 		if err != nil {
-			return fmt.Errorf("%s: %w", entry.path, err)
+			return fmt.Errorf("customSkills.%s: %w", entry.stage, err)
 		}
 
 		*entry.target = skill

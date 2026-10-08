@@ -56,30 +56,6 @@ relative to `software-factory.json`, and gives the first match to that stage
 after its default skill. A configured skill that is missing or cannot be read
 stops the workflow before implementation with an error.
 
-#### Migrating from earlier property names
-
-Earlier versions used snake_case and kebab-case property names. They are no
-longer accepted, and there is no automatic migration. Rename these keys
-manually:
-
-| Old property | New property |
-| --- | --- |
-| `google_drive` | `googleDrive` |
-| `custom-skills` | `customSkills` |
-| `custom-skills.code-review` | `customSkills.codeReview` |
-| `custom-skills.security-review` | `customSkills.securityReview` |
-| `custom-skills.risk-classification` | `customSkills.riskClassification` |
-| `custom-skills.review-changes` | `customSkills.reviewChanges` |
-| `code-review-skill` | `customSkills.codeReview` |
-
-An old property name, or a known name with different capitalization such as
-`GoogleDrive`, stops the workflow before any document loading or agent
-execution, even when its value is empty or the new name is also present:
-
-```text
-validate factory configuration: customSkills.code-review is unsupported; use customSkills.codeReview
-```
-
 Example using both local documents and Google Drive:
 
 ```json

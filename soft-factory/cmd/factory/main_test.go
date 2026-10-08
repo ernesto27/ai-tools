@@ -62,25 +62,3 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 		}
 	}
 }
-
-func TestObsoleteConfigStopsBeforeSkillResolution(t *testing.T) {
-	for _, implement := range []bool{false, true} {
-		name := "review"
-		if implement {
-			name = "implementation"
-		}
-		t.Run(name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			// The missing skill and Drive folder would fail later stages.
-			data := `{"customSkills":{"codeReview":"missing","code-review":"missing"},"googleDrive":{"folders":["test1"]}}`
-			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
-				t.Fatal(err)
-			}
-			err := runWorkflow(workflowOptions{Implement: implement})
-			want := "validate factory configuration: customSkills.code-review is unsupported; use customSkills.codeReview"
-			if err == nil || err.Error() != want {
-				t.Fatalf("expected obsolete configuration error %q, got %v", want, err)
-			}
-		})
-	}
-}

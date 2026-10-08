@@ -33,6 +33,11 @@ if [ "$stage" = reviewChanges ]; then
 	walkthrough=$(grep -o '\.soft-factory-review-changes-[0-9]*\.md' "$prompt" | head -n 1)
 	echo "# Walkthrough" > "$walkthrough"
 fi
+if [ "$stage" = codeReview ] || [ "$stage" = securityReview ]; then
+	report=$(grep -o '\.soft-factory-stage-changes-[A-Z0-9]*-review\.txt' "$prompt" | head -n 1)
+	echo "Status: PASS" > "$report"
+	echo "$report" >> "$FACTORY_TEST_RECORD/reviews"
+fi
 echo "$stage $1 $branch" >> "$FACTORY_TEST_RECORD/calls"
 [ "$stage" = "$FACTORY_TEST_FAIL" ] && exit 1
 exit 0
@@ -228,6 +233,34 @@ func TestWorkflowDisabledStages(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			var planned []string
+			for _, stage := range []struct{ id, label string }{
+				{"implementation", "implementation"},
+				{"codeReview", "code-review"},
+				{"securityReview", "security-review"},
+				{"riskClassification", "risk-classification"},
+			} {
+				if !slices.Contains(tc.disabled, stage.id) {
+					planned = append(planned, stage.label)
+				}
+			}
+			stageLogs, err := filepath.Glob(filepath.Join(logDir, "*.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantHeader := "\nPlanned stages: " + strings.Join(planned, ", ") + "\n"
+			for _, stageLog := range stageLogs {
+				if filepath.Base(stageLog) == "summary.log" {
+					continue
+				}
+				data, err := os.ReadFile(stageLog)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(data), wantHeader) {
+					t.Errorf("%s header does not contain %q:\n%s", stageLog, wantHeader, data)
+				}
+			}
 			for _, stage := range []struct{ id, file, entry string }{
 				{"implementation", "01-implementation.log", "IMPLEMENTATION"},
 				{"codeReview", "02-code-review.log", "CODE REVIEW"},
@@ -377,6 +410,57 @@ func TestWorkflowRejectsInvalidDisabledStagesBeforeAgents(t *testing.T) {
 			}
 			if dir := runLogDirectory(t); dir != "" {
 				t.Fatalf("invalid configuration created execution logs in %s", dir)
+			}
+		})
+	}
+}
+
+func TestWorkflowRemovesReviewReportsWhenRiskDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		opts     workflowOptions
+		disabled []string
+		reports  int
+	}{
+		{"default", workflowOptions{Implement: true}, []string{"riskClassification"}, 2},
+		{"review", workflowOptions{}, []string{"riskClassification"}, 2},
+		{"continue", workflowOptions{Implement: true, Continue: true}, []string{"riskClassification"}, 2},
+		{"review with code review disabled", workflowOptions{}, []string{"codeReview", "riskClassification"}, 1},
+		{"risk enabled", workflowOptions{}, nil, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newWorkflowFixture(t, disabledConfig(tc.disabled...), "")
+			// Reports from earlier runs are not this run's evidence and must survive.
+			stale := ".soft-factory-stage-changes-STALE-review.txt"
+			old := filepath.Join("docs", "code-review-old.md")
+			if err := os.Mkdir("docs", 0700); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{stale, old} {
+				if err := os.WriteFile(name, []byte("old report"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := runWorkflow(tc.opts); err != nil {
+				t.Fatalf("runWorkflow: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(fixture.record, "reviews"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			reports := strings.Fields(string(data))
+			if len(reports) != tc.reports {
+				t.Fatalf("stub wrote %d review reports; want %d: %v", len(reports), tc.reports, reports)
+			}
+			for _, report := range reports {
+				if _, err := os.Stat(report); !os.IsNotExist(err) {
+					t.Errorf("review report %s remains after the run: %v", report, err)
+				}
+			}
+			for _, name := range []string{stale, old} {
+				if data, err := os.ReadFile(name); err != nil || string(data) != "old report" {
+					t.Errorf("pre-existing report %s changed: %q, %v", name, data, err)
+				}
 			}
 		})
 	}

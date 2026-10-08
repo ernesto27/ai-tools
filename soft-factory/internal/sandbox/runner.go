@@ -608,6 +608,24 @@ changes directly and record the missing review evidence as a verification gap.
 	return evidence.String()
 }
 
+// RemoveReviewReports deletes the named review reports from this run's
+// worktree, as risk classification does after reading them. Empty names are
+// ignored, and failures only warn.
+func RemoveReviewReports(input TaskContext, reportFiles []string) {
+	for _, filename := range reportFiles {
+		if filename == "" {
+			continue
+		}
+		reportPath, err := executionlog.StageReportPath(input.Context, input.Branch, filename)
+		if err == nil {
+			err = os.Remove(reportPath)
+		}
+		if err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: remove review report: %v\n", err)
+		}
+	}
+}
+
 // RiskClassification assesses the final changes using only the review reports
 // produced by enabled reviews in this run. Empty report names are ignored.
 func RiskClassification(input TaskContext, reportFiles []string, disabledReviews []config.Stage) error {

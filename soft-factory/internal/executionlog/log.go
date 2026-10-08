@@ -43,7 +43,9 @@ type Run struct {
 }
 
 // NewRun initializes a private run directory before any workflow work starts.
-func NewRun(branch string) (*Run, error) {
+// planned lists, in order, the stage labels this run will execute; stages
+// disabled for the run are omitted from the header.
+func NewRun(branch string, planned []string) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
 	}
@@ -61,8 +63,12 @@ func NewRun(branch string) (*Run, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
+	plannedStages := strings.Join(planned, ", ")
+	if plannedStages == "" {
+		plannedStages = "none"
+	}
 	header := fmt.Sprintf("EXECUTION\nRun: %s\nBranch: %s\nStarted: %s\nDirectory: %s\nPlanned stages: %s\n",
-		filepath.Base(path), branch, timestamp(), workingDirectory, strings.Join(stageNames, ", "))
+		filepath.Base(path), branch, timestamp(), workingDirectory, plannedStages)
 
 	// Create summary
 	pathSummary := filepath.Join(path, summaryFile)

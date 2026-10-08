@@ -85,7 +85,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	var runLog *executionlog.Run
 	if opts.Implement {
 		var err error
-		runLog, err = executionlog.NewRun(branch)
+		runLog, err = executionlog.NewRun(branch, plannedStageLabels(cfg))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 		} else {
@@ -157,6 +157,10 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	}); err != nil {
 		return err
 	}
+	if cfg.StageDisabled(config.StageRiskClassification) {
+		// Risk classification normally removes this run's review reports.
+		sandbox.RemoveReviewReports(input, reports)
+	}
 	if !opts.Implement {
 		return nil
 	}
@@ -188,6 +192,26 @@ func workflowBranch(opts workflowOptions) (string, error) {
 		mode = "run"
 	}
 	return settings.Branch(mode)
+}
+
+// plannedStageLabels lists the internal log labels of the logged stages that
+// are enabled for this run, in pipeline order.
+func plannedStageLabels(cfg config.Config) []string {
+	var labels []string
+	for _, stage := range []struct {
+		stage config.Stage
+		label string
+	}{
+		{config.StageImplementation, "implementation"},
+		{config.StageCodeReview, "code-review"},
+		{config.StageSecurityReview, "security-review"},
+		{config.StageRiskClassification, "risk-classification"},
+	} {
+		if !cfg.StageDisabled(stage.stage) {
+			labels = append(labels, stage.label)
+		}
+	}
+	return labels
 }
 
 // runStage executes an enabled stage. name is the internal log label for the

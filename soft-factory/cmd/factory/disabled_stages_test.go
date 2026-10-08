@@ -392,6 +392,27 @@ func TestWorkflowIgnoresMissingSkillForDisabledStage(t *testing.T) {
 	}
 }
 
+func TestWorkflowRejectsMissingSkillForEnabledStage(t *testing.T) {
+	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+		t.Run(stage, func(t *testing.T) {
+			// Disabling a different stage must not relax the enabled stage's check.
+			other := "codeReview"
+			if stage == other {
+				other = "securityReview"
+			}
+			config := `{"customSkills":{"` + stage + `":"missing"},"disabledStages":["` + other + `"]}`
+			fixture := newWorkflowFixture(t, config, "")
+			err := runWorkflow(workflowOptions{Implement: true})
+			if err == nil || !strings.Contains(err.Error(), "customSkills."+stage+`: project skill "missing" not found`) {
+				t.Fatalf("expected missing skill error for enabled stage %s, got %v", stage, err)
+			}
+			if calls := fixture.calls(t); len(calls) != 0 {
+				t.Fatalf("agent-sandbox ran despite a missing enabled skill: %v", calls)
+			}
+		})
+	}
+}
+
 func TestWorkflowRejectsInvalidDisabledStagesBeforeAgents(t *testing.T) {
 	for _, tc := range []struct{ config, want string }{
 		{`{"disabledStages":["securityReveiw"]}`, `disabledStages[0]: unknown stage "securityReveiw"`},

@@ -8,10 +8,10 @@ import (
 )
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
-	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
+	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		t.Run(stage, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			data := `{"custom-skills":{"` + stage + `":"missing"}}`
+			data := `{"customSkills":{"` + stage + `":"missing"}}`
 			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
 				t.Fatal(err)
 			}
@@ -20,7 +20,7 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 			}
 
 			err := runWorkflow(workflowOptions{Implement: true})
-			want := "custom-skills." + stage + `: project skill "missing" not found`
+			want := "customSkills." + stage + `: project skill "missing" not found`
 			if err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("expected missing-skill error %q first, got %v", want, err)
 			}
@@ -42,7 +42,7 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
-				if err := os.WriteFile("config.json", []byte(`{"custom-skills":{"code-review":"missing"}}`), 0644); err != nil {
+				if err := os.WriteFile("config.json", []byte(`{"customSkills":{"codeReview":"missing"}}`), 0644); err != nil {
 					t.Fatal(err)
 				}
 				if invalid {
@@ -60,5 +60,27 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestObsoleteConfigStopsBeforeSkillResolution(t *testing.T) {
+	for _, implement := range []bool{false, true} {
+		name := "review"
+		if implement {
+			name = "implementation"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			// The missing skill and Drive folder would fail later stages.
+			data := `{"customSkills":{"codeReview":"missing","code-review":"missing"},"googleDrive":{"folders":["test1"]}}`
+			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
+				t.Fatal(err)
+			}
+			err := runWorkflow(workflowOptions{Implement: implement})
+			want := "validate factory configuration: customSkills.code-review is unsupported; use customSkills.codeReview"
+			if err == nil || err.Error() != want {
+				t.Fatalf("expected obsolete configuration error %q, got %v", want, err)
+			}
+		})
 	}
 }

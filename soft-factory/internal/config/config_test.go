@@ -18,19 +18,19 @@ func TestLoadGoogleDrive(t *testing.T) {
 		wantErr string
 	}{
 		{name: "omitted", data: `{}`},
-		{name: "empty block", data: `{"google_drive":{}}`, wantErr: "at least one folder or file"},
-		{name: "empty arrays", data: `{"google_drive":{"folders":[],"files":[]}}`, wantErr: "at least one folder or file"},
-		{name: "folders only", data: `{"google_drive":{"folders":["test1"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}}},
-		{name: "files only", data: `{"google_drive":{"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Files: []string{documentURL}}},
-		{name: "files with empty folders", data: `{"google_drive":{"folders":[],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{}, Files: []string{documentURL}}},
-		{name: "both", data: `{"google_drive":{"folders":["test1"],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}, Files: []string{documentURL}}},
-		{name: "blank folder with valid file", data: `{"google_drive":{"folders":[" "],"files":["` + documentURL + `"]}}`, wantErr: "google_drive.folders[0]"},
-		{name: "blank file", data: `{"google_drive":{"files":[" "]}}`, wantErr: "google_drive.files[0]"},
-		{name: "malformed URL", data: `{"google_drive":{"files":["https://docs.google.com/document/d/%zz"]}}`, wantErr: "google_drive.files[0]"},
-		{name: "wrong host", data: `{"google_drive":{"files":["https://example.com/document/d/abc123/edit"]}}`, wantErr: "google_drive.files[0]"},
-		{name: "missing ID", data: `{"google_drive":{"files":["https://docs.google.com/document/d//edit"]}}`, wantErr: "google_drive.files[0]"},
-		{name: "invalid file with folders", data: `{"google_drive":{"folders":["test1"],"files":["not-a-url"]}}`, wantErr: "google_drive.files[0]"},
-		{name: "invalid second file", data: `{"google_drive":{"files":["` + documentURL + `","not-a-url"]}}`, wantErr: "google_drive.files[1]"},
+		{name: "empty block", data: `{"googleDrive":{}}`, wantErr: "at least one folder or file"},
+		{name: "empty arrays", data: `{"googleDrive":{"folders":[],"files":[]}}`, wantErr: "at least one folder or file"},
+		{name: "folders only", data: `{"googleDrive":{"folders":["test1"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}}},
+		{name: "files only", data: `{"googleDrive":{"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Files: []string{documentURL}}},
+		{name: "files with empty folders", data: `{"googleDrive":{"folders":[],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{}, Files: []string{documentURL}}},
+		{name: "both", data: `{"googleDrive":{"folders":["test1"],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}, Files: []string{documentURL}}},
+		{name: "blank folder with valid file", data: `{"googleDrive":{"folders":[" "],"files":["` + documentURL + `"]}}`, wantErr: "googleDrive.folders[0]"},
+		{name: "blank file", data: `{"googleDrive":{"files":[" "]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "malformed URL", data: `{"googleDrive":{"files":["https://docs.google.com/document/d/%zz"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "wrong host", data: `{"googleDrive":{"files":["https://example.com/document/d/abc123/edit"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "missing ID", data: `{"googleDrive":{"files":["https://docs.google.com/document/d//edit"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "invalid file with folders", data: `{"googleDrive":{"folders":["test1"],"files":["not-a-url"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "invalid second file", data: `{"googleDrive":{"files":["` + documentURL + `","not-a-url"]}}`, wantErr: "googleDrive.files[1]"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -61,10 +61,12 @@ func TestLoadCustomSkills(t *testing.T) {
 		want CustomSkills
 	}{
 		{name: "omitted", data: `{}`},
-		{name: "empty", data: `{"custom-skills":{}}`},
+		{name: "null", data: `{"customSkills":null}`},
+		{name: "empty", data: `{"customSkills":{}}`},
+		{name: "empty values", data: `{"customSkills":{"codeReview":"","securityReview":"","riskClassification":"","reviewChanges":""}}`},
 		{
 			name: "all stages",
-			data: `{"custom-skills":{"code-review":"go-tui-review","security-review":"my-security","risk-classification":"my-risk","review-changes":"my-walkthrough"}}`,
+			data: `{"customSkills":{"codeReview":"go-tui-review","securityReview":"my-security","riskClassification":"my-risk","reviewChanges":"my-walkthrough"}}`,
 			want: CustomSkills{
 				CodeReview: "go-tui-review", SecurityReview: "my-security",
 				RiskClassification: "my-risk", ReviewChanges: "my-walkthrough",
@@ -88,12 +90,12 @@ func TestLoadCustomSkills(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
-	for _, stage := range []string{"code-review", "security-review", "risk-classification", "review-changes"} {
+	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		for _, name := range []string{" ", ".", "..", "nested/skill", `nested\skill`} {
 			t.Run(stage+"/"+name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
 				// Marshal names to preserve backslashes in JSON.
-				data, err := json.Marshal(map[string]any{"custom-skills": map[string]string{stage: name}})
+				data, err := json.Marshal(map[string]any{"customSkills": map[string]string{stage: name}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -101,11 +103,102 @@ func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = Load("software-factory.json")
-				if err == nil || !strings.Contains(err.Error(), "custom-skills."+stage) {
+				if err == nil || !strings.Contains(err.Error(), "customSkills."+stage+" must be") {
 					t.Fatalf("expected validation error for %s = %q, got %v", stage, name, err)
 				}
 			})
 		}
+	}
+}
+
+func TestLoadCanonicalExample(t *testing.T) {
+	t.Chdir(t.TempDir())
+	data := `{
+  "documents": ["task.txt"],
+  "googleDrive": {
+    "folders": ["Project documents"],
+    "files": ["https://docs.google.com/document/d/example-document-id/edit"]
+  },
+  "customSkills": {
+    "codeReview": "test-code-review",
+    "securityReview": "test-security-review",
+    "riskClassification": "test-risk-classification",
+    "reviewChanges": "test-review-changes"
+  }
+}`
+	if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load("software-factory.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Config{
+		Documents: []string{"task.txt"},
+		GoogleDrive: &GoogleDriveConfig{
+			Folders: []string{"Project documents"},
+			Files:   []string{"https://docs.google.com/document/d/example-document-id/edit"},
+		},
+		CustomSkills: CustomSkills{
+			CodeReview:         "test-code-review",
+			SecurityReview:     "test-security-review",
+			RiskClassification: "test-risk-classification",
+			ReviewChanges:      "test-review-changes",
+		},
+	}
+	if !reflect.DeepEqual(cfg, want) {
+		t.Fatalf("Load = %+v; want %+v", cfg, want)
+	}
+}
+
+func TestLoadRejectsObsoleteAndMiscasedNames(t *testing.T) {
+	const documentURL = "https://docs.google.com/document/d/abc123/edit"
+	for _, tc := range []struct {
+		name string
+		data string
+		want string
+	}{
+		{"google_drive", `{"google_drive":{"folders":["test1"]}}`, "google_drive is unsupported; use googleDrive"},
+		{"google_drive null", `{"google_drive":null}`, "google_drive is unsupported; use googleDrive"},
+		{"google_drive empty", `{"google_drive":{}}`, "google_drive is unsupported; use googleDrive"},
+		{"google_drive with canonical", `{"googleDrive":{"folders":["test1"]},"google_drive":{"folders":["test1"]}}`, "google_drive is unsupported; use googleDrive"},
+		{"custom-skills", `{"custom-skills":{"code-review":"my-review"}}`, "custom-skills is unsupported; use customSkills"},
+		{"custom-skills null", `{"custom-skills":null}`, "custom-skills is unsupported; use customSkills"},
+		{"custom-skills empty", `{"custom-skills":{}}`, "custom-skills is unsupported; use customSkills"},
+		{"custom-skills with canonical", `{"customSkills":{"codeReview":"my-review"},"custom-skills":{}}`, "custom-skills is unsupported; use customSkills"},
+		{"code-review-skill", `{"code-review-skill":"my-review"}`, "code-review-skill is unsupported; use customSkills.codeReview"},
+		{"code-review-skill null", `{"code-review-skill":null}`, "code-review-skill is unsupported; use customSkills.codeReview"},
+		{"code-review-skill empty", `{"code-review-skill":""}`, "code-review-skill is unsupported; use customSkills.codeReview"},
+		{"code-review-skill with canonical", `{"customSkills":{"codeReview":"my-review"},"code-review-skill":"my-review"}`, "code-review-skill is unsupported; use customSkills.codeReview"},
+		{"nested code-review", `{"customSkills":{"code-review":"my-review"}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{"nested security-review", `{"customSkills":{"security-review":"my-security"}}`, "customSkills.security-review is unsupported; use customSkills.securityReview"},
+		{"nested risk-classification", `{"customSkills":{"risk-classification":"my-risk"}}`, "customSkills.risk-classification is unsupported; use customSkills.riskClassification"},
+		{"nested review-changes", `{"customSkills":{"review-changes":"my-walkthrough"}}`, "customSkills.review-changes is unsupported; use customSkills.reviewChanges"},
+		{"nested old null", `{"customSkills":{"code-review":null}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{"nested old empty", `{"customSkills":{"code-review":""}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{"nested old with canonical", `{"customSkills":{"codeReview":"my-review","code-review":"my-review"}}`, "customSkills.code-review is unsupported; use customSkills.codeReview"},
+		{"miscased documents", `{"Documents":["task.txt"]}`, "Documents is unsupported; use documents"},
+		{"miscased googleDrive", `{"googledrive":{"folders":["test1"]}}`, "googledrive is unsupported; use googleDrive"},
+		{"miscased customSkills", `{"CustomSkills":{"codeReview":"my-review"}}`, "CustomSkills is unsupported; use customSkills"},
+		{"miscased customSkills null", `{"customskills":null}`, "customskills is unsupported; use customSkills"},
+		{"miscased obsolete", `{"Google_Drive":{"folders":["test1"]}}`, "Google_Drive is unsupported; use googleDrive"},
+		{"miscased folders", `{"googleDrive":{"Folders":["test1"],"files":["` + documentURL + `"]}}`, "googleDrive.Folders is unsupported; use googleDrive.folders"},
+		{"miscased files", `{"googleDrive":{"FILES":["` + documentURL + `"]}}`, "googleDrive.FILES is unsupported; use googleDrive.files"},
+		{"miscased codeReview", `{"customSkills":{"codereview":"my-review"}}`, "customSkills.codereview is unsupported; use customSkills.codeReview"},
+		{"miscased reviewChanges", `{"customSkills":{"ReviewChanges":""}}`, "customSkills.ReviewChanges is unsupported; use customSkills.reviewChanges"},
+		{"miscased nested obsolete", `{"customSkills":{"Code-Review":"my-review"}}`, "customSkills.Code-Review is unsupported; use customSkills.codeReview"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load("software-factory.json")
+			want := "validate factory configuration: " + tc.want
+			if err == nil || err.Error() != want {
+				t.Fatalf("Load error = %v; want %q", err, want)
+			}
+		})
 	}
 }
 

@@ -1,10 +1,10 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"soft-factory/internal/googledrive"
@@ -12,15 +12,15 @@ import (
 
 type Config struct {
 	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"google_drive,omitempty"`
-	CustomSkills CustomSkills       `json:"custom-skills"`
+	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills CustomSkills       `json:"customSkills"`
 }
 
 type CustomSkills struct {
-	CodeReview         string `json:"code-review,omitempty"`
-	SecurityReview     string `json:"security-review,omitempty"`
-	RiskClassification string `json:"risk-classification,omitempty"`
-	ReviewChanges      string `json:"review-changes,omitempty"`
+	CodeReview         string `json:"codeReview,omitempty"`
+	SecurityReview     string `json:"securityReview,omitempty"`
+	RiskClassification string `json:"riskClassification,omitempty"`
+	ReviewChanges      string `json:"reviewChanges,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -77,16 +77,19 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("read factory configuration: %w", err)
 	}
 
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
-	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
-	if value, ok := fields["code-review-skill"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-		return Config{}, fmt.Errorf("validate factory configuration: code-review-skill must be a skill name, not null")
+	// Check names before decoding because encoding/json ignores unknown
+	// fields and matches field names case-insensitively.
+	if err := checkPropertyNames(fields); err != nil {
+		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -96,27 +99,102 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
+// propertyNames lists the supported names of one configuration object and
+// the obsolete names it rejects, mapped to their canonical paths.
+type propertyNames struct {
+	supported []string
+	obsolete  map[string]string
+}
+
+var (
+	topLevelProperties = propertyNames{
+		supported: []string{"documents", "googleDrive", "customSkills"},
+		obsolete: map[string]string{
+			"google_drive":      "googleDrive",
+			"custom-skills":     "customSkills",
+			"code-review-skill": "customSkills.codeReview",
+		},
+	}
+	nestedProperties = map[string]propertyNames{
+		"googleDrive": {supported: []string{"folders", "files"}},
+		"customSkills": {
+			supported: []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"},
+			obsolete: map[string]string{
+				"code-review":         "customSkills.codeReview",
+				"security-review":     "customSkills.securityReview",
+				"risk-classification": "customSkills.riskClassification",
+				"review-changes":      "customSkills.reviewChanges",
+			},
+		},
+	}
+)
+
+// checkPropertyNames rejects obsolete and incorrectly cased known property
+// names regardless of their values. Other unknown names are ignored.
+func checkPropertyNames(fields map[string]json.RawMessage) error {
+	if err := checkObjectNames("", fields, topLevelProperties); err != nil {
+		return err
+	}
+	for _, parent := range []string{"googleDrive", "customSkills"} {
+		var nested map[string]json.RawMessage
+		// Non-object values are reported by the typed decode.
+		if json.Unmarshal(fields[parent], &nested) != nil {
+			continue
+		}
+		if err := checkObjectNames(parent+".", nested, nestedProperties[parent]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkObjectNames(prefix string, fields map[string]json.RawMessage, names propertyNames) error {
+	keys := make([]string, 0, len(fields))
+	for key := range fields {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	for _, key := range keys {
+		if slices.Contains(names.supported, key) {
+			continue
+		}
+		replacement := ""
+		for _, name := range names.supported {
+			if strings.EqualFold(key, name) {
+				replacement = prefix + name
+			}
+		}
+		for name, canonical := range names.obsolete {
+			if strings.EqualFold(key, name) {
+				replacement = canonical
+			}
+		}
+		if replacement != "" {
+			return fmt.Errorf("%s%s is unsupported; use %s", prefix, key, replacement)
+		}
+	}
+	return nil
+}
+
 func (c Config) Validate() error {
-	skillNames := map[string]string{
-		"code-review":         c.CustomSkills.CodeReview,
-		"security-review":     c.CustomSkills.SecurityReview,
-		"risk-classification": c.CustomSkills.RiskClassification,
-		"review-changes":      c.CustomSkills.ReviewChanges,
+	skillNames := []struct{ path, name string }{
+		{"customSkills.codeReview", c.CustomSkills.CodeReview},
+		{"customSkills.securityReview", c.CustomSkills.SecurityReview},
+		{"customSkills.riskClassification", c.CustomSkills.RiskClassification},
+		{"customSkills.reviewChanges", c.CustomSkills.ReviewChanges},
 	}
 
-	for stage, name := range skillNames {
-		if name == "" {
+	for _, skill := range skillNames {
+		if skill.name == "" {
 			continue
 		}
 
-		if strings.TrimSpace(name) == "" ||
-			name == "." ||
-			name == ".." ||
-			strings.ContainsAny(name, `/\`) {
-			return fmt.Errorf(
-				"custom-skills.%s must be a single nonempty skill name",
-				stage,
-			)
+		if strings.TrimSpace(skill.name) == "" ||
+			skill.name == "." ||
+			skill.name == ".." ||
+			strings.ContainsAny(skill.name, `/\`) {
+			return fmt.Errorf("%s must be a single nonempty skill name", skill.path)
 		}
 	}
 
@@ -127,16 +205,16 @@ func (c Config) Validate() error {
 	}
 	if c.GoogleDrive != nil {
 		if len(c.GoogleDrive.Folders) == 0 && len(c.GoogleDrive.Files) == 0 {
-			return fmt.Errorf("google_drive requires at least one folder or file")
+			return fmt.Errorf("googleDrive requires at least one folder or file")
 		}
 		for i, name := range c.GoogleDrive.Folders {
 			if strings.TrimSpace(name) == "" {
-				return fmt.Errorf("google_drive.folders[%d] must not be empty", i)
+				return fmt.Errorf("googleDrive.folders[%d] must not be empty", i)
 			}
 		}
 		for i, fileURL := range c.GoogleDrive.Files {
 			if _, err := googledrive.DocumentIDFromURL(fileURL); err != nil {
-				return fmt.Errorf("google_drive.files[%d]: %w", i, err)
+				return fmt.Errorf("googleDrive.files[%d]: %w", i, err)
 			}
 		}
 	}

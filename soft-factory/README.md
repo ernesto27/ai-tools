@@ -8,21 +8,25 @@ You can provide a task from a local file or a Jira issue, and include supporting
 
 Create these two files in the project folder before running Soft Factory.
 
-### `software-factory.json`: supporting documents and code review skill
+### `software-factory.json`: supporting documents and custom skills
 
 The CLI always reads `software-factory.json` from the current working directory.
 Rename an existing `config.json` to `software-factory.json`; there is no fallback
 to the old filename, and `--config` / `-c` are no longer supported.
 
-These are all the options currently supported:
+All property names use lower camelCase, including nested properties. These are all the options currently supported:
 
 | Option | Purpose |
 | --- | --- |
 | `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
-| `google_drive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
-| `google_drive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
-| `google_drive.files` | Optional list of full Google Docs URLs. Documents can be outside the configured folders. URLs are validated when configuration loads, before the Drive client starts. |
-| `code-review-skill` | Optional project skill name to add after the default code review skill. The name must be one directory name, not a path. |
+| `googleDrive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
+| `googleDrive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
+| `googleDrive.files` | Optional list of full Google Docs URLs. Documents can be outside the configured folders. URLs are validated when configuration loads, before the Drive client starts. |
+| `customSkills` | Optional project skills that extend the bundled stage skills. |
+| `customSkills.codeReview` | Optional project skill name for the code review stage. |
+| `customSkills.securityReview` | Optional project skill name for the security review stage. |
+| `customSkills.riskClassification` | Optional project skill name for the risk classification stage. |
+| `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
 
 Minimal example:
 
@@ -32,27 +36,56 @@ Minimal example:
 }
 ```
 
-To add project-specific code review instructions, set the skill name:
+To add project-specific review instructions, set skill names per stage. Skill
+names keep their own spelling; only property names use camelCase:
 
 ```json
 {
-  "code-review-skill": "mynameskill"
+  "customSkills": {
+    "codeReview": "test-code-review",
+    "securityReview": "test-security-review",
+    "riskClassification": "test-risk-classification",
+    "reviewChanges": "test-review-changes"
+  }
 }
 ```
 
-Soft Factory searches for `.agents/skills/mynameskill/SKILL.md` first, then
-`.claude/skills/mynameskill/SKILL.md`, relative to `software-factory.json`. The first
-matching skill is given to the code reviewer after the default code review
-skill. A configured skill that is missing or cannot be read stops the workflow
-before implementation with an error. Security review and risk classification
-do not use it.
+Each name must be one directory name, not a path. Soft Factory searches for
+`.agents/skills/<name>/SKILL.md` first, then `.claude/skills/<name>/SKILL.md`,
+relative to `software-factory.json`, and gives the first match to that stage
+after its default skill. A configured skill that is missing or cannot be read
+stops the workflow before implementation with an error.
+
+#### Migrating from earlier property names
+
+Earlier versions used snake_case and kebab-case property names. They are no
+longer accepted, and there is no automatic migration. Rename these keys
+manually:
+
+| Old property | New property |
+| --- | --- |
+| `google_drive` | `googleDrive` |
+| `custom-skills` | `customSkills` |
+| `custom-skills.code-review` | `customSkills.codeReview` |
+| `custom-skills.security-review` | `customSkills.securityReview` |
+| `custom-skills.risk-classification` | `customSkills.riskClassification` |
+| `custom-skills.review-changes` | `customSkills.reviewChanges` |
+| `code-review-skill` | `customSkills.codeReview` |
+
+An old property name, or a known name with different capitalization such as
+`GoogleDrive`, stops the workflow before any document loading or agent
+execution, even when its value is empty or the new name is also present:
+
+```text
+validate factory configuration: customSkills.code-review is unsupported; use customSkills.codeReview
+```
 
 Example using both local documents and Google Drive:
 
 ```json
 {
   "documents": ["requirements.md", "guidelines.md"],
-  "google_drive": {
+  "googleDrive": {
     "folders": ["Project Documentation"],
     "files": ["https://docs.google.com/document/d/DOCUMENT_ID/edit?tab=t.0"]
   }
@@ -73,7 +106,7 @@ The downloaded file must contain service-account credentials, including:
 
 
 
-When `google_drive` is configured, a missing or invalid credentials file stops the workflow. Without `google_drive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
+When `googleDrive` is configured, a missing or invalid credentials file stops the workflow. Without `googleDrive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
 
 Folder loading includes only Google Docs directly inside the selected folders. Individual URLs load the specified Google Docs regardless of their folder. See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for download and sharing instructions.
 
@@ -289,7 +322,7 @@ To also include Google Docs from shared Drive folders:
 ```json
 {
   "documents": ["requirements.md"],
-  "google_drive": {
+  "googleDrive": {
     "folders": ["Project Documentation"]
   }
 }
@@ -301,7 +334,7 @@ To load individual Google Docs without loading their folders, use `files`:
 
 ```json
 {
-  "google_drive": {
+  "googleDrive": {
     "files": [
       "https://docs.google.com/document/d/DOCUMENT_ID/edit?tab=t.0"
     ]
@@ -310,7 +343,7 @@ To load individual Google Docs without loading their folders, use `files`:
 ```
 
 Replace the example URL with your document's full Google Docs URL.
-You can configure `folders` only, `files` only, or both in the same `google_drive` block. At least one array must contain an entry. Individual documents can be in different folders, provided the service account has access to them. Invalid URLs fail when configuration loads; inaccessible documents or export errors stop the workflow during context loading.
+You can configure `folders` only, `files` only, or both in the same `googleDrive` block. At least one array must contain an entry. Individual documents can be in different folders, provided the service account has access to them. Invalid URLs fail when configuration loads; inaccessible documents or export errors stop the workflow during context loading.
 
 See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions.
 

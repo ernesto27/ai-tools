@@ -129,6 +129,26 @@ using a context derived with `context.WithoutCancel`. Deferred removal also
 covers attach/start failures and unexpected wait failures. Preserve these
 orderings so an agent cannot outlive the command and hold its worktree open.
 
+## Claude output
+
+[Claude arguments](../internal/agent/claude.go) request print mode with
+`--output-format stream-json --verbose --include-partial-messages` for both
+credential modes and all four execution commands. CLI presentation in
+[agent_output.go](../cmd/agent-sandbox/agent_output.go) supplies a stdout formatter
+through `Runtime.FormatStdout` and `RunOptions.FormatStdout`. Docker's non-TTY
+pump wraps only agent stdout and flushes the formatter after draining the
+attachment; stderr and image/version probes retain their existing routing.
+The formatter buffers an incomplete line, then uses Go's `json.Indent` to display
+each event with two-space indentation without removing fields or changing their
+order, numbers, or string escapes. Non-JSON lines pass through unchanged. A
+trailing event without a newline is flushed at EOF. Partial and completed events
+are both retained. The TUI displays the formatted event text through its existing
+terminal decoder and records it in the transcript.
+Sandbox preparation and publication messages still accompany agent output, so
+the entire command output is not a pure JSONL stream. Stdin and terminal ownership
+retain their existing behavior. Exit status and publication depend on the
+container result, not on JSON event contents.
+
 ## Exit status
 
 [fail()](../cmd/agent-sandbox/main.go) maps `UsageError` to a usage synopsis and

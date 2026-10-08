@@ -32,7 +32,18 @@ func (c *Client) pump(attach types.HijackedResponse, opts RunOptions) <-chan err
 			// frames to demultiplex, and stderr arrives on the same stream.
 			_, err = io.Copy(c.stdout, attach.Reader)
 		} else {
-			_, err = stdcopy.StdCopy(c.stdout, c.stderr, attach.Reader)
+			stdout := c.stdout
+			var formatter io.WriteCloser
+			if opts.FormatStdout != nil {
+				formatter = opts.FormatStdout(stdout)
+				stdout = formatter
+			}
+			_, err = stdcopy.StdCopy(stdout, c.stderr, attach.Reader)
+			if formatter != nil {
+				if closeErr := formatter.Close(); err == nil {
+					err = closeErr
+				}
+			}
 		}
 		done <- err
 	}()

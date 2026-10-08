@@ -25,6 +25,7 @@ type Runtime struct {
 	Sizes            <-chan docker.TerminalSize
 	Observe          func(Event)
 	ViewOwnsTerminal bool
+	FormatStdout     func(io.Writer) io.WriteCloser
 }
 
 func (r Runtime) withDefaults() Runtime {
@@ -93,9 +94,7 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 	if err != nil {
 		return 0, err
 	}
-	if r.ViewOwnsTerminal && opts.Agent.Name() == "claude" {
-		runOpts.Args = append([]string{"--verbose"}, runOpts.Args...)
-	}
+	runOpts.FormatStdout = r.FormatStdout
 	r.emit(Event{Phase: "Running agent"})
 	status, err := client.Run(ctx, runOpts)
 	if err != nil {

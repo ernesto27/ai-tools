@@ -32,7 +32,9 @@ func newResumeCmd(state *commandState) *cobra.Command {
 				return err
 			}
 
-			state.status, err = sandbox.Resume(cmd.Context(), opts, sandbox.Runtime{Output: cmd.OutOrStdout()})
+			state.status, err = sandbox.Resume(cmd.Context(), opts, sandbox.Runtime{
+				Output: cmd.OutOrStdout(), FormatStdout: agentOutputFormatter(opts.Agent.Name()),
+			})
 			return err
 		},
 	}

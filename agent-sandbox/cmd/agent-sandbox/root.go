@@ -95,7 +95,9 @@ func newRunCmd(state *commandState) *cobra.Command {
 				return err
 			}
 
-			state.status, err = sandbox.Run(cmd.Context(), opts, sandbox.Runtime{Output: cmd.OutOrStdout()})
+			state.status, err = sandbox.Run(cmd.Context(), opts, sandbox.Runtime{
+				Output: cmd.OutOrStdout(), FormatStdout: agentOutputFormatter(opts.Agent.Name()),
+			})
 			return err
 		},
 	}

@@ -232,6 +232,20 @@ func TestClaudeCredentialSelection(t *testing.T) {
 			if !slices.Contains(got.Args, "--print") {
 				t.Error("Claude key path must run in non-interactive print mode")
 			}
+			for _, arg := range []string{"--output-format", "stream-json", "--verbose", "--include-partial-messages"} {
+				count := 0
+				for _, actual := range got.Args {
+					if actual == arg {
+						count++
+					}
+				}
+				if count != 1 {
+					t.Errorf("Claude argument %q count = %d, want 1", arg, count)
+				}
+			}
+			if !got.Interactive || got.TTY {
+				t.Error("Claude stdin and TTY settings must remain unchanged")
+			}
 			if (len(got.Tmpfs) == 1 && got.Tmpfs[0].Path == "/claude-home") != tc.wantKeyEnv {
 				t.Errorf("disposable Claude home = %v, want %t", got.Tmpfs, tc.wantKeyEnv)
 			}

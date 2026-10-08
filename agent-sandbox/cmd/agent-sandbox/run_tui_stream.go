@@ -207,6 +207,7 @@ func newLiveJob(ctx context.Context, opts sandbox.Options, bridge *liveBridge, m
 		}
 		j.status, j.err = execute(ctx, opts, sandbox.Runtime{
 			Output: bridge, Sizes: j.sizes, Observe: bridge.observe, ViewOwnsTerminal: true,
+			FormatStdout: agentOutputFormatter(opts.Agent.Name()),
 		})
 		if j.err == nil && ctx.Err() != nil {
 			j.err = ctx.Err()

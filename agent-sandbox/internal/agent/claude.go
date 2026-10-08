@@ -66,7 +66,12 @@ func (c claude) APIKeyArgs(model, prompt string, images []string) []string {
 }
 
 func (claude) Args(model, prompt string, images []string) []string {
-	args := []string{"--print", "--permission-mode", "bypassPermissions", "--effort", "high"}
+	// Streaming events expose tool activity and partial messages while Claude
+	// works, rather than leaving the terminal quiet until its final response.
+	args := []string{
+		"--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+		"--permission-mode", "bypassPermissions", "--effort", "high",
+	}
 	if model != "" {
 		args = append(args, "--model", model)
 	}

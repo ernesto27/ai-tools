@@ -40,6 +40,9 @@ type RunOptions struct {
 	Mounts      []Mount
 	Tmpfs       []Tmpfs
 	HostNetwork bool
+	// FormatStdout wraps agent output for presentation. Close flushes pending
+	// bytes after the attachment is drained without closing the host stream.
+	FormatStdout func(io.Writer) io.WriteCloser
 }
 
 // Client runs containers of a single image, built from the Dockerfile supplied

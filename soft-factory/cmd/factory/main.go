@@ -35,20 +35,10 @@ type workflowOptions struct {
 	IssueURL string
 	// Implement runs the implementation stage before the reviews.
 	Implement bool
+	Continue  bool
 }
 
 func runWorkflow(opts workflowOptions) (runErr error) {
-	var runLog *executionlog.Run
-	if opts.Implement {
-		var err error
-		runLog, err = executionlog.NewRun()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
-		} else {
-			fmt.Printf("Execution logs: %s\n", runLog.Path())
-			defer func() { runLog.Finish(runErr) }()
-		}
-	}
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -87,6 +77,22 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		*entry.target = skill
 	}
 
+	branch, err := workflowBranch(opts)
+	if err != nil {
+		return err
+	}
+	var runLog *executionlog.Run
+	if opts.Implement {
+		var err error
+		runLog, err = executionlog.NewRun(branch)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
+		} else {
+			fmt.Printf("Execution logs: %s\n", runLog.Path())
+			defer func() { runLog.Finish(runErr) }()
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -108,6 +114,8 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		CustomSkills: loadedSkills,
 		Context:      ctx,
 		Log:          runLog,
+		Branch:       branch,
+		Continue:     opts.Continue,
 	}
 
 	if opts.Implement {
@@ -154,6 +162,19 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		fmt.Fprintf(os.Stderr, "Warning: final change walkthrough unavailable: %v; continuing execution.\n", err)
 	}
 	return nil
+}
+
+// workflowBranch selects one branch for every stage and report in this run.
+func workflowBranch(opts workflowOptions) (string, error) {
+	settings, err := config.LoadSandbox()
+	if err != nil {
+		return "", err
+	}
+	mode := "resume"
+	if opts.Implement && !opts.Continue {
+		mode = "run"
+	}
+	return settings.Branch(mode)
 }
 
 func runStage(input sandbox.TaskContext, name, message string, execute func() error) error {

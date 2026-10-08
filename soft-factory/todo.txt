@@ -1,18 +1,22 @@
-[x] - option to run skills in specific state (review, security, etc)
-[] - load specific documento in google drive
 [] - instalar agent-sandbox si no existe en path
 [] - google file should be set in software-factory.json
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
 [] - config file should not be required, now return an error
 [] - list of stages disables in software-factory.json
+[] - review only analysize code changes, not readme or docs
+[] - do not commit review-changes.md
+[] - i want agent-sandbox.json props json added in software-factory.json
+[] - think how to send more changes to current finish branch
+[x] - option to run skills in specific state (review, security, etc)
+[x] - load specific documento in google drive
 [x] - add new stage for get a explanation of code changes, diagram
 [x] - save execution time of any stage and for total time
 [x] - CTRL+C should stop execution
 [x] - change file config.json to software-factory.json
 [x] - integration with Jira to get task content from task
 [x] - save logs
-[x] - doctor command
+[x] - doctor comman
 [x] - commit changes in all stages
 [x] - add code-changes new skill
 [] - integration with GitHub Issues to get task content from an issue URL

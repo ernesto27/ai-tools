@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"soft-factory/internal/executionlog"
 )
 
 func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
@@ -53,12 +55,30 @@ func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	snapshot, err := changeEvidence(context.Background())
+	snapshot, err := changeEvidence(context.Background(), "feature")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if snapshot.Worktree != worktree {
 		t.Fatalf("worktree = %q, want %q", snapshot.Worktree, worktree)
+	}
+	// An explicit continuation branch must override a different configured branch.
+	if err := os.WriteFile(filepath.Join(repo, "agent-sandbox.json"), []byte(`{"resume":{"branch":"main"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err = changeEvidence(context.Background(), "feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Worktree != worktree {
+		t.Fatalf("override worktree = %q, want %q", snapshot.Worktree, worktree)
+	}
+	reportPath, err := executionlog.StageReportPath(context.Background(), "feature", "review.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(worktree, "review.md"); reportPath != want {
+		t.Fatalf("report path = %q, want %q", reportPath, want)
 	}
 	for _, want := range []string{"Comparison: merge base of HEAD and main", "+committed", "+staged", "+unstaged", `"new file.txt"`} {
 		if !strings.Contains(snapshot.Text, want) {

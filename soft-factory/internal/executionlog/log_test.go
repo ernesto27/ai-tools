@@ -43,7 +43,7 @@ func TestFormatDuration(t *testing.T) {
 
 func TestSummaryLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun()
+	run, err := NewRun("feature")
 	if err != nil {
 		t.Fatalf("NewRun: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestStageChangeReports(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
-			run, err := NewRun()
+			run, err := NewRun("feature")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -141,7 +141,7 @@ func TestStageChangeReports(t *testing.T) {
 
 func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun()
+	run, err := NewRun("feature")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 
 func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun()
+	run, err := NewRun("feature")
 	if err != nil {
 		t.Fatal(err)
 	}

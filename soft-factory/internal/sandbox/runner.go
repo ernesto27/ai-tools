@@ -19,6 +19,7 @@ import (
 )
 
 type ExecuteOptions struct {
+	Branch            string
 	Args              []string
 	ReportName        string
 	Prompt            string
@@ -48,14 +49,20 @@ type TaskContext struct {
 	CustomSkills ProjectSkills
 	Context      context.Context
 	Log          *executionlog.Run
+	Branch       string
+	Continue     bool
 }
 
 func Run(input TaskContext) error {
-	args := []string{"run"}
+	mode := "run"
+	if input.Continue {
+		mode = "resume"
+	}
+	args := []string{mode}
 
 	var prompt string
 	var changesFilename string
-	if input.TaskOverride != "" || input.Documents != "" || input.Log != nil {
+	if input.TaskOverride != "" || input.Documents != "" || input.Log != nil || input.Continue {
 		var err error
 		if input.TaskOverride != "" || input.Documents != "" {
 			prompt, err = buildTaskPrompt(input)
@@ -80,6 +87,7 @@ func Run(input TaskContext) error {
 
 	_, err := execute(ExecuteOptions{
 		Args:              args,
+		Branch:            input.Branch,
 		Prompt:            prompt,
 		Context:           input.Context,
 		Log:               input.Log,
@@ -125,7 +133,7 @@ func SecurityReview(input TaskContext) (string, error) {
 }
 
 // ReviewChanges asks the sandbox agent to write the walkthrough, then archives it.
-func ReviewChanges(input TaskContext) (result error) {
+func ReviewChanges(input TaskContext) error {
 	if input.Log == nil {
 		return fmt.Errorf("change walkthrough requires an execution log directory")
 	}
@@ -137,7 +145,7 @@ func ReviewChanges(input TaskContext) (result error) {
 	if err != nil {
 		return err
 	}
-	snapshot, err := changeEvidence(input.Context)
+	snapshot, err := changeEvidence(input.Context, input.Branch)
 	if err != nil {
 		return fmt.Errorf("collect final change evidence: %w", err)
 	}
@@ -147,11 +155,6 @@ func ReviewChanges(input TaskContext) (result error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("inspect temporary change walkthrough path %q: %w", source, err)
 	}
-	defer func() {
-		if err := os.Remove(source); err != nil && !errors.Is(err, os.ErrNotExist) {
-			result = errors.Join(result, fmt.Errorf("remove temporary change walkthrough %q: %w", source, err))
-		}
-	}()
 	prompt := fmt.Sprintf(`
 Create an informational, read-only walkthrough of the final branch changes.
 Use the supplied skill to review the current sandbox worktree after all
@@ -199,7 +202,8 @@ notes. In your final answer, briefly state whether you wrote the file.
 	}
 	defer os.Remove(path)
 	_, err = execute(ExecuteOptions{
-		Args:    []string{"resume", "-f", path},
+		Args:    []string{"resume", "--push=false", "--pr=false", "-f", path},
+		Branch:  input.Branch,
 		Prompt:  prompt,
 		Context: input.Context,
 		Log:     nil,
@@ -210,6 +214,9 @@ notes. In your final answer, briefly state whether you wrote the file.
 		return errors.Join(err, archiveErr)
 	}
 	fmt.Printf("\nReport saved: %s\n", destination)
+	if removeErr := os.Remove(source); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+		return errors.Join(err, fmt.Errorf("remove temporary change walkthrough %q: %w", source, removeErr))
+	}
 	return err
 }
 
@@ -367,6 +374,7 @@ Write this file even when the review is BLOCKED. Keep your normal final answer.
 
 	options := ExecuteOptions{
 		Args:              []string{"resume", "-f", path},
+		Branch:            input.Branch,
 		Prompt:            prompt,
 		Context:           input.Context,
 		Log:               input.Log,
@@ -440,6 +448,10 @@ func execute(options ExecuteOptions) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if options.Branch != "" {
+		args := append([]string(nil), options.Args...)
+		options.Args = append(args, "--branch", options.Branch)
+	}
 	cmd := exec.CommandContext(ctx, "agent-sandbox", options.Args...)
 	// Let the sandbox stop its container on interruption before forcing exit.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
@@ -472,7 +484,7 @@ func execute(options ExecuteOptions) (string, error) {
 
 	runErr := cmd.Run()
 	if options.Log != nil && options.ChangeSummaryFile != "" {
-		options.Log.RegisterStageChanges(ctx, options.Args[0], options.ChangeSummaryFile)
+		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}
 	if ctx.Err() != nil {
 		runErr = errors.Join(runErr, ctx.Err())
@@ -574,7 +586,7 @@ func archiveReviewReport(source, destination string) error {
 func RiskClassification(input TaskContext, reportFiles []string) error {
 	var reportReferences strings.Builder
 	for _, filename := range reportFiles {
-		reportPath, err := executionlog.StageReportPath(input.Context, "resume", filename)
+		reportPath, err := executionlog.StageReportPath(input.Context, input.Branch, filename)
 		if err != nil {
 			return fmt.Errorf("locate review report: %w", err)
 		}
@@ -646,6 +658,7 @@ Do not modify files, apply corrections, or publish changes.
 
 	options := ExecuteOptions{
 		Args:              []string{"resume", "--push=false", "--pr=false", "-f", path},
+		Branch:            input.Branch,
 		Prompt:            prompt,
 		Context:           input.Context,
 		Log:               input.Log,

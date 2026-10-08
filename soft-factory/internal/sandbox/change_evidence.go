@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
 )
 
@@ -19,15 +18,7 @@ type changeSnapshot struct {
 	Worktree string
 }
 
-func changeEvidence(ctx context.Context) (changeSnapshot, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return changeSnapshot{}, fmt.Errorf("load configuration for change evidence: %w", err)
-	}
-	branch, err := settings.Branch("resume")
-	if err != nil {
-		return changeSnapshot{}, err
-	}
+func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) {
 	worktree, err := executionlog.WorktreeForBranch(ctx, branch)
 	if err != nil {
 		return changeSnapshot{}, err

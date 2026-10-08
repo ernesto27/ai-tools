@@ -13,8 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"soft-factory/internal/config"
 )
 
 const (
@@ -45,7 +43,10 @@ type Run struct {
 }
 
 // NewRun initializes a private run directory before any workflow work starts.
-func NewRun() (*Run, error) {
+func NewRun(branch string) (*Run, error) {
+	if strings.TrimSpace(branch) == "" {
+		return nil, fmt.Errorf("execution log requires a branch")
+	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("resolve working directory: %w", err)
@@ -56,18 +57,12 @@ func NewRun() (*Run, error) {
 	if err := os.MkdirAll(logDirectory, 0700); err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
-	branch, branchNote := sandboxBranch()
 	path, err := createRunDirectory(branch, time.Now().UTC())
 	if err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
 	header := fmt.Sprintf("EXECUTION\nRun: %s\nBranch: %s\nStarted: %s\nDirectory: %s\nPlanned stages: %s\n",
 		filepath.Base(path), branch, timestamp(), workingDirectory, strings.Join(stageNames, ", "))
-	if branchNote == "agent-sandbox.json: run.branch" {
-		header += "Branch source: " + branchNote + "\n"
-	} else {
-		header += "Branch note: " + branchNote + "\n"
-	}
 
 	// Create summary
 	pathSummary := filepath.Join(path, summaryFile)
@@ -106,7 +101,7 @@ func IgnoreStageReports() error {
 	if err != nil {
 		return fmt.Errorf("open Git exclude file: %w", err)
 	}
-	_, writeErr := fmt.Fprintln(file, "\n.soft-factory-stage-changes-*.txt")
+	_, writeErr := fmt.Fprintln(file, "\n.soft-factory-stage-changes-*.txt\n.soft-factory-review-changes-*.md")
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return fmt.Errorf("write Git exclude rule: %w", err)
 	}
@@ -128,18 +123,6 @@ func createRunDirectory(branch string, started time.Time) (string, error) {
 		}
 		return path, err
 	}
-}
-
-func sandboxBranch() (string, string) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "no-branch", "agent-sandbox.json unavailable or invalid"
-	}
-	branch, err := settings.Branch("run")
-	if err != nil {
-		return "no-branch", "run.branch unavailable in agent-sandbox.json"
-	}
-	return branch, "agent-sandbox.json: run.branch"
 }
 
 func sanitizeBranch(branch string) string {
@@ -380,8 +363,8 @@ stage's normal final report and output; this file supplements them.
 
 // RegisterStageChanges locates the report after the sandbox creates its worktree.
 // Collection still runs on interruption so partial change reports can be saved.
-func (r *Run) RegisterStageChanges(ctx context.Context, mode, filename string) {
-	path, err := StageReportPath(ctx, mode, filename)
+func (r *Run) RegisterStageChanges(ctx context.Context, branch, filename string) {
+	path, err := StageReportPath(ctx, branch, filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: locate stage change summary: %v\n", err)
 		return
@@ -390,15 +373,7 @@ func (r *Run) RegisterStageChanges(ctx context.Context, mode, filename string) {
 }
 
 // StageReportPath resolves an agent report's host path, even after interruption.
-func StageReportPath(ctx context.Context, mode, filename string) (string, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "", err
-	}
-	branch, err := settings.Branch(mode)
-	if err != nil {
-		return "", err
-	}
+func StageReportPath(ctx context.Context, branch, filename string) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -413,6 +388,9 @@ func StageReportPath(ctx context.Context, mode, filename string) (string, error)
 
 // WorktreeForBranch resolves a branch's host worktree for reports and Git evidence.
 func WorktreeForBranch(ctx context.Context, branch string) (string, error) {
+	if strings.TrimSpace(branch) == "" {
+		return "", fmt.Errorf("worktree lookup requires a branch")
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

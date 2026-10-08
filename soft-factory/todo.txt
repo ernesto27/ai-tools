@@ -2,7 +2,7 @@
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
 [] - config file should not be required, now return an error
-[] - list of stages disables in software-factory.json
+[x] - list of stages disables in software-factory.json
 [] - review only analysize code changes, not readme or docs
 [] - do not commit review-changes.md
 [] - i want agent-sandbox.json props json added in software-factory.json

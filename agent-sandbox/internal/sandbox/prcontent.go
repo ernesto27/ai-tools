@@ -17,8 +17,9 @@ import (
 const prContentFile = ".agent-sandbox-pr.json"
 
 type prContent struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
+	Title      string `json:"title"`
+	Body       string `json:"body"`
+	HasChanges *bool  `json:"has_changes,omitempty"`
 }
 
 // checkPRContentPath refuses collisions before the agent starts. A tracked

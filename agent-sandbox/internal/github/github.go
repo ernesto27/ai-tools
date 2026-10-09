@@ -164,6 +164,37 @@ func (c *Client) MissingReviewers(ctx context.Context, prURL string, reviewers [
 	return missing, nil
 }
 
+func (c *Client) ReadOpenBody(ctx context.Context, prURL, head, base string) (string, error) {
+	output, err := c.command(ctx, nil, "pr", "view", prURL,
+		"--repo", c.Repository, "--json",
+		"url,state,body,headRefName,baseRefName,headRepositoryOwner,headRepository")
+	if err != nil {
+		return "", err
+	}
+	var pr struct {
+		PullRequest
+		State string `json:"state"`
+		Body  string `json:"body"`
+	}
+	if err := json.Unmarshal(output, &pr); err != nil {
+		return "", fmt.Errorf("reading existing PR body: %w", err)
+	}
+	if pr.URL != prURL || pr.State != "OPEN" ||
+		pr.HeadRefName != head || pr.BaseRefName != base ||
+		!strings.EqualFold(pr.HeadRepositoryOwner.Login, c.owner) ||
+		!strings.EqualFold(pr.HeadRepository.Name, c.name) {
+		return "", fmt.Errorf("PR is no longer open with the recorded repository, head and base")
+	}
+	return pr.Body, nil
+}
+
+// UpdateBody supplies body data through stdin so shell syntax stays literal.
+func (c *Client) UpdateBody(ctx context.Context, prURL, body string) error {
+	_, err := c.command(ctx, strings.NewReader(body), "pr", "edit", prURL,
+		"--repo", c.Repository, "--body-file", "-")
+	return err
+}
+
 func (c *Client) command(ctx context.Context, stdin io.Reader, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "gh", args...)
 	cmd.Dir = c.Dir

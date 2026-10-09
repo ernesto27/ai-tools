@@ -1,7 +1,8 @@
 [x] - instalar agent-sandbox si no existe en path
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
-[] - fix test in github  Run /tmp/software-factory -h
+[] - move prompt text to txt files
+[x] - fix test in github  Run /tmp/software-factory -h
 [] update skill revie code to make more visual, less verbose
 agent-sandbox is missing. Download and install it? [y/N]: Error: agent-sandbox installation declined
 Error: Process completed with exit code 1.

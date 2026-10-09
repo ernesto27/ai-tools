@@ -80,7 +80,7 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `-i`, `--base-image` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
 | `--hn` | Optional. Shares the host network with the container, without port restrictions. Disabled by default; see the risks under "Host networking". |
 | `-p`, `--push` | The agent creates the commit inside the container. If it finishes successfully and leaves the worktree clean, the host runs `git push --set-upstream origin <branch>` without creating a PR. |
-| `--pr` | Optional. The agent commits inside the container; if it finishes successfully and leaves the worktree clean, the branch is published to `origin` and a GitHub pull request is created or reused. Does not require `--push`; see "GitHub pull requests". |
+| `--pr` | Commit and publish a PR. `run` creates or reuses one; `resume` appends to an existing open PR. Includes `--push`; see "GitHub pull requests". |
 | `-q`, `--query` | Instructions for the agent. |
 | `-c`, `--commit-message` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
 | `-f`, `--file-prompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
@@ -137,8 +137,8 @@ query. Worktree management commands do not read this file.
 `--pr` is available in `run` and `resume`, and can also be enabled with
 `"pr": true` in the corresponding section of `agent-sandbox.json`. It requires
 GitHub CLI (`gh`) installed and authenticated on the host for the server used
-by `origin`, plus permission to push and create the PR. The fetch and push URLs
-for `origin` must identify the same GitHub repository, and there must be a
+by `origin`, plus permission to push and create or edit the PR. The fetch and
+push URLs for `origin` must identify the same GitHub repository, with a
 single push destination. With `--push` and `--pr`, the commit is created inside
 the container; push and GitHub operations run on the host. For `--pr`, the
 container receives write access to the repository's Git metadata and uses
@@ -156,27 +156,26 @@ Create a worktree and publish its changes as a PR:
 agent-sandbox run -b fix-login -a codex --pr -q "fix the login redirect loop"
 ```
 
-Continue that worktree and update the PR branch:
+Continue the task and append its session summary to the PR:
 
 ```bash
 agent-sandbox resume -b fix-login -a codex --pr -q "add a regression test for the login redirect"
 ```
 
-With `--push` or `--pr`, if the agent exits with a nonzero status, publication
-is skipped and changes remain in the worktree. If it finishes successfully but
-leaves uncommitted changes, an error is reported and no push occurs. With a
-clean worktree, the result is compared against the current base on `origin`.
-Without differences to review, no push occurs and no PR is created. A clean
-worktree with commits that introduce differences against the base can also
-be published.
+Publication requires a successful agent exit and a clean worktree.
 
-After the push, if an open PR already exists for the same repository, branch,
-and base, its URL is displayed and its title, description, and draft status
-are preserved. For a new PR, an additional invocation of the selected agent
-generates the title and description from the full comparison; the PR is then
-created ready for review, without marking it as a draft. That invocation also
-consumes model usage. If PR generation or creation fails, the branch has already
-been published; you can retry with `resume --pr`.
+With `run --pr`, the same agent session generates a title and checklist from the
+full branch comparison. Without reviewable changes, nothing is published.
+Otherwise, the host pushes and creates a PR ready for review or reuses an open
+PR for the same head and base without changing its metadata.
+
+`resume --pr` requires a matching open PR. It pushes and appends a checklist of
+this session's committed changes, preserving earlier text, the title, draft
+status, and reviewers. If the agent reports no net changes, the host pushes
+without editing the description. The TUI commands behave the same way.
+
+If PR creation or editing fails after pushing, the error is reported and the
+branch remains published. Failed description updates are not saved or replayed.
 
 Combining `--pr` with `--push` follows this same flow, without duplicating the
 commit or push. `--commit-message` controls the message given to the agent for
@@ -191,8 +190,7 @@ JSON, pass `--hn=false`.
 
 This mode shares the host network and reduces container isolation: the agent
 can access local host services without a port allowlist. Use it when the task
-needs that access. With `--pr`, the additional invocation that generates the
-title and description uses the same network configuration.
+needs that access.
 
 ### API keys for Codex and Claude Code
 

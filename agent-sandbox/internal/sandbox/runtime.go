@@ -84,11 +84,13 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 		if err := checkPRContentPath(ctx, worktree); err != nil {
 			return 0, err
 		}
-		base, err := worktree.FetchBase(ctx, record.BaseBranch)
-		if err != nil {
-			return 0, fmt.Errorf("fetching PR base before agent execution: %w", err)
+		if !opts.prResume {
+			base, err := worktree.FetchBase(ctx, record.BaseBranch)
+			if err != nil {
+				return 0, fmt.Errorf("fetching PR base before agent execution: %w", err)
+			}
+			opts.prBase = base
 		}
-		opts.prBase = base
 	}
 	runOpts, err := containerOptions(opts, record.Path)
 	if err != nil {

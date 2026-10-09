@@ -1,5 +1,6 @@
 [x] - should be able to add in json global values as model,  branch, etc, hn
 [x] - container sandbox should commit changes
+[] - command to get list of providers, models , pricing
 [x] - should docker have .git folder always
 [] - logs in claude is too big ,  try to minimize it
 [] - add a command to get json sandobox-config

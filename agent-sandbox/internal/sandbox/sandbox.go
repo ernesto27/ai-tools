@@ -131,6 +131,8 @@ func Run(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 // fresh worktree that only happens to have the same branch name.
 func Resume(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 	runtime = runtime.withDefaults()
+	opts.prResume = opts.PR
+	opts.Reviewers = nil
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
@@ -155,17 +157,35 @@ func Resume(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 		}
 	}
 
-	client, err := runtime.prepareImage(ctx, opts)
-	if err != nil {
-		return 0, err
-	}
-	defer client.Close()
-
 	lock, err := lockWorktree(worktree)
 	if err != nil {
 		return 0, err
 	}
 	defer lock.Close()
+
+	if opts.prResume {
+		pr, err := githubClient.FindOpen(
+			ctx, opts.Branch, worktree.BaseBranch,
+		)
+		if err != nil {
+			return 0, fmt.Errorf(
+				"finding existing PR before resume: %w", err,
+			)
+		}
+		if pr == nil {
+			return 0, fmt.Errorf(
+				"resume --pr requires an existing open PR for %s into %s",
+				opts.Branch, worktree.BaseBranch,
+			)
+		}
+		opts.prURL = pr.URL
+	}
+
+	client, err := runtime.prepareImage(ctx, opts)
+	if err != nil {
+		return 0, err
+	}
+	defer client.Close()
 
 	return runtime.execute(ctx, opts, worktree, found.repo, client, githubClient)
 }

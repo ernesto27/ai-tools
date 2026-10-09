@@ -62,6 +62,9 @@ func publishResult(ctx context.Context, opts Options, record worktreeRecord, rep
 	if !opts.PR {
 		return publish(ctx, opts, record.Path, repo, out)
 	}
+	if opts.prResume {
+		return publishResumedPR(ctx, opts, record, repo, githubClient, out)
+	}
 	return publishPullRequest(ctx, opts, record, repo, githubClient, out)
 }
 

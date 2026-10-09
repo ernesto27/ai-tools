@@ -29,7 +29,7 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-i`, `--base-image` | Build the sandbox image from a compatible external base. |
 | `--image` | Attach an image to Codex or Claude Code; repeat for multiple files. |
 | `-p`, `--push` | Ask the agent to commit, then push from the host. |
-| `--pr` | Ask the agent to commit and prepare PR text, then publish from the host. |
+| `--pr` | Commit and publish from the host. Initial runs create or reuse a PR; resumes require an open PR and append a session checklist. |
 | `-c`, `--commit-message` | Exact commit message to use with `--push` or `--pr`. |
 | `--hn` | Share the host's network with the container. |
 

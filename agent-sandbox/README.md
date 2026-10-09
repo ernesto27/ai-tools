@@ -1,112 +1,111 @@
 # agent-sandbox
 
-`agent-sandbox` ejecuta Codex, Claude Code, opencode o pi dentro de un
-contenedor Docker y sobre un *worktree* de Git propio. El agente trabaja en un
-branch y directorio separados, sin modificar la copia de trabajo desde la que
-se invocó el comando.
+`agent-sandbox` runs Codex, Claude Code, opencode, or pi inside a Docker
+container and on its own Git *worktree*. The agent works on a separate branch
+and in a separate directory, without modifying the working copy from which
+the command was invoked.
 
-## Instalación
+## Installation
 
-Las releases se publican para Linux x86_64. Instala la más reciente con:
+Releases are published for Linux x86_64. Install the latest release with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/agent-sandbox/install.sh | bash
 ```
 
-El instalador descarga la última release de `agent-sandbox`, verifica su checksum
-SHA-256 y deja el binario en `~/.local/bin`. Si ese directorio todavía no está
-en `PATH`, el instalador indica la línea que hay que agregar al perfil de la shell.
-Las releases se crean con tags `agent-sandbox-v*`.
+The installer downloads the latest `agent-sandbox` release, verifies its
+SHA-256 checksum, and places the binary in `~/.local/bin`. If that directory
+is not yet in `PATH`, the installer prints the line to add to your shell profile.
+Releases are created with `agent-sandbox-v*` tags.
 
-Para actualizar a la última release:
+To update to the latest release:
 
 ```bash
 agent-sandbox update
 ```
 
-
-Para compilarlo desde este directorio:
+To build from this directory:
 
 ```bash
 go build -o agent-sandbox ./cmd/agent-sandbox
 ```
 
-## Requisitos
+## Requirements
 
-- Docker en ejecución.
-- Git y un repositorio Git: ejecutá el comando desde cualquier directorio
-  dentro del repositorio.
-- Una sesión ya autenticada del agente elegido en el host o, para Codex y
-  Claude Code, una clave API en `./agent-sandbox.json`. opencode y pi requieren
-  la sesión del host.
+- Docker running.
+- Git and a Git repository: run the command from any directory inside the
+  repository.
+- An authenticated session for the selected agent on the host or, for Codex
+  and Claude Code, an API key in `./agent-sandbox.json`. opencode and pi require
+  the host session.
 
-| Agente | Configuración del host cuando no se usa `api-key` |
+| Agent | Host configuration when not using `api-key` |
 | --- | --- |
 | Codex | `~/.codex/` |
-| Claude Code | `~/.claude/` y `~/.claude.json` |
-| opencode | `~/.config/opencode/`, `~/.local/share/opencode/` y `~/.local/state/opencode/` |
+| Claude Code | `~/.claude/` and `~/.claude.json` |
+| opencode | `~/.config/opencode/`, `~/.local/share/opencode/`, and `~/.local/state/opencode/` |
 | pi | `~/.pi/agent/` |
 
-Sin `api-key`, si falta una de esas rutas, el comando falla sin crearla.
-Ejecutá y autenticá primero el agente correspondiente en el host. Con una
-clave API para Codex o Claude Code, el contenedor usa un directorio de inicio
-temporal y no monta las credenciales del host.
+Without `api-key`, if any of these paths is missing, the command fails without
+creating it. Run and authenticate the corresponding agent on the host first.
+With an API key for Codex or Claude Code, the container uses a temporary home
+directory and does not mount host credentials.
 
-En cada ejecución, `agent-sandbox` comprueba la versión del agente seleccionado
-dentro de la imagen contra npm. Construye la imagen si no existe y la reconstruye
-si encuentra una versión más reciente; por eso la primera ejecución puede tardar
-y necesita acceso a npm.
+On each execution, `agent-sandbox` checks the selected agent's version inside
+the image against npm. It builds the image if it does not exist and rebuilds
+it if a newer version is found; the first run can therefore take some time
+and requires access to npm.
 
-## Uso
+## Usage
 
-Para listar las dependencias del host:
+To list host dependencies:
 
 ```bash
 agent-sandbox doctor
 ```
 
-Comprueba si `git`, `docker`, `gh` (opcional, para PRs) y `code` (opcional,
-para `worktree-editor`) están en `PATH`.
+This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
+(optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <modelo>] [-i <imagen>] [--image <archivo>]... [--hn] [-p] [--pr] [-c <mensaje-commit>] (-q <consulta> | -f <archivo-prompt>)
-agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [opciones] (-q <consulta> | -f <archivo-prompt>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--hn] [-p] [--pr] [-c <commit-message>] (-q <query> | -f <prompt-file>)
+agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
-| Parámetro | Descripción |
+
+| Parameter | Description |
 | --- | --- |
-| `-b`, `--branch` | Opcional. Branch para el worktree aislado; si se omite, se genera uno. |
-| `-a`, `--agent` | Obligatorio. Uno de `codex`, `claude`, `opencode` o `pi`. |
-| `-m`, `--model` | Opcional. Sobrescribe el modelo que resuelve el agente. |
-| `-i`, `--base-image` | Opcional. Deriva una imagen desde una base compatible, para disponer de su toolchain dentro del sandbox. |
-| `--hn` | Opcional. Comparte la red del host con el contenedor, sin limitar puertos. Desactivado por defecto; ver los riesgos en "Red del host". |
-| `-p`, `--push` | El agente crea el commit dentro del contenedor. Si termina correctamente y deja el worktree limpio, se hace `git push --set-upstream origin <branch>` sin crear un PR. |
-| `--pr` | Opcional. El agente commitea dentro del contenedor; si termina correctamente y deja el worktree limpio, se publica el branch en `origin` y se crea o reutiliza un pull request de GitHub. No requiere `--push`; ver "Pull requests de GitHub". |
-| `-q`, `--query` | Instrucción para el agente. |
-| `-c`, `--commit-message` | Opcional. Con `--push` o `--pr`, se le indica al agente que use este mensaje exacto en el commit dentro del contenedor. |
-| `-f`, `--file-prompt` | Archivo cuyo contenido se usa como instrucción para el agente, en lugar de `-q` o `--query`. |
-| `--image <archivo>` | Opcional y repetible. Adjunta imágenes al prompt inicial de Codex o Claude Code. Cada ruta debe ser un archivo regular existente en el host; opencode y pi la ignoran. Usá `--` antes del prompt de texto para que Codex no lo interprete como otra imagen. |
+| `-b`, `--branch` | Optional. Branch for the separate worktree; generated if omitted. |
+| `-a`, `--agent` | Required. One of `codex`, `claude`, `opencode`, or `pi`. |
+| `-m`, `--model` | Optional. Overrides the model selected by the agent. |
+| `-i`, `--base-image` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
+| `--hn` | Optional. Shares the host network with the container, without port restrictions. Disabled by default; see the risks under "Host networking". |
+| `-p`, `--push` | The agent creates the commit inside the container. If it finishes successfully and leaves the worktree clean, the host runs `git push --set-upstream origin <branch>` without creating a PR. |
+| `--pr` | Optional. The agent commits inside the container; if it finishes successfully and leaves the worktree clean, the branch is published to `origin` and a GitHub pull request is created or reused. Does not require `--push`; see "GitHub pull requests". |
+| `-q`, `--query` | Instructions for the agent. |
+| `-c`, `--commit-message` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
+| `-f`, `--file-prompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
+| `--image <file>` | Optional and repeatable. Attaches images to the initial prompt for Codex or Claude Code. Each path must be an existing regular file on the host; opencode and pi ignore it. Use `--` before the text prompt so Codex does not interpret it as another image. |
 
-Sin `-p`/`--push` ni `--pr`, los cambios quedan sin commitear en el worktree.
-Con cualquiera de esas opciones, el agente commitea antes de terminar. Hay que
-proporcionar exactamente una fuente de prompt: `-q`/`--query`, `-f`/`--file-prompt`
-o el valor `"query"`/`"file-prompt"` del JSON. No se pueden usar ambas fuentes
-a la vez ni se aceptan instrucciones posicionales. Sin `--commit-message`,
-el agente elige un mensaje basado en los cambios reales.
+Without `-p`/`--push` or `--pr`, changes remain uncommitted in the worktree.
+With either option, the agent commits before finishing. Provide exactly one
+prompt source: `-q`/`--query`, `-f`/`--file-prompt`, or the `"query"`/`"file-prompt"`
+value in JSON. Both sources cannot be used at once, and positional instructions
+are not accepted. Without `--commit-message`, the agent chooses a message based
+on the actual changes.
 
-Para continuar un worktree registrado, usá `agent-sandbox resume -b <branch>`.
-El branch es el nombre mostrado por `worktree-list`. Si se combina con
-`--push` o `--pr`, el agente debe commitear los cambios antes de terminar la sesión.
+To continue a registered worktree, use `agent-sandbox resume -b <branch>`.
+The branch is the name shown by `worktree-list`. When combined with `--push`
+or `--pr`, the agent must commit its changes before ending the session.
 
-`run` y `resume` leen `./agent-sandbox.json` si existe en el directorio desde
-el que se ejecutan. En la raíz del JSON se admiten `agent`, `model`,
-`base-image`, `push`, `pr` y `hn` como valores compartidos por ambos comandos.
-Cada sección admite los nombres largos de las opciones
-`branch`, `agent`, `model`, `base-image`, `query`, `push`, `pr`, `hn`, `commit-message`,
-`file-prompt` e `image`, además del campo `api-key`. `api-key` solo existe en
-el JSON: no hay una opción de línea de comandos equivalente. Para cada campo,
-prevalece la opción explícita de la línea de comandos, luego el valor de la
-sección y finalmente el valor de la raíz. Un `false` o una cadena vacía en la
-sección también reemplaza el valor compartido.`.
+`run` and `resume` read `./agent-sandbox.json` if it exists in the directory
+where they are invoked. The JSON root accepts `agent`, `model`, `base-image`,
+`push`, `pr`, and `hn` as values shared by both commands.
+Each section accepts the long option names `branch`, `agent`, `model`,
+`base-image`, `query`, `push`, `pr`, `hn`, `commit-message`, `file-prompt`, and
+`image`, plus the `api-key` field. `api-key` is available only in JSON: there is
+no equivalent command-line option. For each field, an explicit command-line
+option takes precedence, followed by the section value, then the root value.
+A section's `false` or empty string also overrides the shared value.
 
 ```json
 {
@@ -129,179 +128,179 @@ sección también reemplaza el valor compartido.`.
 }
 ```
 
-Con este archivo, `agent-sandbox run` usa la sección `run`; `resume` usa la
-sección `resume`. También podés pasar `-q "otra tarea"` para reemplazar la
-consulta del JSON. Los comandos de gestión de worktrees no leen el archivo.
+With this file, `agent-sandbox run` uses the `run` section; `resume` uses the
+`resume` section. You can also pass `-q "another task"` to override the JSON
+query. Worktree management commands do not read this file.
 
-### Pull requests de GitHub
+### GitHub pull requests
 
-`--pr` está disponible en `run` y `resume`, y también se puede activar con
-`"pr": true` en la sección correspondiente de `agent-sandbox.json`. Requiere
-GitHub CLI (`gh`) instalado y autenticado en el host para el servidor de
-`origin`, además de permisos para hacer push y crear el PR. Las URLs de fetch
-y push de `origin` deben identificar el mismo repositorio de GitHub y debe
-haber un único destino de push. Con `--push` y `--pr`, el commit se hace dentro del contenedor;
-el push y las operaciones de GitHub se ejecutan en el host. Para `--pr`,
-el contenedor recibe acceso de escritura a los metadatos Git del repositorio
-y usa la identidad Git configurada en el host.
+`--pr` is available in `run` and `resume`, and can also be enabled with
+`"pr": true` in the corresponding section of `agent-sandbox.json`. It requires
+GitHub CLI (`gh`) installed and authenticated on the host for the server used
+by `origin`, plus permission to push and create the PR. The fetch and push URLs
+for `origin` must identify the same GitHub repository, and there must be a
+single push destination. With `--push` and `--pr`, the commit is created inside
+the container; push and GitHub operations run on the host. For `--pr`, the
+container receives write access to the repository's Git metadata and uses
+the Git identity configured on the host.
 
-La base del PR es el branch desde el que se creó el worktree con `run` y queda
-registrada para futuros `resume`. Ese branch debe existir en `origin` y ser
-distinto del branch del worktree. No se admite `--pr` al iniciar desde un HEAD
-separado (*detached HEAD*) ni al continuar registros antiguos sin
-`base_branch`; no se elige otra base automáticamente.
+The PR base is the branch from which the worktree was created with `run`, and
+is recorded for future `resume` invocations. That branch must exist on `origin`
+and differ from the worktree branch. `--pr` is not supported when starting
+from a *detached HEAD* or continuing older records without `base_branch`;
+another base is not chosen automatically.
 
-Crear un worktree y publicar sus cambios como PR:
+Create a worktree and publish its changes as a PR:
 
 ```bash
 agent-sandbox run -b fix-login -a codex --pr -q "fix the login redirect loop"
 ```
 
-Continuar ese worktree y actualizar el branch del PR:
+Continue that worktree and update the PR branch:
 
 ```bash
 agent-sandbox resume -b fix-login -a codex --pr -q "add a regression test for the login redirect"
 ```
 
-Con `--push` o `--pr`, si el agente termina con estado distinto de cero, se omite la publicación y
-los cambios quedan en el worktree. Si termina correctamente pero deja cambios
-sin commitear, se informa un error y no se hace push. Con el worktree limpio,
-se compara el resultado con la base actual de `origin`.
-Sin diferencias para revisar, no se hace push ni se crea un PR. Un worktree
-limpio con commits que aportan diferencias respecto de la base también se
-puede publicar.
+With `--push` or `--pr`, if the agent exits with a nonzero status, publication
+is skipped and changes remain in the worktree. If it finishes successfully but
+leaves uncommitted changes, an error is reported and no push occurs. With a
+clean worktree, the result is compared against the current base on `origin`.
+Without differences to review, no push occurs and no PR is created. A clean
+worktree with commits that introduce differences against the base can also
+be published.
 
-Después del push, si ya existe un PR abierto para el mismo repositorio, branch
-y base, se muestra su URL y se conserva su título, descripción y estado de
-borrador. Para un PR nuevo, una invocación adicional del agente elegido genera
-el título y la descripción a partir de la comparación completa; luego se crea
-el PR listo para revisión, sin marcarlo como borrador. Esa invocación también
-consume uso del modelo. Si falla la generación o creación del PR, el branch
-ya quedó publicado; podés reintentar con `resume --pr`.
+After the push, if an open PR already exists for the same repository, branch,
+and base, its URL is displayed and its title, description, and draft status
+are preserved. For a new PR, an additional invocation of the selected agent
+generates the title and description from the full comparison; the PR is then
+created ready for review, without marking it as a draft. That invocation also
+consumes model usage. If PR generation or creation fails, the branch has already
+been published; you can retry with `resume --pr`.
 
-Combinar `--pr` con `--push` sigue este mismo flujo, sin duplicar el commit ni
-el push. `--commit-message` controla el mensaje indicado al agente para el
-commit, no el título del PR.
+Combining `--pr` with `--push` follows this same flow, without duplicating the
+commit or push. `--commit-message` controls the message given to the agent for
+the commit, not the PR title.
 
-### Red del host
+### Host networking
 
-`--hn` activa el modo de red `host` de Docker para el contenedor del agente.
-Está desactivado por defecto y también se puede configurar con `"hn": true`
-en `run` o `resume` dentro de `agent-sandbox.json`. Para desactivar un valor
-habilitado en el JSON, pasá `--hn=false`.
+`--hn` enables Docker's `host` network mode for the agent container.
+It is disabled by default and can also be configured with `"hn": true` in
+`run` or `resume` within `agent-sandbox.json`. To disable a value enabled in
+JSON, pass `--hn=false`.
 
-Este modo comparte la red del host y reduce el aislamiento del contenedor:
-el agente puede acceder a servicios locales del host, sin una lista de puertos
-permitidos. Usalo cuando la tarea necesite ese acceso. Con `--pr`, la
-invocación adicional que genera el título y la descripción usa la misma
-configuración de red.
+This mode shares the host network and reduces container isolation: the agent
+can access local host services without a port allowlist. Use it when the task
+needs that access. With `--pr`, the additional invocation that generates the
+title and description uses the same network configuration.
 
-### Claves API para Codex y Claude Code
+### API keys for Codex and Claude Code
 
-Para usar una clave API en lugar de la sesión del host, agregá `api-key` a la
-sección `run` o `resume` que vayas a ejecutar. Por ejemplo, para Codex:
+To use an API key instead of the host session, add `api-key` to the `run` or
+`resume` section you will execute. For example, for Codex:
 
 ```json
 {
   "run": {
     "agent": "codex",
-    "api-key": "<CLAVE_API_DE_OPENAI>",
+    "api-key": "<OPENAI_API_KEY>",
     "query": "inspect this repository"
   }
 }
 ```
 
-Para Claude Code:
+For Claude Code:
 
 ```json
 {
   "run": {
     "agent": "claude",
-    "api-key": "<CLAVE_API_DE_ANTHROPIC>",
+    "api-key": "<ANTHROPIC_API_KEY>",
     "query": "inspect this repository"
   }
 }
 ```
 
-### Imagen base externa
+### External base image
 
-`--base-image` usa una imagen que ya trae el runtime del proyecto. Se admiten
-Alpine, Debian, Ubuntu, Fedora, RHEL 8/9, UBI 8/9 y Amazon Linux 2023. Por
-ejemplo, `golang:1.26-alpine` deja disponibles Go, `gofmt` y `go test` dentro
-del contenedor:
+`--base-image` uses an image that already contains the project's runtime.
+Alpine, Debian, Ubuntu, Fedora, RHEL 8/9, UBI 8/9, and Amazon Linux 2023 are
+supported. For example, `golang:1.26-alpine` makes Go, `gofmt`, and `go test`
+available inside the container:
 
 ```bash
 agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q "run gofmt and go test ./..., then fix failures"
 ```
 
-La primera ejecución crea una imagen local derivada e instala lo necesario para
-ejecutar los agentes: Node.js, npm, Bash, Codex, Claude Code, opencode, pi,
-ripgrep, certificados CA, curl y Git. Las siguientes reutilizan esa imagen para
-la misma base y comprueban en npm la versión del agente seleccionado. Si difiere
-de la instalada, reconstruyen la imagen con esa versión y conservan la referencia
-de la base elegida.
+The first run creates a local derived image and installs the tools needed to
+run the agents: Node.js, npm, Bash, Codex, Claude Code, opencode, pi, ripgrep,
+CA certificates, curl, and Git. Later runs reuse that image for the same base
+and check the selected agent's version on npm. If it differs from the installed
+version, they rebuild the image with that version and retain the selected
+base reference.
 
-La base debe ofrecer `apk` (Alpine), `apt-get` (Debian/Ubuntu), `dnf`
-(Fedora/RHEL/UBI/Amazon Linux) o `microdnf` (UBI minimal). Las demás fallan
-durante el build. Alpine instala Node.js desde sus paquetes; las otras bases
-usan Node.js 22 de NodeSource.
+The base must provide `apk` (Alpine), `apt-get` (Debian/Ubuntu), `dnf`
+(Fedora/RHEL/UBI/Amazon Linux), or `microdnf` (UBI minimal). Other bases fail
+during the build. Alpine installs Node.js from its packages; other bases use
+Node.js 22 from NodeSource.
 
-En RHEL, la imagen debe tener repositorios habilitados y, si corresponde, una
-suscripción válida: el sandbox no monta credenciales del host. No habilita
-EPEL ni CRB/CodeReady Builder, ni soporta `yum`; si falta un paquete como
-`ripgrep`, el build falla con el error del gestor de paquetes.
-
+On RHEL, the image must have enabled repositories and, where applicable, a
+valid subscription: the sandbox does not mount host credentials. It does not
+enable EPEL or CRB/CodeReady Builder, and does not support `yum`; if a package
+such as `ripgrep` is missing, the build fails with the package manager's error.
 
 ```bash
 docker image ls 'agent-sandbox-base-*'
 docker image rm <IMAGE_ID>
 ```
 
-### Modelos
+### Models
 
-Al omitir `--model`, Codex usa `gpt-6.1-sol` y Claude Code usa `claude-opus-5-5`.
-opencode y pi dejan que su propia configuración elija el modelo. Los valores de
-`--model` se pasan directamente al agente: por ejemplo, `gpt-5.6-sol` para
-Codex, `sonnet` para Claude Code y `proveedor/modelo` para opencode o pi.
+When `--model` is omitted, Codex uses `gpt-6.1-sol` and Claude Code uses
+`claude-opus-5-5`. opencode and pi let their own configuration select the model.
+Values of `--model` are passed directly to the agent: for example, `gpt-5.6-sol`
+for Codex, `sonnet` for Claude Code, and `provider/model` for opencode or pi.
 
-## Ejemplos
+## Examples
 
-Crear un worktree para Codex y dejar sus cambios listos para revisar:
+Create a worktree for Codex and leave its changes ready for review:
 
 ```bash
 agent-sandbox run -a codex -m gpt-5.6-sol -q "fix the login redirect loop"
 ```
 
-Ejecutar Claude Code y publicar el branch al terminar:
+Run Claude Code and publish the branch when it finishes:
 
 ```bash
 agent-sandbox run -b add-test -a claude -m sonnet -p -q "add a regression test for the login redirect"
 ```
 
-Continuar un worktree registrado por su nombre:
+Continue a registered worktree by name:
 
 ```bash
 agent-sandbox resume -b fix-login -a codex -q "add a regression test for the login redirect"
 ```
 
-Dejar que opencode resuelva su modelo configurado:
+Let opencode resolve its configured model:
 
 ```bash
 agent-sandbox run -b update-copy -a opencode -q "update the empty-state copy"
 ```
 
-Ejecutar Codex con imagen de golang
+Run Codex with a Go image:
 
 ```bash
 agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q "run go test ./... and fix failures"
 ```
 
-Obtener prompt de archivo
+Read the prompt from a file:
+
 ```bash
 agent-sandbox run -b prompt-file-test -a codex -f prompt.md
 ```
 
-Adjuntar una o más imágenes al prompt inicial de Codex o Claude Code
+Attach one or more images to the initial prompt for Codex or Claude Code:
+
 ```bash
 agent-sandbox run -a claude \
   --image "/home/user/Pictures/mockup.png" \
@@ -309,37 +308,37 @@ agent-sandbox run -a claude \
   -q "compare these screenshots and implement the resulting UI"
 ```
 
-## Gestionar worktrees creados por el sandbox
+## Manage worktrees created by the sandbox
 
-El comando crea los worktrees en
-`~/.config/agent-sandbox/worktrees/<repo>-<hash>/<branch>` y registra los que
-creó en `~/.config/agent-sandbox/worktrees.jsonl`. El identificador del
-repositorio evita que branches con el mismo nombre en repositorios distintos
-colisionen. Los siguientes subcomandos solo ven y eliminan esas entradas; no
-afectan worktrees creados manualmente.
+The command creates worktrees at
+`~/.config/agent-sandbox/worktrees/<repo>-<hash>/<branch>` and records those it
+created in `~/.config/agent-sandbox/worktrees.jsonl`. The repository identifier
+prevents collisions between branches with the same name in different
+repositories. The following subcommands only list and delete those entries;
+they do not affect manually created worktrees.
 
 ```bash
-# Mostrar los worktrees registrados para el repositorio actual.
+# Show registered worktrees for the current repository.
 agent-sandbox worktree-list
 
-# Abrir un worktree registrado en VS Code.
+# Open a registered worktree in VS Code.
 agent-sandbox worktree-editor -b fix-login
 
-# Eliminar un worktree limpio y su branch.
+# Delete a clean worktree and its branch.
 agent-sandbox worktree-delete --branch fix-login
 
-# Permitir eliminar también sus cambios sin commitear.
+# Also allow deletion of its uncommitted changes.
 agent-sandbox worktree-delete -b fix-login --force
 
-# Mostrar todos, pedir confirmación y eliminarlos junto con sus branches.
+# Show all worktrees, ask for confirmation, and delete them and their branches.
 agent-sandbox worktree-delete-all
 
-# Omitir la confirmación de la eliminación masiva.
+# Skip confirmation for bulk deletion.
 agent-sandbox worktree-delete-all --yes
 ```
 
-`worktree-delete` se niega a descartar cambios sin `--force`.
-`worktree-delete-all` siempre elimina los cambios sin commitear después de la
-confirmación (o inmediatamente con `--yes`). No ejecutes los comandos de
-eliminación desde el worktree que querés borrar.
-`worktree-editor` requiere `-b` y abre en vscode el branch worktree
+`worktree-delete` refuses to discard changes without `--force`.
+`worktree-delete-all` always deletes uncommitted changes after confirmation
+(or immediately with `--yes`). Do not run deletion commands from the worktree
+you want to remove.
+`worktree-editor` requires `-b` and opens the branch's worktree in VS Code.

@@ -1,14 +1,16 @@
-name: Agent Sandbox Documentation
+name: AI Tools Documentation
 
 on:
   push:
     branches: [master]
     paths:
       - agent-sandbox/site-docs/**
+      - soft-factory/site-docs/**
       - .github/workflows/agent-sandbox-docs.yml
   pull_request:
     paths:
       - agent-sandbox/site-docs/**
+      - soft-factory/site-docs/**
       - .github/workflows/agent-sandbox-docs.yml
   workflow_dispatch:
 
@@ -16,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: agent-sandbox-docs-${{ github.ref }}
+  group: ai-tools-docs-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -35,11 +37,25 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: agent-sandbox/site-docs/package-lock.json
+          cache-dependency-path: |
+            agent-sandbox/site-docs/package-lock.json
+            soft-factory/site-docs/package-lock.json
       - name: Install documentation dependencies
         run: npm ci
       - name: Build and check documentation
         run: npm run docs:build
+      - name: Install Soft Factory documentation dependencies
+        working-directory: soft-factory/site-docs
+        run: npm ci
+      - name: Build and check Soft Factory documentation
+        working-directory: soft-factory/site-docs
+        run: npm run docs:build
+      - name: Assemble both documentation sites
+        working-directory: .
+        run: |
+          mkdir -p _site/soft-factory
+          cp -a agent-sandbox/site-docs/guide/.vitepress/dist/. _site/
+          cp -a soft-factory/site-docs/guide/.vitepress/dist/. _site/soft-factory/
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/configure-pages@v5
@@ -47,7 +63,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v4
         with:
-          path: agent-sandbox/site-docs/guide/.vitepress/dist
+          path: _site
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'

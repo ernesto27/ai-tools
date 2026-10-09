@@ -1,5 +1,7 @@
 # Soft Factory
 
+[Read the documentation](https://ernesto27.github.io/ai-tools/soft-factory/).
+
 Soft Factory is a command-line tool that uses `agent-sandbox` to implement a task, review the changes, apply corrections, assess the final risk, and explain the final changes.
 
 You can provide a task from a local file or a Jira issue, and include supporting documents from local files or Google Drive.

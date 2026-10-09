@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -24,6 +27,13 @@ var version = "dev"
 const factoryConfigFile = "software-factory.json"
 
 func main() {
+	ctx := context.Background()
+	err := installAgentSandbox(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(1)
+	}
+
 	if err := newRootCmd(runWorkflow).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
@@ -276,4 +286,34 @@ func loadJiraTask(ctx context.Context, issueURL string) (string, error) {
 		return "", err
 	}
 	return issue.Task(), nil
+}
+
+func installAgentSandbox(ctx context.Context) error {
+	_, err := exec.LookPath("agent-sandbox")
+	if err != nil {
+		fmt.Fprint(os.Stderr, "agent-sandbox is missing. Download and install it? [y/N]: ")
+		input := bufio.NewScanner(os.Stdin)
+		input.Scan()
+		if err := input.Err(); err != nil {
+			return fmt.Errorf("read installation confirmation: %w", err)
+		}
+		answer := strings.ToLower(strings.TrimSpace(input.Text()))
+		if answer != "y" && answer != "yes" {
+			return fmt.Errorf("agent-sandbox installation declined")
+		}
+
+		cmd := exec.CommandContext(ctx, "bash", "-o", "pipefail", "-c",
+			"curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/agent-sandbox/install.sh | bash",
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("install agent-sandbox: %w", err)
+		}
+		return nil
+	}
+
+	return nil
+
 }

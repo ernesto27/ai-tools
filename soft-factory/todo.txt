@@ -1,6 +1,7 @@
 [] - instalar agent-sandbox si no existe en path
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
+[] - logs folder should have a parent for branch and all next resumes next
 [] - config file should not be required, now return an error
 [x] - list of stages disables in software-factory.json
 [] - review only analysize code changes, not readme or docs

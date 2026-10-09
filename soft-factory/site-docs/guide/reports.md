@@ -6,8 +6,8 @@ plus a run summary and the final walkthrough.
 
 | Command | Saved output |
 | --- | --- |
-| `software-factory` | `logs/<run>/summary.log`, stage `.log` files, and `05-review-changes.md` when the walkthrough runs successfully. |
-| `software-factory continue` | The same files in a new run directory for `resume.branch`. |
+| `software-factory` | `logs/<sanitized-branch>/run-<UTC-timestamp>/summary.log`, stage `.log` files, and `05-review-changes.md` when the walkthrough runs successfully. |
+| `software-factory continue` | The same files in `logs/<sanitized-branch>/continue-<UTC-timestamp>/` for `resume.branch`. |
 | `software-factory review` | Risk-classification output in `docs/risk-classification-<datetime>.md` when that stage runs; no execution-log directory or final walkthrough. |
 
 Code and security reviews also write temporary reports in the sandbox worktree
@@ -31,11 +31,41 @@ Local configuration, credentials, task files, and generated reports are ignored 
 
 ## Execution logs
 
-Default and `continue` workflows save logs in
-`logs/<branch>-<UTC-datetime>/`, using the selected sandbox worktree branch:
-`run.branch` for the default workflow, or `resume.branch` for `continue`.
-Branch slashes become hyphens, so `feature/logs` appears as `feature-logs`. The
-first four stages have position-prefixed files (`01-implementation.log`,
+Default workflows save logs in `logs/<sanitized-branch>/run-<UTC-timestamp>/`,
+using `run.branch`. `continue` uses `resume.branch` and creates
+`logs/<sanitized-branch>/continue-<UTC-timestamp>/`. When commands select the
+same branch, their invocations share a branch folder. The parent is created
+when needed, including for a continue without earlier logs. The log root is
+relative to the CLI working directory. Existing flat log folders stay untouched.
+
+ASCII letters, digits, `.`, `_`, and `-` remain in branch folder names; all
+other characters become `-`. For example, `feature/logs` maps to the single
+folder `feature-logs`. The timestamp is UTC with nanosecond precision, using
+`2006-01-02_15-04-05.000000000`. An existing child name gets a suffix of `-2`,
+`-3`, and so on, keeping every invocation's files separate.
+
+```text
+logs/
+└── feature-logs/
+    ├── run-2026-10-08_19-38-48.007046183/
+    │   ├── summary.log
+    │   ├── 01-implementation.log
+    │   └── 05-review-changes.md
+    ├── continue-2026-10-08_20-09-49.425026374/
+    │   ├── summary.log
+    │   └── ...
+    └── continue-2026-10-08_21-15-30.123456789/
+        ├── summary.log
+        └── ...
+```
+
+The CLI prints the invocation child path, for example:
+
+```text
+Execution logs: logs/feature-logs/continue-2026-10-08_20-09-49.425026374
+```
+
+The first four stages have position-prefixed files (`01-implementation.log`,
 `02-code-review.log`, `03-security-review.log`, and
 `04-risk-classification.log`); another attempt at a stage uses a numbered file
 such as `01-implementation-2.log`. Each stage file includes the run details

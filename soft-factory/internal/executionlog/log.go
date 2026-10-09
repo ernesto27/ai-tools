@@ -42,12 +42,16 @@ type Run struct {
 	ready             bool
 }
 
-// NewRun initializes a private run directory before any workflow work starts.
+// NewRun initializes a private invocation directory under the branch's log folder.
+// command identifies the invocation as "run" or "continue".
 // planned lists, in order, the stage labels this run will execute; stages
 // disabled for the run are omitted from the header.
-func NewRun(branch string, planned []string) (*Run, error) {
+func NewRun(branch, command string, planned []string) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
+	}
+	if command != "run" && command != "continue" {
+		return nil, fmt.Errorf("unsupported execution log command %q", command)
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -56,10 +60,7 @@ func NewRun(branch string, planned []string) (*Run, error) {
 	if err := IgnoreStageReports(); err != nil {
 		return nil, fmt.Errorf("ignore stage change reports: %w", err)
 	}
-	if err := os.MkdirAll(logDirectory, 0700); err != nil {
-		return nil, fmt.Errorf("create execution log directory: %w", err)
-	}
-	path, err := createRunDirectory(branch, time.Now().UTC())
+	path, err := createRunDirectory(branch, command, time.Now().UTC())
 	if err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
@@ -114,15 +115,19 @@ func IgnoreStageReports() error {
 	return nil
 }
 
-// createRunDirectory reserves a unique name without replacing an existing run.
-func createRunDirectory(branch string, started time.Time) (string, error) {
-	name := sanitizeBranch(branch) + "-" + started.Format("2006-01-02_15-04-05.000000000")
+// createRunDirectory reserves a unique child without replacing an earlier invocation.
+func createRunDirectory(branch, command string, started time.Time) (string, error) {
+	branchDirectory := filepath.Join(logDirectory, sanitizeBranch(branch))
+	if err := os.MkdirAll(branchDirectory, 0700); err != nil {
+		return "", fmt.Errorf("create branch log directory: %w", err)
+	}
+	name := command + "-" + started.UTC().Format("2006-01-02_15-04-05.000000000")
 	for suffix := 0; ; suffix++ {
 		directory := name
 		if suffix > 0 {
 			directory = fmt.Sprintf("%s-%d", name, suffix+1)
 		}
-		path := filepath.Join(logDirectory, directory)
+		path := filepath.Join(branchDirectory, directory)
 		err := os.Mkdir(path, 0700)
 		if errors.Is(err, os.ErrExist) {
 			continue

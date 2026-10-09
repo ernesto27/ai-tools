@@ -94,8 +94,12 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	}
 	var runLog *executionlog.Run
 	if opts.Implement {
+		command := "run"
+		if opts.Continue {
+			command = "continue"
+		}
 		var err error
-		runLog, err = executionlog.NewRun(branch, plannedStageLabels(cfg))
+		runLog, err = executionlog.NewRun(branch, command, plannedStageLabels(cfg))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 		} else {

@@ -34,8 +34,13 @@ Every stage uses the branch selected for that command, even when the two
 configured branches differ. List available worktrees with
 `agent-sandbox worktree-list`.
 
-`continue` starts a new workflow invocation with a new log directory; it runs
-implementation again rather than resuming at the last failed stage. To run
+`continue` starts a new workflow invocation in
+`logs/<sanitized-branch>/continue-<UTC-timestamp>/`. Default invocations use a
+`run-<UTC-timestamp>` child under the same branch folder when `run.branch` and
+`resume.branch` select the same branch. A continue creates the branch folder
+if needed and keeps its files separate from all earlier invocations. See
+[execution logs](reports.md#execution-logs) for examples. It runs implementation
+again rather than resuming at the last failed stage. To run
 only reviews and risk classification, use `software-factory review` instead.
 
 Keep the original task in `run.file-prompt`, or supply `--jira` again when

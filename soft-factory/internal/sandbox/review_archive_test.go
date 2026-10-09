@@ -2,15 +2,29 @@ package sandbox
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"soft-factory/internal/executionlog"
 )
 
 func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
-	dir := t.TempDir()
-	source := filepath.Join(dir, "agent-report.md")
-	destination := filepath.Join(dir, "05-review-changes.md")
+	t.Chdir(t.TempDir())
+	if output, err := exec.Command("git", "init", "-b", "main").CombinedOutput(); err != nil {
+		t.Fatalf("initialize test repository: %v\n%s", err, output)
+	}
+	run, err := executionlog.NewRun("feature/logs", executionlog.CommandContinue, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer run.Finish(nil)
+	source := "agent-report.md"
+	destination := filepath.Join(run.Path(), "05-review-changes.md")
+	if filepath.Dir(run.Path()) != filepath.Join("logs", "feature-logs") || !strings.HasPrefix(filepath.Base(run.Path()), "continue-") {
+		t.Fatalf("unexpected walkthrough directory: %s", run.Path())
+	}
 	content := "# Changes\n\n### File: `./a.go`\nThe branch has no changed files.\n" + strings.Repeat("extra output\n", 200)
 	if err := os.WriteFile(source, []byte(content), 0644); err != nil {
 		t.Fatal(err)

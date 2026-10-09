@@ -30,7 +30,13 @@ software-factory continue
 
 This runs implementation and subsequent stages against the existing sandbox
 worktree selected by `resume.branch`. The default command selects `run.branch`.
-List available worktrees with `agent-sandbox worktree-list`.
+Every stage uses the branch selected for that command, even when the two
+configured branches differ. List available worktrees with
+`agent-sandbox worktree-list`.
+
+`continue` starts a new workflow invocation with a new log directory; it runs
+implementation again rather than resuming at the last failed stage. To run
+only reviews and risk classification, use `software-factory review` instead.
 
 Keep the original task in `run.file-prompt`, or supply `--jira` again when
 continuing a Jira task. Supporting documents and enabled stages still apply.

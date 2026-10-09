@@ -128,7 +128,12 @@ succeeds without starting an agent.
 
 ### `agent-sandbox.json`: agent and task
 
-The `run` section controls implementation. The `resume` section controls code review, security review, risk classification, and the final change walkthrough. Set the same branch in both sections so all stages use the same sandbox worktree.
+The default workflow uses `run` settings for implementation and `resume`
+settings for later stages. `continue` and `review` use `resume` settings.
+Soft Factory selects one branch for every stage: `run.branch` for the default
+workflow, or `resume.branch` for `review` and `continue`, overriding the branch
+in each Agent Sandbox invocation. Set both branches to the same value when
+you want to review or continue the task you just implemented.
 
 Example for a local task:
 
@@ -150,7 +155,10 @@ Example for a local task:
 }
 ```
 
-Choose a new branch name for each new task. For review-only runs, use an existing sandbox branch in `resume.branch`; list available branches with `agent-sandbox worktree-list`.
+Choose a new `run.branch` for each new task. For `review` or `continue`, use an
+existing sandbox branch in `resume.branch`; list available branches with
+`agent-sandbox worktree-list`. Even for `continue`, the local task is read from
+`run.file-prompt` unless you supply `--jira`.
 
 Example for a Jira task, where `--jira` supplies the task instead of a local file:
 
@@ -176,7 +184,7 @@ Common settings in either section:
 | Option | Purpose |
 | --- | --- |
 | `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
-| `branch` | Sandbox branch to create (`run`) or continue (`resume`). |
+| `branch` | `run.branch` selects the default workflow's worktree; `resume.branch` selects the worktree for `review` and `continue`. All stages use that selected branch. |
 | `file-prompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
 | `base-image` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |

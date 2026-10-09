@@ -27,6 +27,7 @@ All property names use lower camelCase, including nested properties. These are a
 | `customSkills.securityReview` | Optional project skill name for the security review stage. |
 | `customSkills.riskClassification` | Optional project skill name for the risk classification stage. |
 | `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
+| `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
 Minimal example:
 
@@ -53,8 +54,8 @@ names keep their own spelling; only property names use camelCase:
 Each name must be one directory name, not a path. Soft Factory searches for
 `.agents/skills/<name>/SKILL.md` first, then `.claude/skills/<name>/SKILL.md`,
 relative to `software-factory.json`, and gives the first match to that stage
-after its default skill. A configured skill that is missing or cannot be read
-stops the workflow before implementation with an error.
+after its default skill. A configured skill for an enabled stage that is missing
+or cannot be read stops the workflow before implementation with an error.
 
 Example using both local documents and Google Drive:
 
@@ -85,6 +86,51 @@ The downloaded file must contain service-account credentials, including:
 When `googleDrive` is configured, a missing or invalid credentials file stops the workflow. Without `googleDrive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
 
 Folder loading includes only Google Docs directly inside the selected folders. Individual URLs load the specified Google Docs regardless of their folder. See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for download and sharing instructions.
+
+#### Disabling stages
+
+To skip stages without changing their order, list them in `disabledStages`.
+Omitting the property or using `[]` runs every stage as before:
+
+```json
+{
+  "documents": ["task.txt"],
+  "disabledStages": ["securityReview", "riskClassification"]
+}
+```
+
+| Stage | Default workflow | `review` | `continue` |
+| --- | --- | --- | --- |
+| `implementation` | Yes | No | Yes |
+| `codeReview` | Yes | Yes | Yes |
+| `securityReview` | Yes | Yes | Yes |
+| `riskClassification` | Yes | Yes | Yes |
+| `reviewChanges` | Yes | No | Yes |
+
+Names are exact and case-sensitive. Kebab-case names such as
+`security-review`, other spellings, blank or padded names, `null`, and
+non-string entries are rejected before any agent runs, for example:
+
+```text
+Error: validate factory configuration: disabledStages[0]: unknown stage "securityReveiw"; allowed: implementation, codeReview, securityReview, riskClassification, reviewChanges
+```
+
+Duplicates are allowed. Listing a stage that the selected command never runs,
+such as `implementation` with `review`, has no effect. Each skipped stage
+prints `Skipping disabled stage: <name>` and, in the default workflow and
+`continue`, adds that line to `summary.log`. Skipped stages start no agent,
+create no stage log or report, and do not load their configured custom skill,
+so a missing skill file does not block a disabled stage. Skill names are still
+validated.
+
+Disabling a stage never disables later stages. Risk classification uses only
+the reports from reviews that ran in the current invocation and states when
+review evidence is missing. Disabling `implementation` does not change branch
+selection: the default workflow still uses `run.branch`, so that sandbox
+worktree must already exist, and the final walkthrough still runs unless
+`reviewChanges` is also disabled. Existing environment, branch, Jira, and
+document checks still run when every stage is disabled; the command then
+succeeds without starting an agent.
 
 ### `agent-sandbox.json`: agent and task
 

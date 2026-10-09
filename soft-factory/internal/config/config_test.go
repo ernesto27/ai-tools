@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -219,5 +220,84 @@ func TestLoadSandboxErrorsAndReload(t *testing.T) {
 	}
 	if branch, err := cfg.Branch("run"); err != nil || branch != "updated" {
 		t.Fatalf("updated configuration not loaded: %q, %v", branch, err)
+	}
+}
+
+func TestLoadDisabledStages(t *testing.T) {
+	const allowed = "allowed: implementation, codeReview, securityReview, riskClassification, reviewChanges"
+	for _, tc := range []struct {
+		name    string
+		data    string
+		want    []Stage
+		wantErr string
+	}{
+		{name: "omitted", data: `{}`},
+		{name: "empty", data: `{"disabledStages":[]}`, want: []Stage{}},
+		{name: "implementation", data: `{"disabledStages":["implementation"]}`, want: []Stage{StageImplementation}},
+		{name: "codeReview", data: `{"disabledStages":["codeReview"]}`, want: []Stage{StageCodeReview}},
+		{name: "securityReview", data: `{"disabledStages":["securityReview"]}`, want: []Stage{StageSecurityReview}},
+		{name: "riskClassification", data: `{"disabledStages":["riskClassification"]}`, want: []Stage{StageRiskClassification}},
+		{name: "reviewChanges", data: `{"disabledStages":["reviewChanges"]}`, want: []Stage{StageReviewChanges}},
+		{
+			name: "all",
+			data: `{"disabledStages":["reviewChanges","riskClassification","securityReview","codeReview","implementation"]}`,
+			want: []Stage{StageReviewChanges, StageRiskClassification, StageSecurityReview, StageCodeReview, StageImplementation},
+		},
+		{name: "duplicates", data: `{"disabledStages":["codeReview","codeReview"]}`, want: []Stage{StageCodeReview, StageCodeReview}},
+		{name: "malformed JSON", data: `{"disabledStages":["codeReview"`, wantErr: "parse factory configuration"},
+		{name: "null", data: `{"disabledStages":null}`, wantErr: "disabledStages must be an array"},
+		{name: "string", data: `{"disabledStages":"codeReview"}`, wantErr: "disabledStages must be an array"},
+		{name: "number", data: `{"disabledStages":1}`, wantErr: "disabledStages must be an array"},
+		{name: "boolean", data: `{"disabledStages":true}`, wantErr: "disabledStages must be an array"},
+		{name: "object", data: `{"disabledStages":{"codeReview":true}}`, wantErr: "disabledStages must be an array"},
+		{name: "null entry", data: `{"disabledStages":["codeReview",null]}`, wantErr: "disabledStages[1] must be a string"},
+		{name: "number entry", data: `{"disabledStages":[1]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "array entry", data: `{"disabledStages":[["codeReview"]]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "object entry", data: `{"disabledStages":[{}]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "blank", data: `{"disabledStages":[""]}`, wantErr: `disabledStages[0]: unknown stage ""; ` + allowed},
+		{name: "whitespace", data: `{"disabledStages":[" "]}`, wantErr: `disabledStages[0]: unknown stage " "`},
+		{name: "padded", data: `{"disabledStages":[" codeReview"]}`, wantErr: `disabledStages[0]: unknown stage " codeReview"`},
+		{name: "case mismatch", data: `{"disabledStages":["CodeReview"]}`, wantErr: `disabledStages[0]: unknown stage "CodeReview"`},
+		{name: "kebab-case", data: `{"disabledStages":["security-review"]}`, wantErr: `disabledStages[0]: unknown stage "security-review"`},
+		{name: "unknown after valid", data: `{"disabledStages":["codeReview","securityReveiw"]}`, wantErr: `disabledStages[1]: unknown stage "securityReveiw"; ` + allowed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load("software-factory.json")
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+				}
+				if !strings.Contains(tc.wantErr, "parse") && !strings.Contains(err.Error(), "validate factory configuration: disabledStages") {
+					t.Fatalf("error %q does not identify disabledStages validation", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(cfg.DisabledStages, tc.want) {
+				t.Fatalf("DisabledStages = %#v; want %#v", cfg.DisabledStages, tc.want)
+			}
+			for _, stage := range Stages {
+				if got, want := cfg.StageDisabled(stage), slices.Contains(tc.want, stage); got != want {
+					t.Errorf("StageDisabled(%q) = %v; want %v", stage, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	data := `{"customSkills":{"codeReview":"../escape"},"disabledStages":["codeReview"]}`
+	if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load("software-factory.json"); err == nil || !strings.Contains(err.Error(), "customSkills.codeReview must be") {
+		t.Fatalf("expected custom skill validation error for disabled stage, got %v", err)
 	}
 }

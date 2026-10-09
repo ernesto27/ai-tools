@@ -43,7 +43,7 @@ func TestFormatDuration(t *testing.T) {
 
 func TestSummaryLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature")
+	run, err := NewRun("feature", stageNames)
 	if err != nil {
 		t.Fatalf("NewRun: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestStageChangeReports(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
-			run, err := NewRun("feature")
+			run, err := NewRun("feature", stageNames)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -141,7 +141,7 @@ func TestStageChangeReports(t *testing.T) {
 
 func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature")
+	run, err := NewRun("feature", stageNames)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 
 func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature")
+	run, err := NewRun("feature", stageNames)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,6 +194,35 @@ func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	}
 	if strings.Contains(string(data), "Earlier stage changes") {
 		t.Fatal("summary followed report symlink")
+	}
+}
+
+func TestHeaderListsOnlyPlannedStages(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		planned []string
+		want    string
+	}{
+		{"disabled stage omitted", []string{"implementation", "code-review", "risk-classification"}, "implementation, code-review, risk-classification"},
+		{"none planned", nil, "none"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prepareLogTestDirectory(t)
+			run, err := NewRun("feature", tc.planned)
+			if err != nil {
+				t.Fatal(err)
+			}
+			run.StartStage("implementation")
+			run.FinishStage(nil)
+			run.Finish(nil)
+			data, err := os.ReadFile(filepath.Join(run.Path(), "01-implementation.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(data), "\nPlanned stages: "+tc.want+"\n") {
+				t.Fatalf("header does not list planned stages %q:\n%s", tc.want, data)
+			}
+		})
 	}
 }
 

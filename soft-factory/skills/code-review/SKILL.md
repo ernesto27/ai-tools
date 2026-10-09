@@ -27,18 +27,39 @@ Skip cosmetic preferences and speculative refactors unless they violate an expli
 
 ## Report findings
 
+Make the report easy to scan: short headings, compact finding cards, and a checks table. Keep the analysis thorough and the output concise. Do not repeat the same finding in a summary and again in detail, print full checklists, or include large code excerpts.
+
 List actionable findings in descending priority:
 
-- **P0:** Critical failure requiring immediate intervention.
-- **P1:** Serious bug that should block delivery.
-- **P2:** Concrete correctness or maintainability issue that should be fixed.
-- **P3:** Minor actionable issue with limited impact.
+| Priority | Meaning |
+| --- | --- |
+| P0 | Critical failure requiring immediate intervention |
+| P1 | Serious bug that should block delivery |
+| P2 | Concrete correctness or maintainability issue that should be fixed |
+| P3 | Minor actionable issue with limited impact |
 
-For each finding, provide:
+Use this layout, replacing placeholders with inspected evidence:
 
-- A short title beginning with its priority, such as `[P1] Handle missing input`.
-- The affected file and a precise line or short line range in the reviewed change.
-- The triggering conditions and resulting impact, supported by code or check results.
-- A brief suggested correction, without applying it.
+```markdown
+## Review — <N> findings | Verification: <complete / incomplete>
+Scope: <comparison point and included changes, or scope limitation>
 
-Finish with checks performed and any material verification gaps. If there are no actionable findings, say so explicitly. Do not claim the change is verified when relevant checks were skipped or blocked. Do not publish changes or start another review attempt as part of this skill.
+### [P1] <Short actionable title> — <path:line or short line range>
+- **Cause → impact:** <concrete trigger> → <failure and consequence>.
+- **Evidence:** <specific code behavior or check result supporting the finding>.
+- **Fix:** <brief suggested correction; do not apply it>.
+
+## Checks
+| Status | Check | Result / gap |
+| --- | --- | --- |
+| PASS / FAIL / BLOCKED / SKIPPED | <exact command or inspection> | <brief result or reason> |
+```
+
+- Repeat the finding card only for supported issues. Use clickable locations when supported by the interface.
+- Keep each field to one short sentence when possible. Preserve important evidence and unresolved findings rather than truncating them to meet a word limit.
+- Use a small fenced `text` diagram only when a nontrivial branch, call sequence, or data flow needs clarification. Base every node and arrow on inspected code; skip decorative diagrams.
+- If there are no actionable findings, replace the finding cards with **No actionable findings.**
+- Finish with checks performed and material verification gaps. If no checks ran, say so and explain why; omit the empty table. Distinguish failures from checks that could not run.
+- Mark verification incomplete when relevant checks were skipped or blocked, or scope remains uncertain. No findings does not mean the change is verified.
+
+Do not publish changes or start another review attempt as part of this skill.

@@ -42,10 +42,6 @@ type workflowOptions struct {
 }
 
 func runWorkflow(opts workflowOptions) (runErr error) {
-	if err := installAgentSandbox(context.Background()); err != nil {
-		return err
-	}
-
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -83,6 +79,10 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		}
 
 		*entry.target = skill
+	}
+
+	if err := installAgentSandbox(context.Background()); err != nil {
+		return err
 	}
 
 	branch, err := workflowBranch(opts)

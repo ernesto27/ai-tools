@@ -11,6 +11,7 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		t.Run(stage, func(t *testing.T) {
 			t.Chdir(t.TempDir())
+			t.Setenv("PATH", t.TempDir())
 			data := `{"customSkills":{"` + stage + `":"missing"}}`
 			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
 				t.Fatal(err)
@@ -42,6 +43,7 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
+				t.Setenv("PATH", t.TempDir())
 				if err := os.WriteFile("config.json", []byte(`{"customSkills":{"codeReview":"missing"}}`), 0644); err != nil {
 					t.Fatal(err)
 				}

@@ -117,10 +117,31 @@ func IgnoreStageReports() error {
 
 // createRunDirectory reserves a unique child without replacing an earlier invocation.
 func createRunDirectory(branch, command string, started time.Time) (string, error) {
-	branchDirectory := filepath.Join(logDirectory, sanitizeBranch(branch))
-	if err := os.MkdirAll(branchDirectory, 0700); err != nil {
+	branchName := sanitizeBranch(branch)
+	if branchName == "." || branchName == ".." {
+		return "", fmt.Errorf("create branch log directory: invalid branch directory %q", branchName)
+	}
+	if err := os.MkdirAll(logDirectory, 0700); err != nil {
 		return "", fmt.Errorf("create branch log directory: %w", err)
 	}
+	root, err := os.OpenRoot(logDirectory)
+	if err != nil {
+		return "", fmt.Errorf("open log directory: %w", err)
+	}
+	defer root.Close()
+	if err := root.Mkdir(branchName, 0700); err != nil {
+		if !errors.Is(err, os.ErrExist) {
+			return "", fmt.Errorf("create branch log directory: %w", err)
+		}
+		info, err := root.Lstat(branchName)
+		if err != nil {
+			return "", fmt.Errorf("inspect branch log directory: %w", err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("create branch log directory: %q is not a directory", branchName)
+		}
+	}
+	branchDirectory := filepath.Join(logDirectory, branchName)
 	name := command + "-" + started.UTC().Format("2006-01-02_15-04-05.000000000")
 	for suffix := 0; ; suffix++ {
 		directory := name
@@ -128,7 +149,7 @@ func createRunDirectory(branch, command string, started time.Time) (string, erro
 			directory = fmt.Sprintf("%s-%d", name, suffix+1)
 		}
 		path := filepath.Join(branchDirectory, directory)
-		err := os.Mkdir(path, 0700)
+		err := root.Mkdir(filepath.Join(branchName, directory), 0700)
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}

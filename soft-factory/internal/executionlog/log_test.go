@@ -386,3 +386,53 @@ func TestBranchDirectoryCreationFailure(t *testing.T) {
 		t.Fatalf("expected contextual branch directory error, got %v", err)
 	}
 }
+
+func TestBranchDirectoryRejectsDotComponents(t *testing.T) {
+	for _, branch := range []string{".", ".."} {
+		t.Run(branch, func(t *testing.T) {
+			workingDirectory := t.TempDir()
+			t.Chdir(workingDirectory)
+			path, err := createRunDirectory(branch, "continue", time.Now())
+			if err == nil || !strings.Contains(err.Error(), "invalid branch directory") || path != "" {
+				t.Fatalf("expected contextual rejection, got path %q, error %v", path, err)
+			}
+			entries, err := os.ReadDir(workingDirectory)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("invalid branch created entries: %v, error %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestBranchDirectoryRejectsSymlinks(t *testing.T) {
+	for _, target := range []string{"../outside", "other-branch", "../missing"} {
+		t.Run(target, func(t *testing.T) {
+			workingDirectory := t.TempDir()
+			t.Chdir(workingDirectory)
+			for _, directory := range []string{"logs", "outside", filepath.Join("logs", "other-branch")} {
+				if err := os.MkdirAll(directory, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink(target, filepath.Join("logs", "feature")); err != nil {
+				t.Fatal(err)
+			}
+			path, err := createRunDirectory("feature", "continue", time.Now())
+			if err == nil || !strings.Contains(err.Error(), "create branch log directory") || path != "" {
+				t.Fatalf("expected contextual symlink rejection, got path %q, error %v", path, err)
+			}
+			for _, directory := range []string{"outside", filepath.Join("logs", "other-branch")} {
+				entries, err := os.ReadDir(directory)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("symlink target %s gained entries: %v, error %v", directory, entries, err)
+				}
+			}
+			if _, err := os.Stat("missing"); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("dangling symlink target was created: %v", err)
+			}
+			if targetAfter, err := os.Readlink(filepath.Join("logs", "feature")); err != nil || targetAfter != target {
+				t.Fatalf("branch symlink changed: target %q, error %v", targetAfter, err)
+			}
+		})
+	}
+}

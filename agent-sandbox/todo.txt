@@ -1,6 +1,9 @@
 [x] - should be able to add in json global values as model,  branch, etc, hn
 [x] - container sandbox should commit changes
 [x] - should docker have .git folder always
+[] - logs in claude is too big ,  try to minimize it
 [] - add a command to get json sandobox-config
 [x] - Check if branch in run exists in remote repo 
-[] - i want to add reviewer in PR githug
+[x] - i want to add reviewer in PR githug
+[] - improve error messages in general
+

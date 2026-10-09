@@ -1,0 +1,65 @@
+name: Agent Sandbox Documentation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - agent-sandbox/site-docs/**
+      - .github/workflows/agent-sandbox-docs.yml
+  pull_request:
+    paths:
+      - agent-sandbox/site-docs/**
+      - .github/workflows/agent-sandbox-docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-sandbox-docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent-sandbox/site-docs
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: agent-sandbox/site-docs/package-lock.json
+      - name: Install documentation dependencies
+        run: npm ci
+      - name: Build and check documentation
+        run: npm run docs:build
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: actions/configure-pages@v5
+      - name: Upload website
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: agent-sandbox/site-docs/guide/.vitepress/dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

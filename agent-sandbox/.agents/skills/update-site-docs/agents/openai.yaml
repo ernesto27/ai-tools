@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Site Docs"
+  short_description: "Maintain the agent-sandbox documentation website"
+  default_prompt: "Use $update-site-docs to update the agent-sandbox user guide for the relevant changes and validate the documentation build."

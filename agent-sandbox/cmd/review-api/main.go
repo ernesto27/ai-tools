@@ -76,7 +76,7 @@ func (a *api) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if input.Title == "" {
+	if strings.TrimSpace(input.Title) == "" {
 		writeError(w, http.StatusBadRequest, "title is required")
 		return
 	}
@@ -116,8 +116,12 @@ func (a *api) handleTask(w http.ResponseWriter, r *http.Request, rawID string) {
 	switch r.Method {
 	case http.MethodGet:
 		a.mu.Lock()
-		t := a.tasks[id]
+		t, exists := a.tasks[id]
 		a.mu.Unlock()
+		if !exists {
+			writeError(w, http.StatusNotFound, "task not found")
+			return
+		}
 		writeJSON(w, http.StatusOK, t)
 	case http.MethodDelete:
 		a.mu.Lock()

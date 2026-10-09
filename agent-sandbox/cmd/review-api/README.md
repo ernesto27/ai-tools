@@ -17,9 +17,12 @@ go run ./cmd/review-api
 - `GET /health` returns `200` and `{"status":"ok"}`.
 - `POST /tasks` creates a task and returns `201` with its JSON representation.
 - `GET /tasks` returns `200` with a JSON array, including `[]` when empty.
-- `GET /tasks/{id}` returns the requested task or `404` if it does not exist.
+- `GET /tasks/{id}` returns the requested task with `200`, or a JSON error with
+  `404` if it does not exist.
 - `DELETE /tasks/{id}` removes the requested task and returns `204` with an empty body, or `404` if it does not exist.
-- Missing or whitespace-only titles, malformed JSON, and invalid IDs return `400` with a JSON error.
+- Missing or whitespace-only titles, malformed JSON, and invalid IDs return
+  `400` with a JSON error. Titles containing non-whitespace characters are
+  accepted as submitted.
 - Unsupported HTTP methods return `405`.
 - JSON responses use `Content-Type: application/json`.
 

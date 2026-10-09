@@ -1,6 +1,11 @@
-[] - instalar agent-sandbox si no existe en path
+[x] - instalar agent-sandbox si no existe en path
 [] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
+[] - fix test in github  Run /tmp/software-factory -h
+[] update skill revie code to make more visual, less verbose
+agent-sandbox is missing. Download and install it? [y/N]: Error: agent-sandbox installation declined
+Error: Process completed with exit code 1.
+[] - check how review is made, if not found errors in first round should stop, not run 3
 [] - logs folder should have a parent for branch and all next resumes next
 [] - config file should not be required, now return an error
 [x] - list of stages disables in software-factory.json
@@ -21,22 +26,22 @@
 [x] - add code-changes new skill
 [] - integration with GitHub Issues to get task content from an issue URL
 
+..................
+The Go image works. The failure comes from prompt argument handling in agent-sandbox.
 
-inconsistencias en json,  use camelCase
+Your task begins with - remove new test.... The installed sandbox adds -- before the prompt only when images are attached, so Codex interprets the leading -  as an option.
 
-  "documents": [
-    "docs/context.txt",
-    "docs/requirement.txt"
-  ],
-  "custom-skills": {
-    "code-review": "test-code-review",
-    "security-review": "test-security-review",
-    "risk-classification": "test-risk-classification",
-    "review-changes": "test-review-changes"
-  },
-  "google_drive": {
-    "folders": [
-      "test1"
-    ]
-  }
-}
+- Quick workaround: Start your task file with # Task before the bullets.
+- Permanent fix: In agent-sandbox/internal/agent/codex.go, always append -- before the prompt.
+
+The missing stage-summary warning is a consequence: Codex exited before executing the task.
+
+............
+prevent commit this file
+
+‎.soft-factory-stage-changes-EKIJLS52PFDRIY2WSJOW4TO4AS.txt‎
++2
+Lines changed: 2 additions & 0 deletions
+Original file line number	Diff line number	Diff line change
+Added shared run/continue constants and updated logging and CLI callers.
+Removed newly added main workflow tests, reverted README edits, and deleted the branch execution log spec.

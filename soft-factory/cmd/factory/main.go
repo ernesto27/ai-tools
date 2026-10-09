@@ -27,13 +27,6 @@ var version = "dev"
 const factoryConfigFile = "software-factory.json"
 
 func main() {
-	ctx := context.Background()
-	err := installAgentSandbox(ctx)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
-
 	if err := newRootCmd(runWorkflow).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
@@ -49,6 +42,10 @@ type workflowOptions struct {
 }
 
 func runWorkflow(opts workflowOptions) (runErr error) {
+	if err := installAgentSandbox(context.Background()); err != nil {
+		return err
+	}
+
 	if err := loadEnvironment(); err != nil {
 		return err
 	}

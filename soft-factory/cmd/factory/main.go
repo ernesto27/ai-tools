@@ -94,9 +94,9 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	}
 	var runLog *executionlog.Run
 	if opts.Implement {
-		command := "run"
+		command := executionlog.CommandRun
 		if opts.Continue {
-			command = "continue"
+			command = executionlog.CommandContinue
 		}
 		var err error
 		runLog, err = executionlog.NewRun(branch, command, plannedStageLabels(cfg))
@@ -203,7 +203,7 @@ func workflowBranch(opts workflowOptions) (string, error) {
 	}
 	mode := "resume"
 	if opts.Implement && !opts.Continue {
-		mode = "run"
+		mode = executionlog.CommandRun
 	}
 	return settings.Branch(mode)
 }

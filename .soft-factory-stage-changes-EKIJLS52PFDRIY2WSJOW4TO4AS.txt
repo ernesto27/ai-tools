@@ -1,0 +1,2 @@
+Added shared run/continue constants and updated logging and CLI callers.
+Removed newly added main workflow tests, reverted README edits, and deleted the branch execution log spec.

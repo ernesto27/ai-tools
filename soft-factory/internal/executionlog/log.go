@@ -16,6 +16,11 @@ import (
 )
 
 const (
+	// CommandRun identifies an initial workflow invocation.
+	CommandRun = "run"
+	// CommandContinue identifies a continued workflow invocation.
+	CommandContinue = "continue"
+
 	logDirectory = "logs"
 	separator    = "=================================================="
 	summaryFile  = "summary.log"
@@ -50,7 +55,7 @@ func NewRun(branch, command string, planned []string) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
 	}
-	if command != "run" && command != "continue" {
+	if command != CommandRun && command != CommandContinue {
 		return nil, fmt.Errorf("unsupported execution log command %q", command)
 	}
 	workingDirectory, err := os.Getwd()

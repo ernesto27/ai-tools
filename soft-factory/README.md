@@ -267,17 +267,10 @@ Soft Factory runs these stages in order:
 4. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
 5. Write a read-only walkthrough of the final changes, including diff lines and flow diagrams.
 
-The default workflow saves logs in `logs/<sanitized-branch>/run-<UTC-timestamp>/`,
-using the sandbox worktree branch from `agent-sandbox.json` (`run.branch`).
-`software-factory continue` uses `resume.branch` and saves a new invocation in
-`logs/<sanitized-branch>/continue-<UTC-timestamp>/`. Commands selecting the same
-branch share the parent folder, while every invocation keeps its own files. A
-continue can create that parent even when there are no earlier logs. The log
-root is relative to the CLI working directory; existing flat log folders remain
-untouched. Branch slashes become hyphens, so `feature/logs` appears as the single
-folder `feature-logs`. Timestamps use UTC with nanosecond precision, for example
-`run-2026-10-08_19-38-48.007046183`; name collisions add `-2`, `-3`, and so on.
-The first four stages have position-prefixed files (`01-implementation.log`,
+The default workflow saves logs in `logs/<branch>-<UTC-datetime>/`, using the
+sandbox worktree branch from `agent-sandbox.json` (`run.branch`). Branch slashes
+become hyphens, so `feature/logs` appears as `feature-logs`. Each
+first four stages have position-prefixed files (`01-implementation.log`,
 `02-code-review.log`, `03-security-review.log`, and
 `04-risk-classification.log`); another attempt at a stage uses a numbered file
 such as `01-implementation-2.log`. Each stage file includes the run details
@@ -382,10 +375,7 @@ See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions
 
 Reports appear in the terminal. The default workflow saves the code review,
 security review, and risk classification output in their `.log` files, and
-only the final walkthrough as
-`logs/<sanitized-branch>/run-<UTC-timestamp>/05-review-changes.md`.
-`continue` saves the same artifacts in its own `continue-<UTC-timestamp>` child
-under the selected branch folder.
+only the final walkthrough as `logs/<run>/05-review-changes.md`.
 The standalone `review` command saves its three reports as timestamped
 Markdown files in `docs/` because it has no run log directory.
 

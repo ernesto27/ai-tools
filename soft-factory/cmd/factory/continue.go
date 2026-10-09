@@ -1,10 +1,14 @@
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"soft-factory/internal/executionlog"
+)
 
 func newContinueCmd(run func(workflowOptions) error) *cobra.Command {
 	return &cobra.Command{
-		Use:   "continue",
+		Use:   executionlog.CommandContinue,
 		Short: "Continue work in the resume.branch configured in agent-sandbox.json",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

@@ -43,7 +43,7 @@ func TestFormatDuration(t *testing.T) {
 
 func TestSummaryLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", "run", stageNames)
+	run, err := NewRun("feature", CommandRun, stageNames)
 	if err != nil {
 		t.Fatalf("NewRun: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestStageChangeReports(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
-			run, err := NewRun("feature", "run", stageNames)
+			run, err := NewRun("feature", CommandRun, stageNames)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -141,7 +141,7 @@ func TestStageChangeReports(t *testing.T) {
 
 func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", "run", stageNames)
+	run, err := NewRun("feature", CommandRun, stageNames)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 
 func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", "run", stageNames)
+	run, err := NewRun("feature", CommandRun, stageNames)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestHeaderListsOnlyPlannedStages(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
-			run, err := NewRun("feature", "run", tc.planned)
+			run, err := NewRun("feature", CommandRun, tc.planned)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -235,7 +235,7 @@ func prepareLogTestDirectory(t *testing.T) {
 }
 
 func TestInvocationDirectoryAllocation(t *testing.T) {
-	for _, firstCommand := range []string{"run", "continue"} {
+	for _, firstCommand := range []string{CommandRun, CommandContinue} {
 		t.Run(firstCommand+" first", func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			// Earlier flat logs must remain untouched.
@@ -267,9 +267,9 @@ func TestInvocationDirectoryAllocation(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			otherCommand := "continue"
-			if firstCommand == "continue" {
-				otherCommand = "run"
+			otherCommand := CommandContinue
+			if firstCommand == CommandContinue {
+				otherCommand = CommandRun
 			}
 			otherPath, err := createRunDirectory("feature/logs", otherCommand, started)
 			if err != nil {
@@ -322,7 +322,7 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 	}
 	parent := filepath.Join("logs", "Feature-logs._-9-")
 	paths := make(map[string]int)
-	for i, command := range []string{"run", "continue", "continue", "run"} {
+	for i, command := range []string{CommandRun, CommandContinue, CommandContinue, CommandRun} {
 		run, err := NewRun("Feature/logs._-9é", command, []string{"implementation"})
 		if err != nil {
 			t.Fatal(err)
@@ -381,7 +381,7 @@ func TestBranchDirectoryCreationFailure(t *testing.T) {
 	if err := os.WriteFile(filepath.Join("logs", "feature"), []byte("existing file"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := createRunDirectory("feature", "continue", time.Now())
+	_, err := createRunDirectory("feature", CommandContinue, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "create branch log directory") {
 		t.Fatalf("expected contextual branch directory error, got %v", err)
 	}
@@ -392,7 +392,7 @@ func TestBranchDirectoryRejectsDotComponents(t *testing.T) {
 		t.Run(branch, func(t *testing.T) {
 			workingDirectory := t.TempDir()
 			t.Chdir(workingDirectory)
-			path, err := createRunDirectory(branch, "continue", time.Now())
+			path, err := createRunDirectory(branch, CommandContinue, time.Now())
 			if err == nil || !strings.Contains(err.Error(), "invalid branch directory") || path != "" {
 				t.Fatalf("expected contextual rejection, got path %q, error %v", path, err)
 			}
@@ -417,7 +417,7 @@ func TestBranchDirectoryRejectsSymlinks(t *testing.T) {
 			if err := os.Symlink(target, filepath.Join("logs", "feature")); err != nil {
 				t.Fatal(err)
 			}
-			path, err := createRunDirectory("feature", "continue", time.Now())
+			path, err := createRunDirectory("feature", CommandContinue, time.Now())
 			if err == nil || !strings.Contains(err.Error(), "create branch log directory") || path != "" {
 				t.Fatalf("expected contextual symlink rejection, got path %q, error %v", path, err)
 			}

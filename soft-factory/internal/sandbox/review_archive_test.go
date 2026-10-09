@@ -15,7 +15,7 @@ func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 	if output, err := exec.Command("git", "init", "-b", "main").CombinedOutput(); err != nil {
 		t.Fatalf("initialize test repository: %v\n%s", err, output)
 	}
-	run, err := executionlog.NewRun("feature/logs", "continue", nil)
+	run, err := executionlog.NewRun("feature/logs", executionlog.CommandContinue, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

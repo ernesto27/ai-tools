@@ -1,4 +1,4 @@
-module agent-sandbox
+module github.com/ernesto27/ai-tools/agent-sandbox
 
 go 1.26.0
 

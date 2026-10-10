@@ -3,7 +3,7 @@ package agent
 import (
 	"path/filepath"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // opencode runs opencode. It writes inside $HOME (~/.cache) and Docker creates

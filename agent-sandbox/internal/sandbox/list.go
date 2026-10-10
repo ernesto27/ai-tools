@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
 // WorktreeList prints the worktrees the sandbox created in the repository the

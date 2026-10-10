@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"agent-sandbox/internal/git"
-	"agent-sandbox/internal/github"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
 )
 
 func TestAppendPRChecklist(t *testing.T) {

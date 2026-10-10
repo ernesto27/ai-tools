@@ -1,8 +1,6 @@
 package sandbox
 
 import (
-	"agent-sandbox/internal/agent"
-	"agent-sandbox/internal/utils"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -10,6 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agent"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/utils"
 )
 
 // Options is one invocation of the sandbox.

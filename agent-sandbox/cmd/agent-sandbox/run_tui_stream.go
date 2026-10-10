@@ -10,8 +10,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"agent-sandbox/internal/docker"
-	"agent-sandbox/internal/sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 // liveBridge batches writes without asking the renderer to keep up with each

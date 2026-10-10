@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	agentsandbox "agent-sandbox"
-	"agent-sandbox/internal/docker"
+	agentsandbox "github.com/ernesto27/ai-tools/agent-sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // baseSandboxDockerfile derives a runnable image for every registered agent

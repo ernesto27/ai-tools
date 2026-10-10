@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"agent-sandbox/config"
-	"agent-sandbox/internal/sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/config"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 const localConfigFile = "agent-sandbox.json"

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
 func TestConsumePRContent(t *testing.T) {

@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"agent-sandbox/internal/agent"
-	"agent-sandbox/internal/docker"
-	"agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agent"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
 // imageName is the tag of the sandbox image, shared by every agent.

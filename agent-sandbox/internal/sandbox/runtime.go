@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 
-	"agent-sandbox/internal/docker"
-	"agent-sandbox/internal/git"
-	"agent-sandbox/internal/github"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
 )
 
 // Event reports known execution facts without exposing credentials or process

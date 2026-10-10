@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"agent-sandbox/internal/sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 func newRunTUICmd(state *commandState) *cobra.Command {

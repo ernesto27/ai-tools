@@ -11,8 +11,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"agent-sandbox/internal/docker"
-	"agent-sandbox/internal/sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 type liveTickMsg struct{}

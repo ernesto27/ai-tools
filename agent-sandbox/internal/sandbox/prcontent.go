@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
 // prContentFile lives in the coding worktree only until the host consumes it.

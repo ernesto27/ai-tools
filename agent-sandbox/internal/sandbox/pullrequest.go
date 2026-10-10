@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"agent-sandbox/internal/git"
-	"agent-sandbox/internal/github"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
 )
 
 // preparePullRequest runs before image work or worktree creation. The recorded

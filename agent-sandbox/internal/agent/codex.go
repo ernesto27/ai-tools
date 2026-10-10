@@ -3,7 +3,7 @@ package agent
 import (
 	"path/filepath"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // codex runs OpenAI Codex. It needs a TTY, so the container is started with -it.

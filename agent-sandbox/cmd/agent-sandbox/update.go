@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agentsandbox "agent-sandbox"
+	agentsandbox "github.com/ernesto27/ai-tools/agent-sandbox"
 )
 
 func newUpdateCmd() *cobra.Command {

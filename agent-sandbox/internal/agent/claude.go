@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // claude runs Claude Code. Its HOME is redirected so each credential mode sees

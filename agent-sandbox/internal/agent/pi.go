@@ -3,7 +3,7 @@ package agent
 import (
 	"path/filepath"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // pi runs the pi coding agent.

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 func gitConfigMounts(gitDir, commonDir string) ([]docker.Mount, error) {

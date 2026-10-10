@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"agent-sandbox/internal/agent"
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agent"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 func TestAddImageMountsUsesAgentImageCapability(t *testing.T) {

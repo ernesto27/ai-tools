@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"agent-sandbox/internal/docker"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
 // Agent is a coding agent installed in the sandbox image.

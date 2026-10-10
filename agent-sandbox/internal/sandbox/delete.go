@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"agent-sandbox/internal/git"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
 func WorktreeDelete(branch string, force bool, out io.Writer) error {

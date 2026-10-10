@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"agent-sandbox/internal/sandbox"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 func main() {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"agent-sandbox/config"
 	"agent-sandbox/internal/sandbox"
 )
 
@@ -18,35 +19,6 @@ const configAPIKey = "apiKey"
 const configReviewers = "reviewers"
 
 var reviewerUsername = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*$`)
-
-type localConfig struct {
-	Run         *configSection `json:"run"`
-	Resume      *configSection `json:"resume"`
-	Model       string         `json:"model"`
-	Agent       string         `json:"agent"`
-	BaseImage   string         `json:"baseImage"`
-	Push        bool           `json:"push"`
-	PR          bool           `json:"pr"`
-	HostNetwork bool           `json:"hn"`
-}
-
-// Pointers preserve the difference between an omitted field and an explicit
-// zero value, which matters when JSON defaults are merged with CLI flags.
-type configSection struct {
-	Branch        *string   `json:"branch"`
-	Agent         *string   `json:"agent"`
-	APIKey        *string   `json:"apiKey"`
-	Model         *string   `json:"model"`
-	BaseImage     *string   `json:"baseImage"`
-	Query         *string   `json:"query"`
-	Push          *bool     `json:"push"`
-	PR            *bool     `json:"pr"`
-	HostNetwork   *bool     `json:"hn"`
-	CommitMessage *string   `json:"commitMessage"`
-	FilePrompt    *string   `json:"filePrompt"`
-	Image         *[]string `json:"image"`
-	Reviewers     []string  `json:"reviewers"`
-}
 
 // configRunArgs merges local defaults after Cobra has parsed the command line
 // but before it validates prompt sources. A JSON query or filePrompt can
@@ -156,13 +128,13 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 // readLocalConfig validates both supported sections even though only one is
 // applied. This catches misspellings when a user first runs either command;
 // worktree management verbs never call this function.
-func readLocalConfig() (localConfig, error) {
+func readLocalConfig() (config.Config, error) {
 	data, err := os.ReadFile(localConfigFile)
 	if errors.Is(err, os.ErrNotExist) {
-		return localConfig{}, nil
+		return config.Config{}, nil
 	}
 	if err != nil {
-		return localConfig{}, fmt.Errorf("%s: %w", localConfigFile, err)
+		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
 	}
 
 	// Decode raw fields first because encoding/json treats null as an omitted
@@ -170,48 +142,48 @@ func readLocalConfig() (localConfig, error) {
 	// section and field before decoding into the typed configuration below.
 	var root map[string]json.RawMessage
 	if err := json.Unmarshal(data, &root); err != nil {
-		return localConfig{}, fmt.Errorf("%s: %w", localConfigFile, err)
+		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
 	}
 	if root == nil {
-		return localConfig{}, fmt.Errorf("%s: expected a JSON object", localConfigFile)
+		return config.Config{}, fmt.Errorf("%s: expected a JSON object", localConfigFile)
 	}
 
 	for name, value := range root {
 		if name == flagModel || name == flagAgent || name == flagBaseImage {
 			var field string
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-				return localConfig{}, fmt.Errorf("%s: %s must be a JSON string", localConfigFile, name)
+				return config.Config{}, fmt.Errorf("%s: %s must be a JSON string", localConfigFile, name)
 			}
 			continue
 		}
 		if name == flagPush || name == flagPR || name == flagHostNetwork {
 			var field bool
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-				return localConfig{}, fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, name)
+				return config.Config{}, fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, name)
 			}
 			continue
 		}
 		if name != "run" && name != "resume" {
-			return localConfig{}, fmt.Errorf("%s: unknown section %q", localConfigFile, name)
+			return config.Config{}, fmt.Errorf("%s: unknown section %q", localConfigFile, name)
 		}
 		var section map[string]json.RawMessage
 		if err := json.Unmarshal(value, &section); err != nil || section == nil {
-			return localConfig{}, fmt.Errorf("%s: %s must be a JSON object", localConfigFile, name)
+			return config.Config{}, fmt.Errorf("%s: %s must be a JSON object", localConfigFile, name)
 		}
 		for key, field := range section {
 			if err := validateConfigField(name, key, field); err != nil {
-				return localConfig{}, err
+				return config.Config{}, err
 			}
 		}
 	}
-	var config localConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return localConfig{}, fmt.Errorf("%s: %w", localConfigFile, err)
+	var cfg config.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
 	}
-	if config.Run != nil {
-		config.Run.Reviewers = normalizeReviewers(config.Run.Reviewers)
+	if cfg.Run != nil {
+		cfg.Run.Reviewers = normalizeReviewers(cfg.Run.Reviewers)
 	}
-	return config, nil
+	return cfg, nil
 }
 
 func normalizeReviewers(reviewers []string) []string {

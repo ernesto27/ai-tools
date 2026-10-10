@@ -6,7 +6,8 @@ describes the CLI contract; consult the linked source when changing behavior.
 ## Package responsibilities
 
 ```text
-cmd/agent-sandbox -> sandbox -> agent -> docker
+cmd/agent-sandbox -> config
+                 -> sandbox -> agent -> docker
                             -> docker
                             -> git
                             -> github
@@ -22,6 +23,9 @@ cmd/agent-sandbox -> sandbox -> agent -> docker
   [update.go](../cmd/agent-sandbox/update.go) runs the embedded
   [install.sh](../install.sh) with Bash to install the latest release, independently
   of sandbox execution and configuration.
+- [config](../config/config.go) exposes the public `Config` and `Section` JSON
+  types without dependencies. The CLI owns file loading, validation, reviewer
+  normalization, and flag merging.
 - [internal/sandbox](../internal/sandbox/sandbox.go) orchestrates image preparation,
   worktree creation or reuse, container execution, and publication.
   [Runtime](../internal/sandbox/runtime.go) routes output and execution events

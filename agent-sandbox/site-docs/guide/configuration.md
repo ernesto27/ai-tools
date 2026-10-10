@@ -9,7 +9,7 @@ directories for it. Worktree management commands do not read this file.
 ```json
 {
   "agent": "codex",
-  "base-image": "golang:1.26-alpine",
+  "baseImage": "golang:1.26-alpine",
   "push": false,
   "pr": false,
   "run": {
@@ -46,10 +46,17 @@ your configuration enables `push` and you want to leave changes uncommitted.
 
 ## Supported fields
 
+Multiword JSON keys and long CLI flags use camelCase: `baseImage`,
+`commitMessage`, and `filePrompt`. For example, use `--baseImage` on the CLI.
+The JSON-only API key field is `apiKey`.
+Rename the old `base-image`, `commit-message`, `file-prompt`, and `api-key`
+names in existing files and invocations; they are rejected, with no aliases.
+Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
+
 | Location | Fields |
 | --- | --- |
-| Shared root | `agent`, `model`, `base-image`, `push`, `pr`, `hn` |
-| `run` and `resume` | `branch`, `agent`, `model`, `base-image`, `query`, `file-prompt`, `push`, `pr`, `hn`, `commit-message`, `image`, `api-key` |
+| Shared root | `agent`, `model`, `baseImage`, `push`, `pr`, `hn` |
+| `run` and `resume` | `branch`, `agent`, `model`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `apiKey` |
 | `run` only | `reviewers` |
 
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
@@ -57,5 +64,5 @@ of strings for `image` and `reviewers`. Unknown fields, `null`, and wrong
 types are rejected. Both command sections are validated even when only one
 is being used.
 
-`api-key` and `reviewers` are JSON-only fields. See [authentication](authentication.md)
+`apiKey` and `reviewers` are JSON-only fields. See [authentication](authentication.md)
 for keys and [publishing](publishing.md#request-reviewers) for reviewers.

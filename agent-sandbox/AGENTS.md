@@ -31,7 +31,7 @@ repository, checks npm, and may build an image; it is not a cheap smoke test.
 - Keep orchestration in `internal/sandbox` and CLI presentation in
   `cmd/agent-sandbox`. See the architecture reference for the actual dependency graph.
 - Preserve both authentication modes: host configuration mounts, and JSON
-  `api-key` authentication for Codex and Claude with disposable container homes.
+  `apiKey` authentication for Codex and Claude with disposable container homes.
   See `internal/agent` and `containerOptions` in `internal/sandbox/sandbox.go`.
 - With `--push` or `--pr`, the agent commits inside the container; the host
   validates and publishes the result. Without either option, the prompt forbids

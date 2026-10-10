@@ -25,16 +25,16 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-a`, `--agent` | `codex`, `claude`, `opencode`, or `pi`; required unless supplied by JSON. |
 | `-m`, `--model` | Override the model selected for the agent. |
 | `-q`, `--query` | Task instructions. |
-| `-f`, `--file-prompt` | Read task instructions from a file, instead of `-q`. |
-| `-i`, `--base-image` | Build the sandbox image from a compatible external base. |
+| `-f`, `--filePrompt` | Read task instructions from a file, instead of `-q`. |
+| `-i`, `--baseImage` | Build the sandbox image from a compatible external base. |
 | `--image` | Attach an image to Codex or Claude Code; repeat for multiple files. |
 | `-p`, `--push` | Ask the agent to commit, then push from the host. |
 | `--pr` | Commit and publish from the host. Initial runs create or reuse a PR; resumes require an open PR and append a session checklist. |
-| `-c`, `--commit-message` | Exact commit message to use with `--push` or `--pr`. |
+| `-c`, `--commitMessage` | Exact commit message to use with `--push` or `--pr`. |
 | `--hn` | Share the host's network with the container. |
 
 Exactly one prompt source must be supplied through flags or JSON.
-`api-key` and `reviewers` are [JSON-only settings](configuration.md).
+`apiKey` and `reviewers` are [JSON-only settings](configuration.md).
 
 ## Help and version
 

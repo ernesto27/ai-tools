@@ -19,14 +19,14 @@ type commandState struct {
 const (
 	flagAgent         = "agent"
 	flagModel         = "model"
-	flagBaseImage     = "base-image"
+	flagBaseImage     = "baseImage"
 	flagPush          = "push"
 	flagPR            = "pr"
 	flagHostNetwork   = "hn"
 	flagBranch        = "branch"
 	flagQuery         = "query"
-	flagFilePrompt    = "file-prompt"
-	flagCommitMessage = "commit-message"
+	flagFilePrompt    = "filePrompt"
+	flagCommitMessage = "commitMessage"
 	flagImage         = "image"
 )
 
@@ -41,7 +41,7 @@ func newRootCmd() (*cobra.Command, *commandState) {
 			"for the terminal view, or run and resume for plain output. Run\n" +
 			"creates a worktree; resume continues one already recorded.\n\n" +
 			"Authentication comes from the agent's configuration directory on the host,\n" +
-			"or from api-key in agent-sandbox.json for Codex or Claude.",
+			"or from apiKey in agent-sandbox.json for Codex or Claude.",
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
 			"  agent-sandbox resume -b fix-login -a codex -q \"add a regression test\"",
 
@@ -83,7 +83,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 		Short: "Run a coding agent with plain terminal output",
 		Long: "Run a coding agent in a new sandbox worktree with plain output. Supply the\n" +
 			"branch with -b or --branch; otherwise one is generated. Supply the\n" +
-			"instruction with -q or --query, or -f or --file-prompt. Defaults\n" +
+			"instruction with -q or --query, or -f or --filePrompt. Defaults\n" +
 			"may be set in ./agent-sandbox.json.",
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
 			"  agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
@@ -154,7 +154,7 @@ func runArgs(cmd *cobra.Command, args []string) error {
 		return sandbox.UsageError{}
 	}
 	if query != "" && filePrompt != "" {
-		return sandbox.NewUsageError(errors.New("--query and --file-prompt cannot be used together"))
+		return sandbox.NewUsageError(errors.New("--query and --filePrompt cannot be used together"))
 	}
 	return nil
 }

@@ -18,8 +18,8 @@ func TestRunArgsAcceptsFilePromptWithoutPositionalPrompt(t *testing.T) {
 	}
 
 	cmd := newRunCmd(&commandState{})
-	if err := cmd.Flags().Set("file-prompt", path); err != nil {
-		t.Fatalf("set file-prompt: %v", err)
+	if err := cmd.Flags().Set("filePrompt", path); err != nil {
+		t.Fatalf("set filePrompt: %v", err)
 	}
 
 	if err := runArgs(cmd, nil); err != nil {
@@ -50,8 +50,8 @@ func TestImageFlagIsRepeatableWithQuery(t *testing.T) {
 
 func TestRunArgsRejectsBothFlagPromptSources(t *testing.T) {
 	cmd := newRunCmd(&commandState{})
-	if err := cmd.Flags().Set("file-prompt", "prompt.md"); err != nil {
-		t.Fatalf("set file-prompt: %v", err)
+	if err := cmd.Flags().Set("filePrompt", "prompt.md"); err != nil {
+		t.Fatalf("set filePrompt: %v", err)
 	}
 	if err := cmd.Flags().Set("query", "different task"); err != nil {
 		t.Fatalf("set query: %v", err)

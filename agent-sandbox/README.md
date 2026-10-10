@@ -39,14 +39,14 @@ go build -o agent-sandbox ./cmd/agent-sandbox
   and Claude Code, an API key in `./agent-sandbox.json`. opencode and pi require
   the host session.
 
-| Agent | Host configuration when not using `api-key` |
+| Agent | Host configuration when not using `apiKey` |
 | --- | --- |
 | Codex | `~/.codex/` |
 | Claude Code | `~/.claude/` and `~/.claude.json` |
 | opencode | `~/.config/opencode/`, `~/.local/share/opencode/`, and `~/.local/state/opencode/` |
 | pi | `~/.pi/agent/` |
 
-Without `api-key`, if any of these paths is missing, the command fails without
+Without `apiKey`, if any of these paths is missing, the command fails without
 creating it. Run and authenticate the corresponding agent on the host first.
 With an API key for Codex or Claude Code, the container uses a temporary home
 directory and does not mount host credentials.
@@ -68,7 +68,7 @@ This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--hn] [-p] [--pr] [-c <commit-message>] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
 
@@ -77,20 +77,20 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `-b`, `--branch` | Optional. Branch for the separate worktree; generated if omitted. |
 | `-a`, `--agent` | Required. One of `codex`, `claude`, `opencode`, or `pi`. |
 | `-m`, `--model` | Optional. Overrides the model selected by the agent. |
-| `-i`, `--base-image` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
+| `-i`, `--baseImage` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
 | `--hn` | Optional. Shares the host network with the container, without port restrictions. Disabled by default; see the risks under "Host networking". |
 | `-p`, `--push` | The agent creates the commit inside the container. If it finishes successfully and leaves the worktree clean, the host runs `git push --set-upstream origin <branch>` without creating a PR. |
 | `--pr` | Commit and publish a PR. `run` creates or reuses one; `resume` appends to an existing open PR. Includes `--push`; see "GitHub pull requests". |
 | `-q`, `--query` | Instructions for the agent. |
-| `-c`, `--commit-message` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
-| `-f`, `--file-prompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
+| `-c`, `--commitMessage` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
+| `-f`, `--filePrompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
 | `--image <file>` | Optional and repeatable. Attaches images to the initial prompt for Codex or Claude Code. Each path must be an existing regular file on the host; opencode and pi ignore it. Use `--` before the text prompt so Codex does not interpret it as another image. |
 
 Without `-p`/`--push` or `--pr`, changes remain uncommitted in the worktree.
 With either option, the agent commits before finishing. Provide exactly one
-prompt source: `-q`/`--query`, `-f`/`--file-prompt`, or the `"query"`/`"file-prompt"`
+prompt source: `-q`/`--query`, `-f`/`--filePrompt`, or the `"query"`/`"filePrompt"`
 value in JSON. Both sources cannot be used at once, and positional instructions
-are not accepted. Without `--commit-message`, the agent chooses a message based
+are not accepted. Without `--commitMessage`, the agent chooses a message based
 on the actual changes.
 
 To continue a registered worktree, use `agent-sandbox resume -b <branch>`.
@@ -98,20 +98,26 @@ The branch is the name shown by `worktree-list`. When combined with `--push`
 or `--pr`, the agent must commit its changes before ending the session.
 
 `run` and `resume` read `./agent-sandbox.json` if it exists in the directory
-where they are invoked. The JSON root accepts `agent`, `model`, `base-image`,
+where they are invoked. The JSON root accepts `agent`, `model`, `baseImage`,
 `push`, `pr`, and `hn` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`,
-`base-image`, `query`, `push`, `pr`, `hn`, `commit-message`, `file-prompt`, and
-`image`, plus the `api-key` field. `api-key` is available only in JSON: there is
+`baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
+`image`, plus the `apiKey` field. `apiKey` is available only in JSON: there is
 no equivalent command-line option. For each field, an explicit command-line
 option takes precedence, followed by the section value, then the root value.
 A section's `false` or empty string also overrides the shared value.
+
+Multiword JSON keys and long CLI flags use camelCase: `baseImage`,
+`commitMessage`, and `filePrompt`, plus the JSON-only `apiKey`.
+The previous names `base-image`, `commit-message`, `file-prompt`, and `api-key`
+are rejected. Rename them in existing configuration files and invocations.
+Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 ```json
 {
   "agent": "codex",
   "model": "gpt-6.1-sol",
-  "base-image": "golang:1.26-alpine",
+  "baseImage": "golang:1.26-alpine",
   "push": false,
   "pr": false,
   "hn": false,
@@ -178,7 +184,7 @@ If PR creation or editing fails after pushing, the error is reported and the
 branch remains published. Failed description updates are not saved or replayed.
 
 Combining `--pr` with `--push` follows this same flow, without duplicating the
-commit or push. `--commit-message` controls the message given to the agent for
+commit or push. `--commitMessage` controls the message given to the agent for
 the commit, not the PR title.
 
 ### Host networking
@@ -194,14 +200,14 @@ needs that access.
 
 ### API keys for Codex and Claude Code
 
-To use an API key instead of the host session, add `api-key` to the `run` or
+To use an API key instead of the host session, add `apiKey` to the `run` or
 `resume` section you will execute. For example, for Codex:
 
 ```json
 {
   "run": {
     "agent": "codex",
-    "api-key": "<OPENAI_API_KEY>",
+    "apiKey": "<OPENAI_API_KEY>",
     "query": "inspect this repository"
   }
 }
@@ -213,7 +219,7 @@ For Claude Code:
 {
   "run": {
     "agent": "claude",
-    "api-key": "<ANTHROPIC_API_KEY>",
+    "apiKey": "<ANTHROPIC_API_KEY>",
     "query": "inspect this repository"
   }
 }
@@ -221,7 +227,7 @@ For Claude Code:
 
 ### External base image
 
-`--base-image` uses an image that already contains the project's runtime.
+`--baseImage` uses an image that already contains the project's runtime.
 Alpine, Debian, Ubuntu, Fedora, RHEL 8/9, UBI 8/9, and Amazon Linux 2023 are
 supported. For example, `golang:1.26-alpine` makes Go, `gofmt`, and `go test`
 available inside the container:

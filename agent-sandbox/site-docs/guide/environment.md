@@ -10,7 +10,7 @@ agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine \
   -q "run gofmt and go test ./..., then fix failures"
 ```
 
-`-i` is short for `--base-image`. The tool builds a local image derived from
+`-i` is short for `--baseImage`. The tool builds a local image derived from
 your base, adding Node.js, npm, Bash, the agents, ripgrep, CA certificates,
 curl, and Git. Later invocations reuse it and check the selected agent's
 version against npm, rebuilding when it differs.

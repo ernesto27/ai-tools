@@ -111,7 +111,7 @@ cat >"$config_dir/agent-sandbox.json" <<'JSON'
 {
   "agent": "claude",
   "model": "opus",
-  "base-image": "golang:1.26-alpine",
+  "baseImage": "golang:1.26-alpine",
   "pr": true,
   "push": false,
   "hn": true,
@@ -136,7 +136,7 @@ execute_from "$config_dir" resume --pr=false --hn=false \
   -q "read hello.txt, then create resumed.txt at the repository root containing the text resumed successfully"
 show_state
 
-# --file-prompt takes the task from a regular host file. This run is kept for
+# --filePrompt takes the task from a regular host file. This run is kept for
 # worktree-delete-all below. Explicit false publication flags also work when
 # there is no JSON config in the invocation directory.
 printf '%s\n' "create file-prompt.txt at the repository root containing file prompt works" >"$prompt_file"

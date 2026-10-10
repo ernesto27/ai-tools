@@ -34,7 +34,7 @@ For Codex:
 {
   "run": {
     "agent": "codex",
-    "api-key": "<YOUR_OPENAI_API_KEY>",
+    "apiKey": "<YOUR_OPENAI_API_KEY>",
     "query": "inspect this repository and summarize its structure"
   }
 }
@@ -47,7 +47,7 @@ agent-sandbox run
 ```
 
 For Claude Code, use `"agent": "claude"` and your Anthropic API key instead.
-`api-key` is supported only in the `run` and `resume` JSON sections.
+`apiKey` is supported only in the `run` and `resume` JSON sections.
 
 In this mode, the key is supplied to the container as the provider's environment
 variable. The container uses a temporary home and does not mount host agent

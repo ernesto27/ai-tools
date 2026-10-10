@@ -57,7 +57,7 @@ func NewOptions(opts Options) (Options, error) {
 	opts.Agent = selected
 	if opts.APIKey != "" {
 		if _, ok := selected.(agent.APIKeyAgent); !ok {
-			return Options{}, usageErrorf("api-key is not supported for agent %s", selected.Name())
+			return Options{}, usageErrorf("apiKey is not supported for agent %s", selected.Name())
 		}
 	}
 

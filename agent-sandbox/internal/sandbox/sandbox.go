@@ -243,7 +243,7 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	if opts.APIKey != "" {
 		keyed, ok := opts.Agent.(agent.APIKeyAgent)
 		if !ok {
-			return docker.RunOptions{}, usageErrorf("api-key is not supported for agent %s", opts.Agent.Name())
+			return docker.RunOptions{}, usageErrorf("apiKey is not supported for agent %s", opts.Agent.Name())
 		}
 		runOpts = keyed.APIKeyContainer(opts.APIKey)
 	} else {

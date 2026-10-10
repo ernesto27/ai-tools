@@ -68,10 +68,10 @@ of two credential modes:
   [Codex](../internal/agent/codex.go) mounts `.codex`; [Claude](../internal/agent/claude.go)
   mounts `.claude` and `.claude.json`; [opencode](../internal/agent/opencode.go)
   mounts configuration, data, and state; [pi](../internal/agent/pi.go) mounts `.pi/agent`.
-- JSON `api-key` authentication requires `APIKeyAgent`, implemented by Codex
+- JSON `apiKey` authentication requires `APIKeyAgent`, implemented by Codex
   and Claude. The key is supplied as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in
   the container environment. These runs use a tmpfs home and do not mount host
-  agent credentials. There is no CLI `api-key` flag.
+  agent credentials. There is no CLI `apiKey` flag.
 
 The container runs as the invoking UID/GID with the worktree at `/workspace`.
 It also mounts the repository's common Git directory at its original absolute

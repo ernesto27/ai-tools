@@ -93,18 +93,18 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 	}{
 		{
 			name:       "JSON query and commit message stay separate",
-			config:     `{"run":{"agent":"codex","query":"run go version","commit-message":"this is from json file"}}`,
+			config:     `{"run":{"agent":"codex","query":"run go version","commitMessage":"this is from json file"}}`,
 			wantPrompt: "run go version",
 			wantCommit: "this is from json file",
 		},
 		{
 			name:      "commit message does not supply a query",
-			config:    `{"run":{"agent":"codex","commit-message":"this is from json file"}}`,
+			config:    `{"run":{"agent":"codex","commitMessage":"this is from json file"}}`,
 			wantUsage: true,
 		},
 		{
 			name:       "CLI query shorthand overrides JSON query and file prompt",
-			config:     `{"run":{"agent":"codex","query":"JSON task","file-prompt":"prompt.md"}}`,
+			config:     `{"run":{"agent":"codex","query":"JSON task","filePrompt":"prompt.md"}}`,
 			args:       []string{"-q", "CLI task"},
 			wantPrompt: "CLI task",
 		},
@@ -216,8 +216,8 @@ func TestRunAndResumeAPIKeysStayInTheirSections(t *testing.T) {
 	} {
 		t.Run(tc.section, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			config := `{"run":{"agent":"codex","query":"run task","api-key":"run-key"},` +
-				`"resume":{"agent":"codex","query":"resume task","api-key":"resume-key"}}`
+			config := `{"run":{"agent":"codex","query":"run task","apiKey":"run-key"},` +
+				`"resume":{"agent":"codex","query":"resume task","apiKey":"resume-key"}}`
 			if err := os.WriteFile(localConfigFile, []byte(config), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +246,7 @@ func TestLocalConfigFieldsAndValidation(t *testing.T) {
 		config  string
 		wantErr string
 	}{
-		{name: "all typed fields", config: `{"run":{"branch":"fix","agent":"codex","api-key":"key","model":"model","base-image":"alpine:latest","query":"task","push":false,"pr":true,"hn":false,"commit-message":"commit","file-prompt":"prompt.md","image":["one.png","two.png"]}}`},
+		{name: "all typed fields", config: `{"run":{"branch":"fix","agent":"codex","apiKey":"key","model":"model","baseImage":"alpine:latest","query":"task","push":false,"pr":true,"hn":false,"commitMessage":"commit","filePrompt":"prompt.md","image":["one.png","two.png"]}}`},
 		{name: "unknown section", config: `{"other":{}}`, wantErr: `unknown section "other"`},
 		{name: "unknown field", config: `{"resume":{"typo":true}}`, wantErr: `unknown field resume.typo`},
 		{name: "null section", config: `{"run":null}`, wantErr: `run must be a JSON object`},
@@ -331,7 +331,7 @@ func TestRunAndResumeBranchPrecedence(t *testing.T) {
 }
 
 func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
-	sectionOverrides := `,"model":"section-model","agent":"claude","base-image":"section-image","push":false,"pr":false,"hn":false`
+	sectionOverrides := `,"model":"section-model","agent":"claude","baseImage":"section-image","push":false,"pr":false,"hn":false`
 	tests := []struct {
 		name          string
 		sectionFields string
@@ -350,12 +350,12 @@ func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
 		{
 			name:          "CLI overrides both JSON levels",
 			sectionFields: sectionOverrides,
-			args:          []string{"--model", "cli-model", "--agent", "pi", "--base-image", "cli-image", "--push=true", "--pr=true", "--hn=true"},
+			args:          []string{"--model", "cli-model", "--agent", "pi", "--baseImage", "cli-image", "--push=true", "--pr=true", "--hn=true"},
 			want:          sandbox.Options{Model: "cli-model", AgentName: "pi", BaseImage: "cli-image", Push: true, PR: true, HostNetwork: true},
 		},
 		{
 			name:          "explicit empty and false section values override top-level defaults",
-			sectionFields: `,"model":"","base-image":"","push":false,"pr":false,"hn":false`,
+			sectionFields: `,"model":"","baseImage":"","push":false,"pr":false,"hn":false`,
 			want:          sandbox.Options{AgentName: "codex"},
 		},
 		{
@@ -369,7 +369,7 @@ func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(section+"/"+tt.name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
-				config := fmt.Sprintf(`{"model":"shared-model","agent":"codex","base-image":"shared-image","push":true,"pr":true,"hn":true,"%s":{"branch":"existing","query":"task"%s}}`, section, tt.sectionFields)
+				config := fmt.Sprintf(`{"model":"shared-model","agent":"codex","baseImage":"shared-image","push":true,"pr":true,"hn":true,"%s":{"branch":"existing","query":"task"%s}}`, section, tt.sectionFields)
 				if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
 					t.Fatal(err)
 				}
@@ -387,7 +387,7 @@ func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
 				if got.Model != tt.want.Model || got.AgentName != tt.want.AgentName ||
 					got.BaseImage != tt.want.BaseImage || got.Push != tt.want.Push ||
 					got.PR != tt.want.PR || got.HostNetwork != tt.want.HostNetwork {
-					t.Errorf("merged options = %+v, want model=%q agent=%q base-image=%q push=%t pr=%t hn=%t",
+					t.Errorf("merged options = %+v, want model=%q agent=%q baseImage=%q push=%t pr=%t hn=%t",
 						got, tt.want.Model, tt.want.AgentName, tt.want.BaseImage, tt.want.Push, tt.want.PR, tt.want.HostNetwork)
 				}
 			})
@@ -403,7 +403,7 @@ func TestTopLevelConfigTypes(t *testing.T) {
 	}{
 		{name: "model null", field: `"model":null`, wantErr: "model must be a JSON string"},
 		{name: "agent number", field: `"agent":1`, wantErr: "agent must be a JSON string"},
-		{name: "base-image boolean", field: `"base-image":false`, wantErr: "base-image must be a JSON string"},
+		{name: "baseImage boolean", field: `"baseImage":false`, wantErr: "baseImage must be a JSON string"},
 		{name: "push string", field: `"push":"yes"`, wantErr: "push must be a JSON boolean"},
 		{name: "pr null", field: `"pr":null`, wantErr: "pr must be a JSON boolean"},
 		{name: "hn number", field: `"hn":1`, wantErr: "hn must be a JSON boolean"},

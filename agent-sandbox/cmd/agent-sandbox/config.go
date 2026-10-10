@@ -14,7 +14,7 @@ import (
 )
 
 const localConfigFile = "agent-sandbox.json"
-const configAPIKey = "api-key"
+const configAPIKey = "apiKey"
 const configReviewers = "reviewers"
 
 var reviewerUsername = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*$`)
@@ -24,7 +24,7 @@ type localConfig struct {
 	Resume      *configSection `json:"resume"`
 	Model       string         `json:"model"`
 	Agent       string         `json:"agent"`
-	BaseImage   string         `json:"base-image"`
+	BaseImage   string         `json:"baseImage"`
 	Push        bool           `json:"push"`
 	PR          bool           `json:"pr"`
 	HostNetwork bool           `json:"hn"`
@@ -35,21 +35,21 @@ type localConfig struct {
 type configSection struct {
 	Branch        *string   `json:"branch"`
 	Agent         *string   `json:"agent"`
-	APIKey        *string   `json:"api-key"`
+	APIKey        *string   `json:"apiKey"`
 	Model         *string   `json:"model"`
-	BaseImage     *string   `json:"base-image"`
+	BaseImage     *string   `json:"baseImage"`
 	Query         *string   `json:"query"`
 	Push          *bool     `json:"push"`
 	PR            *bool     `json:"pr"`
 	HostNetwork   *bool     `json:"hn"`
-	CommitMessage *string   `json:"commit-message"`
-	FilePrompt    *string   `json:"file-prompt"`
+	CommitMessage *string   `json:"commitMessage"`
+	FilePrompt    *string   `json:"filePrompt"`
 	Image         *[]string `json:"image"`
 	Reviewers     []string  `json:"reviewers"`
 }
 
 // configRunArgs merges local defaults after Cobra has parsed the command line
-// but before it validates prompt sources. A JSON query or file-prompt can
+// but before it validates prompt sources. A JSON query or filePrompt can
 // therefore satisfy the requirement, while a command-line source overrides it.
 func configRunArgs(section string, flags *runFlags) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {

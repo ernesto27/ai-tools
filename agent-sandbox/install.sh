@@ -45,8 +45,14 @@ echo "Resolving latest ${BINARY} release for ${REPO} ..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 "${DOWNLOAD[@]}" "https://api.github.com/repos/${REPO}/releases?per_page=100" > "$TMP_DIR/releases.json"
-ASSET_LINE="$(grep -m1 -oE "\"browser_download_url\"[[:space:]]*:[[:space:]]*\"https://[^\"]*/${ASSET}\"" "$TMP_DIR/releases.json" || true)"
-DOWNLOAD_URL="$(printf '%s\n' "$ASSET_LINE" | sed -E 's/.*"(https:[^"]+)".*/\1/')"
+# GitHub's response order is not a semantic version order. Compare the numeric
+# components of this project's stable release tags before choosing an asset.
+ASSET_LINES="$(grep -oE "\"browser_download_url\"[[:space:]]*:[[:space:]]*\"https://github.com/${REPO}/releases/download/agent-sandbox-v[0-9]+\\.[0-9]+\\.[0-9]+/${ASSET}\"" "$TMP_DIR/releases.json" || true)"
+DOWNLOAD_URL="$(printf '%s\n' "$ASSET_LINES" |
+    sed -nE 's@.*"(https:[^"]*/agent-sandbox-v([0-9]+)\.([0-9]+)\.([0-9]+)/[^"]+)".*@\2 \3 \4 \1@p' |
+    sort -k1,1n -k2,2n -k3,3n |
+    tail -n 1 |
+    awk '{print $4}')"
 
 if [ -z "$DOWNLOAD_URL" ]; then
     echo "error: could not find asset '${ASSET}' in recent releases of ${REPO}" >&2

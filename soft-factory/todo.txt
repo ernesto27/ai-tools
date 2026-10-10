@@ -1,5 +1,5 @@
 [x] - instalar agent-sandbox si no existe en path
-[] - in each stage update comment of PR if new commit is created
+[x] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
 [] - move prompt text to txt files
 [x] - fix test in github  Run /tmp/software-factory -h

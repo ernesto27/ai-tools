@@ -23,7 +23,7 @@ set -uo pipefail
 cd -- "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # Package-path invocation also works from the temporary directories below.
-sandbox=(go run agent-sandbox/cmd/agent-sandbox)
+sandbox=(go run github.com/ernesto27/ai-tools/agent-sandbox/cmd/agent-sandbox)
 state="${XDG_CONFIG_HOME:-$HOME/.config}/agent-sandbox/worktrees.jsonl"
 agent="${AGENT:-claude}"
 model="${MODEL:-opus}"

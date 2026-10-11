@@ -198,11 +198,14 @@ func workflowBranch(opts workflowOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mode := "resume"
+	section := settings.Resume
 	if opts.Implement && !opts.Continue {
-		mode = executionlog.CommandRun
+		section = settings.Run
 	}
-	return settings.Branch(mode)
+	if section == nil || section.Branch == nil {
+		return "", nil
+	}
+	return *section.Branch, nil
 }
 
 // plannedStageLabels lists the internal log labels of the logged stages that

@@ -138,6 +138,12 @@ succeeds without starting an agent.
 
 The `run` section controls implementation. The `resume` section controls code review, security review, risk classification, and the final change walkthrough. Set the same branch in both sections so all stages use the same sandbox worktree.
 
+Soft Factory reads this file using agent-sandbox's shared configuration types.
+It reports file-read and JSON decoding errors; agent-sandbox validates its
+configuration when each stage starts. Use camelCase keys such as `filePrompt`,
+`baseImage`, `apiKey`, and `commitMessage`; old hyphenated keys are unsupported.
+Keep explicit branch names for Factory's worktree reports and execution logs.
+
 Example for a local task:
 
 ```json
@@ -145,7 +151,7 @@ Example for a local task:
   "run": {
     "agent": "codex",
     "branch": "factory-task",
-    "file-prompt": "task.txt",
+    "filePrompt": "task.txt",
     "push": false,
     "pr": false
   },
@@ -185,22 +191,22 @@ Common settings in either section:
 | --- | --- |
 | `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
 | `branch` | Sandbox branch to create (`run`) or continue (`resume`). |
-| `file-prompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
+| `filePrompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
-| `base-image` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
-| `api-key` | Optional API key for Codex or Claude. Otherwise, use the agent's existing host authentication. |
+| `baseImage` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
+| `apiKey` | Optional API key for Codex or Claude. Otherwise, use the agent's existing host authentication. |
 | `push` | Commit and push changes after a sandbox stage. The examples leave this disabled. |
 | `pr` | Commit, push, and create or reuse a GitHub pull request after a sandbox stage. The examples leave this disabled. |
-| `commit-message` | Optional commit message when `push` or `pr` is enabled. |
+| `commitMessage` | Optional commit message when `push` or `pr` is enabled. |
 | `hn` | Allow the container to access host services; defaults to `false`. |
 | `image` | Optional list of image paths to attach for agents that support them. |
-| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.file-prompt` or `--jira` to keep the original task available to every stage. |
+| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
 
 Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.
 
 ## Requirements
 
-- Go 1.25.3 or later when building from source.
+- Go 1.26.0 or later when building from source.
 - `agent-sandbox` installed and configured.
 - Docker running and the selected agent authenticated.
 

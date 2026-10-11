@@ -16,8 +16,12 @@ func TestWorkflowBranch(t *testing.T) {
 		{"implementation", workflowOptions{Implement: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "new-task", false},
 		{"review only", workflowOptions{}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
 		{"continuation", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
-		{"missing resume branch", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"}}`, "", true},
-		{"blank resume branch", workflowOptions{Implement: true, Continue: true}, `{"resume":{"branch":" "}}`, "", true},
+		{"missing resume branch", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"}}`, "", false},
+		{"missing run section", workflowOptions{Implement: true}, `{}`, "", false},
+		{"null branch", workflowOptions{Implement: true}, `{"run":{"branch":null}}`, "", false},
+		{"empty branch", workflowOptions{Implement: true}, `{"run":{"branch":""}}`, "", false},
+		{"decode failure", workflowOptions{Implement: true}, `{"run":{"branch":123}}`, "", true},
+		{"blank resume branch", workflowOptions{Implement: true, Continue: true}, `{"resume":{"branch":" "}}`, " ", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())

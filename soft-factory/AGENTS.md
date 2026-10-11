@@ -14,7 +14,7 @@ This repository contains a Go CLI that coordinates implementation, code review, 
 
 ## Build, Test, and Development Commands
 
-Use Go 1.25.3 or later. Run commands from the repository root so relative skill paths resolve.
+Use Go 1.26.0 or later. Run commands from the repository root so relative skill paths resolve.
 
 - `go build -o /tmp/software-factory ./cmd/factory`: build the CLI without adding a repository artifact.
 - `go test ./...`: run all package tests.
@@ -43,4 +43,4 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 ## Configuration & Reports
 
-Create local `software-factory.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.file-prompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.
+Create local `software-factory.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.filePrompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.

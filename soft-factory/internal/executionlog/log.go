@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,7 +25,14 @@ const (
 	logDirectory = "logs"
 	separator    = "=================================================="
 	summaryFile  = "summary.log"
+	// containerWorktree matches agent-sandbox's container mount point.
+	containerWorktree = "/workspace"
 )
+
+// ContainerReportPath returns a report path within the container's worktree.
+func ContainerReportPath(filename string) string {
+	return path.Join(containerWorktree, filename)
+}
 
 var stageNames = []string{"implementation", "code-review", "security-review", "risk-classification"}
 
@@ -384,8 +392,9 @@ func (r *Run) StageChangesPrompt(prompt string) (string, string) {
 
 ## Stage change summary
 
-As your final action, write a short plain-text summary to %q in the
-worktree root. Use at most two short lines, without headings or bullets.
+As your final action, write a short plain-text summary to %q.
+Use this absolute container path even if you work in a project subdirectory.
+Use at most two short lines, without headings or bullets.
 Do not exceed two lines; do not write a full report in this file.
 Describe only implementation changes made during this stage execution,
 including corrections made by fixer subagents. Do not repeat earlier stages'
@@ -394,7 +403,7 @@ This temporary reporting file is explicitly allowed even for read-only
 assessment stages; it is not an implementation change. Do not include it
 or other factory report files in your change description. Preserve the
 stage's normal final report and output; this file supplements them.
-`, filename)
+`, ContainerReportPath(filename))
 	return prompt, filename
 }
 
@@ -420,7 +429,27 @@ func StageReportPath(ctx context.Context, branch, filename string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(worktree, filename), nil
+	rootPath := filepath.Join(worktree, filename)
+	if _, err := os.Lstat(rootPath); err == nil {
+		return rootPath, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("inspect stage report %q: %w", rootPath, err)
+	}
+	// Agents may write a relative report in the project directory instead of
+	// the worktree root. Map only the invocation directory, not arbitrary files.
+	prefix, err := exec.CommandContext(collectionCtx, "git", "rev-parse", "--show-prefix").Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve project directory for stage report: %w", err)
+	}
+	projectPath := filepath.Join(worktree, strings.TrimSuffix(string(prefix), "\n"), filename)
+	if projectPath != rootPath {
+		if _, err := os.Lstat(projectPath); err == nil {
+			return projectPath, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("inspect stage report %q: %w", projectPath, err)
+		}
+	}
+	return rootPath, nil
 }
 
 // WorktreeForBranch resolves a branch's host worktree for reports and Git evidence.

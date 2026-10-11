@@ -43,6 +43,6 @@ if needed and keeps its files separate from all earlier invocations. See
 again rather than resuming at the last failed stage. To run
 only reviews and risk classification, use `software-factory review` instead.
 
-Keep the original task in `run.file-prompt`, or supply `--jira` again when
+Keep the original task in `run.filePrompt`, or supply `--jira` again when
 continuing a Jira task. Supporting documents and enabled stages still apply.
 See [configuration](configuration.md#disabling-stages) to skip selected stages.

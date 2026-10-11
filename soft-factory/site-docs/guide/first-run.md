@@ -26,7 +26,7 @@ Create `agent-sandbox.json`:
   "run": {
     "agent": "codex",
     "branch": "fix-login",
-    "file-prompt": "task.txt",
+    "filePrompt": "task.txt",
     "push": false,
     "pr": false
   },

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 
+	sandboxconfig "github.com/ernesto27/ai-tools/agent-sandbox/config"
+
 	"soft-factory/internal/googledrive"
 )
 
@@ -56,47 +58,17 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// SandboxConfig exposes only individual settings needed by the factory.
-type SandboxConfig struct {
-	sections map[string]json.RawMessage
-}
-
-// LoadSandbox reads the local agent-sandbox configuration without caching it.
-func LoadSandbox() (SandboxConfig, error) {
+// LoadSandbox decodes the shared types; agent-sandbox owns configuration validation.
+func LoadSandbox() (sandboxconfig.Config, error) {
 	data, err := os.ReadFile("agent-sandbox.json")
 	if err != nil {
-		return SandboxConfig{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
+		return sandboxconfig.Config{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
 	}
-	var cfg SandboxConfig
-	if err := json.Unmarshal(data, &cfg.sections); err != nil {
-		return SandboxConfig{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
+	var cfg sandboxconfig.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return sandboxconfig.Config{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
 	}
 	return cfg, nil
-}
-
-// String returns an empty string for absent or non-string settings.
-func (c SandboxConfig) String(section, key string) string {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(c.sections[section], &fields); err != nil {
-		return ""
-	}
-	var value string
-	if err := json.Unmarshal(fields[key], &value); err != nil {
-		return ""
-	}
-	return value
-}
-
-// Branch selects the worktree branch for an implementation or resumed stage.
-func (c SandboxConfig) Branch(mode string) (string, error) {
-	if mode != "run" && mode != "resume" {
-		return "", fmt.Errorf("unsupported stage command %q", mode)
-	}
-	branch := c.String(mode, "branch")
-	if strings.TrimSpace(branch) == "" {
-		return "", fmt.Errorf("%s.branch is required to locate the sandbox worktree", mode)
-	}
-	return branch, nil
 }
 
 func Load(path string) (Config, error) {

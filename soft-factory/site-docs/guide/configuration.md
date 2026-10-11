@@ -135,6 +135,12 @@ workflow, or `resume.branch` for `review` and `continue`, overriding the branch
 in each Agent Sandbox invocation. Set both branches to the same value when
 you want to review or continue the task you just implemented.
 
+Soft Factory reads this file using agent-sandbox's shared configuration types.
+It reports file-read and JSON decoding errors; agent-sandbox validates its
+configuration when each stage starts. Use camelCase keys such as `filePrompt`,
+`baseImage`, `apiKey`, and `commitMessage`; old hyphenated keys are unsupported.
+Keep explicit branch names for Factory's worktree reports and execution logs.
+
 Example for a local task:
 
 ```json
@@ -142,7 +148,7 @@ Example for a local task:
   "run": {
     "agent": "codex",
     "branch": "factory-task",
-    "file-prompt": "task.txt",
+    "filePrompt": "task.txt",
     "push": false,
     "pr": false
   },
@@ -158,7 +164,7 @@ Example for a local task:
 Choose a new `run.branch` for each new task. For `review` or `continue`, use an
 existing sandbox branch in `resume.branch`; list available branches with
 `agent-sandbox worktree-list`. Even for `continue`, the local task is read from
-`run.file-prompt` unless you supply `--jira`.
+`run.filePrompt` unless you supply `--jira`.
 
 Example for a Jira task, where `--jira` supplies the task instead of a local file:
 
@@ -185,15 +191,15 @@ Common settings in either section:
 | --- | --- |
 | `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
 | `branch` | `run.branch` selects the default workflow's worktree; `resume.branch` selects the worktree for `review` and `continue`. All stages use that selected branch. |
-| `file-prompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
+| `filePrompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
-| `base-image` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
-| `api-key` | Optional API key for Codex or Claude. Otherwise, use the agent's existing host authentication. |
+| `baseImage` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
+| `apiKey` | Optional API key for Codex or Claude. Otherwise, use the agent's existing host authentication. |
 | `push` | Commit and push changes after a sandbox stage. The examples leave this disabled. |
 | `pr` | Commit, push, and create or reuse a GitHub pull request after a sandbox stage. The examples leave this disabled. |
-| `commit-message` | Optional commit message when `push` or `pr` is enabled. |
+| `commitMessage` | Optional commit message when `push` or `pr` is enabled. |
 | `hn` | Allow the container to access host services; defaults to `false`. |
 | `image` | Optional list of image paths to attach for agents that support them. |
-| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.file-prompt` or `--jira` to keep the original task available to every stage. |
+| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
 
 Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.

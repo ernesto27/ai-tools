@@ -50,7 +50,7 @@ Inspect the stage log and `summary.log` in the printed execution-log directory.
 Set `resume.branch` to that run's branch, then use `software-factory continue`
 to run implementation and subsequent enabled stages again, or
 `software-factory review` to run only reviews and risk classification.
-Keep the task in `run.file-prompt`, or pass `--jira` again for a Jira task.
+Keep the task in `run.filePrompt`, or pass `--jira` again for a Jira task.
 See [continuing work](workflow.md#continue-an-existing-task) and
 [execution logs](reports.md#execution-logs).
 

@@ -18,7 +18,21 @@ type Config struct {
 	CustomSkills CustomSkills       `json:"customSkills"`
 	// DisabledStages lists stages that must not execute. Load parses it
 	// separately so type errors can name the offending entry.
-	DisabledStages []Stage `json:"-"`
+	DisabledStages []Stage      `json:"-"`
+	Stages         StagesConfig `json:"stages"`
+}
+
+type StageConfig struct {
+	Agent string `json:"agent,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+
+type StagesConfig struct {
+	Implementation     StageConfig `json:"implementation"`
+	CodeReview         StageConfig `json:"codeReview"`
+	SecurityReview     StageConfig `json:"securityReview"`
+	RiskClassification StageConfig `json:"riskClassification"`
+	ReviewChanges      StageConfig `json:"reviewChanges"`
 }
 
 // Stage is a public, case-sensitive pipeline stage identifier.

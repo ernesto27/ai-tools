@@ -10,6 +10,10 @@
 The standalone `review` command starts at code review and finishes at risk
 classification. [Reports](reports.md) document results and verification gaps.
 
+Choose agents and models independently for each stage with
+[`stages` in configuration](configuration.md#stage-agents-and-models).
+Omitted settings inherit the defaults from `agent-sandbox.json`.
+
 Each code or security review follows **review → corrections when needed → verification**, with up to three rounds. Failures before the final walkthrough stop the workflow. A walkthrough failure warns and does not change the exit status.
 
 ## Review existing changes

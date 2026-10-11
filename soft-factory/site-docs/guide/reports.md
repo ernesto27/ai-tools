@@ -76,6 +76,13 @@ in the run directory. The code review, security review, and risk classification
 output stays in their stage logs. The standalone `review` command does not run
 the final stage or create these logs.
 
+Stage logs identify the configured agent and model and where each value came
+from. A [stage override](configuration.md#stage-agents-and-models) names its
+Factory setting, for example
+`software-factory.json: stages.codeReview.model`; inherited values name their
+setting in `agent-sandbox.json`. If no model is configured, the log refers to
+the sandbox or agent default and its runtime output.
+
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
 `INTERRUPTED`), duration, a short summary of changes made during that stage,

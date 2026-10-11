@@ -1,19 +1,21 @@
-[x] - instalar agent-sandbox si no existe en path
-[x] - in each stage update comment of PR if new commit is created
 [] - option for verbose output in terminal, default true
 [] - move prompt text to txt files
-[x] - fix test in github  Run /tmp/software-factory -h
-[] update skill revie code to make more visual, less verbose
-agent-sandbox is missing. Download and install it? [y/N]: Error: agent-sandbox installation declined
-Error: Process completed with exit code 1.
+[] - branch of task name should be set here
 [] - check how review is made, if not found errors in first round should stop, not run 3
-[] - logs folder should have a parent for branch and all next resumes next
-[] - config file should not be required, now return an error
-[x] - list of stages disables in software-factory.json
+[] - i want to be able to config specific model, agent in every stage
 [] - review only analysize code changes, not readme or docs
-[] - do not commit review-changes.md
+[] - config file should not be required, now return an error
 [] - i want agent-sandbox.json props json added in software-factory.json
+[] - do not commit review-changes.md
 [] - think how to send more changes to current finish branch
+[] - integration with GitHub Issues to get task content from an issue URL
+[x] - instalar agent-sandbox si no existe en path
+[x] - in each stage update comment of PR if new commit is created
+[x] - fix test in github  Run /tmp/software-factory -h
+[x] update skill revie code to make more visual, less verbose
+agent-sandbox is missing. Download and install it? [y/N]: Error: agent-sandbox installation declined
+Error: Process completed with exit code 1.}
+[x] - list of stages disables in software-factory.json
 [x] - option to run skills in specific state (review, security, etc)
 [x] - load specific documento in google drive
 [x] - add new stage for get a explanation of code changes, diagram
@@ -25,7 +27,6 @@ Error: Process completed with exit code 1.
 [x] - doctor comman
 [x] - commit changes in all stages
 [x] - add code-changes new skill
-[] - integration with GitHub Issues to get task content from an issue URL
 
 ..................
 The Go image works. The failure comes from prompt argument handling in agent-sandbox.

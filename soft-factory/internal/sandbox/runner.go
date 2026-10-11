@@ -20,6 +20,8 @@ import (
 )
 
 type ExecuteOptions struct {
+	Stage             config.Stage
+	StageConfig       config.StageConfig
 	Branch            string
 	Args              []string
 	ReportName        string
@@ -52,6 +54,7 @@ type TaskContext struct {
 	Log          *executionlog.Run
 	Branch       string
 	Continue     bool
+	Config       config.Config
 }
 
 func Run(input TaskContext) error {
@@ -86,7 +89,10 @@ func Run(input TaskContext) error {
 		args = append(args, "-f", path)
 	}
 
+	args = appendStageArgs(args, input.Config.Stages.Implementation)
 	_, err := execute(ExecuteOptions{
+		Stage:             config.StageImplementation,
+		StageConfig:       input.Config.Stages.Implementation,
 		Args:              args,
 		Branch:            input.Branch,
 		Prompt:            prompt,
@@ -120,6 +126,7 @@ func customSkillPrompt(skill *ProjectSkill, reviewerOnly bool) string {
 func Review(input TaskContext) (string, error) {
 	return review(
 		input,
+		config.StageCodeReview,
 		"code-review/SKILL.md",
 		customSkillPrompt(input.CustomSkills.CodeReview, true),
 	)
@@ -128,6 +135,7 @@ func Review(input TaskContext) (string, error) {
 func SecurityReview(input TaskContext) (string, error) {
 	return review(
 		input,
+		config.StageSecurityReview,
 		"security-review/SKILL.md",
 		customSkillPrompt(input.CustomSkills.SecurityReview, true),
 	)
@@ -203,12 +211,19 @@ notes. In your final answer, briefly state whether you wrote the file.
 		return err
 	}
 	defer os.Remove(path)
+
+	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
+
+	args = appendStageArgs(args, input.Config.Stages.ReviewChanges)
+
 	_, err = execute(ExecuteOptions{
-		Args:    []string{"resume", "--push=false", "--pr=false", "-f", path},
-		Branch:  input.Branch,
-		Prompt:  prompt,
-		Context: input.Context,
-		Log:     nil,
+		Stage:       config.StageReviewChanges,
+		StageConfig: input.Config.Stages.ReviewChanges,
+		Args:        args,
+		Branch:      input.Branch,
+		Prompt:      prompt,
+		Context:     input.Context,
+		Log:         nil,
 	})
 	resolvedSource, locateErr := executionlog.StageReportPath(input.Context, input.Branch, filepath.Base(source))
 	if locateErr != nil {
@@ -243,7 +258,16 @@ func LoadProjectSkill(projectDir, name string) (*ProjectSkill, error) {
 	return nil, fmt.Errorf("project skill %q not found; searched %q and %q", name, first, second)
 }
 
-func review(input TaskContext, skillPath, additionalSkill string) (string, error) {
+func review(input TaskContext, stage config.Stage, skillPath, additionalSkill string) (string, error) {
+	var settings config.StageConfig
+
+	switch stage {
+	case config.StageCodeReview:
+		settings = input.Config.Stages.CodeReview
+	case config.StageSecurityReview:
+		settings = input.Config.Stages.SecurityReview
+	}
+
 	skill, err := skills.ReadFile(skillPath)
 	if err != nil {
 		return "", fmt.Errorf("read review skill %q: %w", skillPath, err)
@@ -380,8 +404,13 @@ Write this file even when the review is BLOCKED. Keep your normal final answer.
 	}
 	defer os.Remove(path)
 
+	args := []string{"resume", "-f", path}
+	args = appendStageArgs(args, settings)
+
 	options := ExecuteOptions{
-		Args:              []string{"resume", "-f", path},
+		Stage:             stage,
+		StageConfig:       settings,
+		Args:              args,
 		Branch:            input.Branch,
 		Prompt:            prompt,
 		Context:           input.Context,
@@ -449,6 +478,16 @@ func writePrompt(prompt string) (string, error) {
 	return file.Name(), nil
 }
 
+func appendStageArgs(args []string, settings config.StageConfig) []string {
+	if settings.Agent != "" {
+		args = append(args, "-a", settings.Agent)
+	}
+	if settings.Model != "" {
+		args = append(args, "-m", settings.Model)
+	}
+	return args
+}
+
 func execute(options ExecuteOptions) (string, error) {
 	ctx := options.Context
 	if ctx == nil {
@@ -465,7 +504,7 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.Stdin = os.Stdin
 
 	if options.Log != nil {
-		agent, model, provider := selectionDetails(options.Args[0])
+		agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
 		options.Log.Details(agent, model, provider)
 		options.Log.Command(cmd.Path, options.Args)
 		options.Log.Prompt(options.Prompt)
@@ -524,34 +563,40 @@ func execute(options ExecuteOptions) (string, error) {
 // selectionDetails reads only supported selection fields. Provider means the
 // selected sandbox agent, not its underlying API backend. Do not copy the
 // configuration into logs: it may also contain API keys.
-func selectionDetails(section string) (agent, model, provider string) {
+func selectionDetails(section string, stage config.Stage, override config.StageConfig) (agent, model, provider string) {
 	agent = "unavailable (no configured selection)"
 	model = "unavailable (sandbox/agent default; see runtime output)"
-	provider = "unavailable (no configured agent in agent-sandbox.json)"
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return
-	}
-	selected := settings.Run
-	if section == "resume" {
-		selected = settings.Resume
-	}
-	agentValue, modelValue := settings.Agent, settings.Model
-	agentSource, modelSource := "agent", "model"
-	if selected != nil {
-		if selected.Agent != nil {
-			agentValue, agentSource = *selected.Agent, section+".agent"
+	provider = "unavailable (no configured agent)"
+	var agentValue, modelValue string
+	agentSource, modelSource := "agent-sandbox.json: agent", "agent-sandbox.json: model"
+	if settings, err := config.LoadSandbox(); err == nil {
+		agentValue, modelValue = settings.Agent, settings.Model
+		selected := settings.Run
+		if section == "resume" {
+			selected = settings.Resume
 		}
-		if selected.Model != nil {
-			modelValue, modelSource = *selected.Model, section+".model"
+		if selected != nil {
+			if selected.Agent != nil {
+				agentValue, agentSource = *selected.Agent, "agent-sandbox.json: "+section+".agent"
+			}
+			if selected.Model != nil {
+				modelValue, modelSource = *selected.Model, "agent-sandbox.json: "+section+".model"
+			}
 		}
+	}
+	stageSource := "software-factory.json: stages." + string(stage)
+	if override.Agent != "" {
+		agentValue, agentSource = override.Agent, stageSource+".agent"
+	}
+	if override.Model != "" {
+		modelValue, modelSource = override.Model, stageSource+".model"
 	}
 	if agentValue != "" {
 		agent = agentValue + " (configured: " + agentSource + ")"
-		provider = agentValue + " (agent-sandbox.json: " + agentSource + ")"
+		provider = agentValue + " (" + agentSource + ")"
 	}
 	if modelValue != "" {
-		model = modelValue + " (configured: " + modelSource + "; effective selection not verified)"
+		model = modelValue + " (configured: " + modelSource + ")"
 	}
 	return
 }
@@ -721,8 +766,13 @@ Do not modify files, apply corrections, or publish changes.
 	}
 	defer os.Remove(path)
 
+	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
+	args = appendStageArgs(args, input.Config.Stages.RiskClassification)
+
 	options := ExecuteOptions{
-		Args:              []string{"resume", "--push=false", "--pr=false", "-f", path},
+		Stage:             config.StageRiskClassification,
+		StageConfig:       input.Config.Stages.RiskClassification,
+		Args:              args,
 		Branch:            input.Branch,
 		Prompt:            prompt,
 		Context:           input.Context,

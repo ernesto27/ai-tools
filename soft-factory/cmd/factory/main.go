@@ -128,6 +128,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		Log:          runLog,
 		Branch:       branch,
 		Continue:     opts.Continue,
+		Config:       cfg,
 	}
 
 	if opts.Implement {

@@ -2,7 +2,7 @@
 
 Create these two files in the project folder before running Soft Factory.
 
-### `software-factory.json`: supporting documents and custom skills
+### `software-factory.json`: documents, skills, and stage settings
 
 The CLI always reads `software-factory.json` from the current working directory.
 Rename an existing `config.json` to `software-factory.json`; there is no fallback
@@ -21,6 +21,9 @@ All property names use lower camelCase, including nested properties. These are a
 | `customSkills.securityReview` | Optional project skill name for the security review stage. |
 | `customSkills.riskClassification` | Optional project skill name for the risk classification stage. |
 | `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
+| `stages` | Optional agent and model overrides for individual stages. See [Stage agents and models](#stage-agents-and-models). |
+| `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
+| `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
 | `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
 Minimal example:
@@ -126,10 +129,72 @@ worktree must already exist, and the final walkthrough still runs unless
 document checks still run when every stage is disabled; the command then
 succeeds without starting an agent.
 
-### `agent-sandbox.json`: agent and task
+### Stage agents and models
+
+Use `stages` in `software-factory.json` to choose an agent and model for each
+stage. Each stage and each field is optional. For example:
+
+```json
+{
+  "stages": {
+    "implementation": {
+      "agent": "codex",
+      "model": "gpt-6.1-sol"
+    },
+    "codeReview": {
+      "agent": "claude",
+      "model": "claude-sonnet-4-6"
+    },
+    "securityReview": {
+      "agent": "claude",
+      "model": "claude-opus-4-6"
+    },
+    "riskClassification": {
+      "model": "gpt-6.1-sol"
+    },
+    "reviewChanges": {
+      "agent": "codex",
+      "model": "gpt-6-luna"
+    }
+  }
+}
+```
+
+This example assumes Codex is the default agent in `agent-sandbox.json` for
+risk classification. Authenticate both Codex and Claude before using the
+mixed-agent example. Choose model IDs available to your account and supported
+by the selected agent.
+
+| Stage key | Applies to |
+| --- | --- |
+| `implementation` | Implementation in the default workflow and `continue`. |
+| `codeReview` | Code review and corrections in every workflow. |
+| `securityReview` | Security review and corrections in every workflow. |
+| `riskClassification` | Final risk classification in every workflow. |
+| `reviewChanges` | Final read-only walkthrough in the default workflow and `continue`. |
+
+Use these exact camelCase keys. Overrides apply only when the stage runs;
+`disabledStages` still skips a stage even when it has settings here.
+
+Each nonempty `agent` or `model` overrides its corresponding value from
+`agent-sandbox.json` for that invocation. Omitted or empty fields retain
+Agent Sandbox's configuration defaults independently: setting only `model`
+keeps the configured agent, and setting only `agent` keeps the configured
+model. When changing agents, ensure any inherited model is compatible with
+the new agent, or set both fields.
+
+The default workflow inherits `run` settings for implementation and `resume`
+settings for later stages. `continue` and `review` inherit `resume` settings.
+Soft Factory passes overrides as command-line arguments and leaves
+`agent-sandbox.json` unchanged. Branch, task, authentication, and other sandbox
+settings still come from the existing configuration.
+
+### `agent-sandbox.json`: defaults and task
 
 The default workflow uses `run` settings for implementation and `resume`
 settings for later stages. `continue` and `review` use `resume` settings.
+The [stage overrides](#stage-agents-and-models) take priority over agent and
+model defaults from this file.
 Soft Factory selects one branch for every stage: `run.branch` for the default
 workflow, or `resume.branch` for `review` and `continue`, overriding the branch
 in each Agent Sandbox invocation. Set both branches to the same value when

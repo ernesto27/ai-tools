@@ -7,24 +7,43 @@ import (
 	"sync"
 )
 
-// runtimeSelection is shared by the two output streams. Only startup metadata
-// replaces it; configured values and agent-authored change reports never do.
+// runtimeSelection is shared by the two output streams of one agent-sandbox
+// invocation. agent-sandbox starts exactly one agent attempt per invocation, so
+// that attempt's startup record is authoritative; a later attempt is a new
+// execute call with a fresh selection, which SetStageSelection then replaces.
+// Configured values and agent-authored change reports never replace it.
 type runtimeSelection struct {
 	mu           sync.Mutex
 	agent, model string
+	started      bool
 }
 
-func (s *runtimeSelection) set(agent, model string) {
+// start records the attempt's startup agent and model. Once a startup record
+// has been captured it reports false and changes nothing: the attempt's later
+// prompt text, messages, and tool output can repeat startup markers verbatim.
+func (s *runtimeSelection) start(agent, model string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.agent, s.model = agent, model
+	if s.started {
+		return false
+	}
+	s.agent, s.model, s.started = agent, model, true
+	return true
+}
+
+// setModel completes a started Codex record from its startup header.
+func (s *runtimeSelection) setModel(model string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.model = model
 }
 
 // selectionStream observes existing agent startup output without altering it.
-// Codex's startup banner and Claude's system/init event establish a started
-// attempt. Each new startup replaces both fields, even when its model is absent.
-// Other agents currently expose no supported selection metadata through the
-// sandbox CLI, so their selections remain unknown. Never infer them from flags.
+// Codex's startup banner and header, or Claude's system/init event, establish
+// the attempt's selection. Markers after that record are ordinary output and
+// are ignored. Other agents currently expose no supported selection metadata
+// through the sandbox CLI, so their selections remain unknown. Never infer them
+// from flags.
 type selectionStream struct {
 	selection *runtimeSelection
 	line      []byte
@@ -34,7 +53,10 @@ type selectionStream struct {
 	inString  bool
 	escaped   bool
 	largeJSON bool
-	codex     int
+	// codex follows the header of the Codex banner this stream captured: 1
+	// after the banner, 2 inside the header block, 0 otherwise. Only the first
+	// model line inside that header may complete the record.
+	codex int
 }
 
 const selectionBufferLimit = 64 * 1024
@@ -105,11 +127,10 @@ func (s *selectionStream) observeJSON() {
 		return
 	}
 	var model string
-	// An absent or malformed model still establishes the agent, and clears the
-	// previous attempt's model rather than treating it as the current selection.
+	// An absent or malformed model still establishes the agent; the model then
+	// stays unknown rather than being taken from later output.
 	_ = json.Unmarshal(event.Model, &model)
-	s.selection.set("claude", model)
-	s.codex = 0
+	s.selection.start("claude", model)
 }
 
 // flushLine also collects an unterminated final banner line after cancellation.
@@ -118,8 +139,9 @@ func (s *selectionStream) flushLine() {
 		line := strings.TrimSpace(terminalEscape.ReplaceAllString(string(s.line), ""))
 		switch {
 		case strings.HasPrefix(line, "OpenAI Codex v"):
-			s.selection.set("codex", "")
-			s.codex = 1
+			if s.selection.start("codex", "") {
+				s.codex = 1
+			}
 		case line == "--------" && s.codex == 1:
 			s.codex = 2
 		case line == "--------" && s.codex == 2:
@@ -129,7 +151,10 @@ func (s *selectionStream) flushLine() {
 			if fields := strings.Fields(model); len(fields) > 0 {
 				model = fields[0]
 			}
-			s.selection.set("codex", model)
+			s.selection.setModel(model)
+			// The header's first model line completes the record; any later
+			// model line is ordinary output.
+			s.codex = 0
 		}
 	}
 	s.line, s.longLine = nil, false

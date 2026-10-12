@@ -85,11 +85,28 @@ the sandbox or agent default and its runtime output.
 
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
-`INTERRUPTED`), duration, a short summary of changes made during that stage,
-and any execution error. If the agent's change summary cannot be collected,
+`INTERRUPTED`), agent, model, duration, a short summary of changes made during
+that stage, and any execution error. If the agent's change summary cannot be collected,
 the entry says `Change summary unavailable.` Disabled stages are listed as
 skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.
+
+The `Agent:` and `Model:` lines follow `Status:` and describe only the final
+attempt that started, including a retry or fallback. Each unknown value is
+`unavailable`; configured defaults are not proof of runtime selection. The
+current plain `agent-sandbox run` and `resume` commands do not expose reliable
+attempt selection metadata, so these fields are currently `unavailable` even
+when configuration names an agent or model. Missing metadata does not change
+the stage's execution status. Stage logs retain their configured details.
+
+```text
+1. IMPLEMENTATION
+   Status:    SUCCEEDED
+   Agent:     unavailable
+   Model:     unavailable
+   Duration:  20 sec
+   Changes:   Created hello.txt containing Hello, world!
+```
 
 Execution statuses describe whether the stage ran successfully. They are
 separate from the review verdicts (`PASS`, `UNRESOLVED`, or `BLOCKED`); read the

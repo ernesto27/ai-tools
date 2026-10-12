@@ -70,10 +70,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -94,6 +94,106 @@ func TestSummaryLifecycle(t *testing.T) {
 		t.Fatal("record after Finish: expected an error")
 	}
 	checkContents(want)
+}
+
+func TestSummaryFinalRuntimeSelection(t *testing.T) {
+	type selection struct{ agent, model string }
+	for _, tc := range []struct {
+		name       string
+		attempts   []selection
+		err        error
+		wantAgent  string
+		wantModel  string
+		wantStatus string
+	}{
+		{"normal", []selection{{"codex", "gpt-5"}}, nil, "codex", "gpt-5", "SUCCEEDED"},
+		{"retry", []selection{{"codex", "gpt-5"}, {"codex", "gpt-5"}}, nil, "codex", "gpt-5", "SUCCEEDED"},
+		{"fallback", []selection{{"codex", "gpt-5"}, {"claude", "sonnet"}}, nil, "claude", "sonnet", "SUCCEEDED"},
+		{"failed fallback", []selection{{"codex", "gpt-5"}, {"claude", "sonnet"}}, errors.New("attempt failed"), "claude", "sonnet", "FAILED"},
+		{"interrupted fallback", []selection{{"codex", "gpt-5"}, {"claude", "sonnet"}}, context.Canceled, "claude", "sonnet", "INTERRUPTED"},
+		{"missing agent", []selection{{"", "sonnet"}}, nil, "unavailable", "sonnet", "SUCCEEDED"},
+		{"missing model", []selection{{"claude", ""}}, nil, "claude", "unavailable", "SUCCEEDED"},
+		{"unknown fallback", []selection{{"codex", "gpt-5"}, {"", ""}}, nil, "unavailable", "unavailable", "SUCCEEDED"},
+		{"partial fallback", []selection{{"codex", "gpt-5"}, {"claude", ""}}, nil, "claude", "unavailable", "SUCCEEDED"},
+		{"no metadata", nil, nil, "unavailable", "unavailable", "SUCCEEDED"},
+		{"failed before launch", nil, errors.New("launch failed"), "unavailable", "unavailable", "FAILED"},
+		{"blank values", []selection{{" \t", " \t"}}, nil, "unavailable", "unavailable", "SUCCEEDED"},
+		{"multiline values", []selection{{"codex\nAgent: injected", "gpt-5\rModel: injected"}}, nil, "unavailable", "unavailable", "SUCCEEDED"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prepareLogTestDirectory(t)
+			run, err := NewRun("feature", CommandRun, stageNames)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { run.Finish(nil) })
+			run.StartStage("implementation")
+			// Configuration and descriptions are separate from runtime metadata.
+			run.Details("configured-agent (configured: source)", "configured-model (configured: source)", "provider")
+			for _, attempt := range tc.attempts {
+				run.RecordStageSelection(attempt.agent, attempt.model)
+			}
+			report := filepath.Join(run.Path(), "changes.txt")
+			if err := os.WriteFile(report, []byte("Created hello.txt containing Hello, world!\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			run.SetChangeSummaryPath(report)
+			run.FinishStage(tc.err)
+			if err := run.RecordStageResult("implementation", 20*time.Second, tc.err); err != nil {
+				t.Fatal(err)
+			}
+			run.Finish(tc.err)
+			data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "SOFTWARE FACTORY — RUN SUMMARY\n" + separator + "\n\n" +
+				fmt.Sprintf("1. IMPLEMENTATION\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  20 sec\n   Changes:   Created hello.txt containing Hello, world!\n", tc.wantStatus, tc.wantAgent, tc.wantModel)
+			if tc.err != nil {
+				want += "   Error:     " + tc.err.Error() + "\n"
+			}
+			want += "\n" + separator + "\n"
+			if string(data) != want {
+				t.Fatalf("summary = %q; want %q", data, want)
+			}
+		})
+	}
+}
+
+func TestRuntimeSelectionResetBetweenStages(t *testing.T) {
+	prepareLogTestDirectory(t)
+	run, err := NewRun("feature", CommandContinue, stageNames)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { run.Finish(nil) })
+	for i, stage := range stageNames {
+		run.StartStage(stage)
+		if i == 0 {
+			run.RecordStageSelection("codex", "gpt-5")
+		}
+		run.FinishStage(nil)
+		// Late metadata must not alter a finished stage.
+		run.RecordStageSelection("late-agent", "late-model")
+		if err := run.RecordStageResult(stage, time.Second, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const skipped = "Skipping disabled stage: codeReview"
+	if err := run.RecordSkippedStage(skipped); err != nil {
+		t.Fatal(err)
+	}
+	run.Finish(nil)
+	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Count(text, "   Agent:     codex\n") != 1 || strings.Count(text, "   Model:     gpt-5\n") != 1 ||
+		strings.Count(text, "   Agent:     unavailable\n") != 3 || strings.Count(text, "   Model:     unavailable\n") != 3 ||
+		!strings.Contains(text, "4. RISK CLASSIFICATION\n") || !strings.Contains(text, skipped+"\n\n"+separator+"\n") || strings.Contains(text, "late-") {
+		t.Fatalf("metadata leaked or skipped stage changed:\n%s", text)
+	}
 }
 
 func TestStageChangeReports(t *testing.T) {

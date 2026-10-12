@@ -527,7 +527,16 @@ func execute(options ExecuteOptions) (string, error) {
 	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
-	runErr := cmd.Run()
+	runErr := cmd.Start()
+	if runErr == nil {
+		if options.Log != nil {
+			// The plain run/resume CLI exposes no authoritative attempt selection
+			// metadata. Do not promote selectionDetails or agent output to facts.
+			// A new subprocess also invalidates any earlier attempt's selection.
+			options.Log.RecordStageSelection("", "")
+		}
+		runErr = cmd.Wait()
+	}
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}

@@ -525,9 +525,20 @@ func execute(options ExecuteOptions) (string, error) {
 		stdout = io.MultiWriter(options.Log.Stream("stdout"), stdout)
 		stderr = io.MultiWriter(options.Log.Stream("stderr"), stderr)
 	}
+	var selection *selectionWriter
+	if options.Log != nil {
+		selection = &selectionWriter{out: stdout, log: options.Log}
+		if options.ReportName != "" {
+			stderr = selection
+		}
+		stdout = selection
+	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	runErr := cmd.Run()
+	if selection != nil {
+		selection.flush()
+	}
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}

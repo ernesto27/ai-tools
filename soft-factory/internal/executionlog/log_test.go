@@ -70,10 +70,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -94,6 +94,55 @@ func TestSummaryLifecycle(t *testing.T) {
 		t.Fatal("record after Finish: expected an error")
 	}
 	checkContents(want)
+}
+
+func TestSummaryRuntimeSelectionLifecycle(t *testing.T) {
+	prepareLogTestDirectory(t)
+	run, err := NewRun("feature", CommandContinue, stageNames)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer run.Finish(nil)
+	for i, tt := range []struct {
+		stage, agent, model string
+		err                 error
+	}{
+		{"implementation", "codex", "final-model", nil},
+		{"code-review", "", "", errors.New("failed before launch")},
+		{"security-review", "claude", "", context.Canceled},
+		{"risk-classification", "", "runtime-model", nil},
+	} {
+		run.StartStage(tt.stage)
+		// Configured details never populate the summary, even after a known stage.
+		run.Details("configured-agent", "configured-model", "configured-provider")
+		if tt.agent != "" || tt.model != "" {
+			run.RuntimeSelection("earlier-agent", "earlier-model")
+			run.RuntimeSelection(tt.agent, tt.model)
+		}
+		run.FinishStage(tt.err)
+		if err := run.RecordStageResult(tt.stage, time.Second, tt.err); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
+			i+1, strings.ToUpper(strings.ReplaceAll(tt.stage, "-", " ")), outcome(tt.err), selectionName(tt.agent), selectionName(tt.model))
+		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "configured-") {
+			t.Fatalf("unexpected summary: %s", data)
+		}
+	}
+	if err := run.RecordSkippedStage("Skipping disabled stage: codeReview"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(data), "   Agent:") != 4 || strings.Count(string(data), "   Model:") != 4 || !strings.HasSuffix(string(data), "Skipping disabled stage: codeReview\n\n") {
+		t.Fatalf("skipped stage added result fields: %s", data)
+	}
 }
 
 func TestStageChangeReports(t *testing.T) {

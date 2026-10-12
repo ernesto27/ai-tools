@@ -85,11 +85,31 @@ the sandbox or agent default and its runtime output.
 
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
-`INTERRUPTED`), duration, a short summary of changes made during that stage,
+`INTERRUPTED`), the final attempt's agent and model, duration, a short summary
+of changes made during that stage,
 and any execution error. If the agent's change summary cannot be collected,
 the entry says `Change summary unavailable.` Disabled stages are listed as
 skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.
+
+`Agent:` and `Model:` appear between `Status:` and `Duration:`, with names
+only. Runtime startup records replace earlier selections when an attempt
+restarts or changes agents. Configuration is not proof of runtime selection.
+Unknown values appear independently as `unavailable`, without failing the
+workflow. Currently Soft Factory recognizes Codex's startup header and Claude's
+streaming initialization event. Other agents, missing startup records, and
+output formats it cannot recognize produce `unavailable`. The sandbox has no
+uniform metadata interface; these fields do not infer selections from defaults
+or change reports. No attempt history is included.
+
+```text
+1. IMPLEMENTATION
+   Status:    SUCCEEDED
+   Agent:     codex
+   Model:     gpt-5
+   Duration:  20 sec
+   Changes:   Created hello.txt containing Hello, world!
+```
 
 Execution statuses describe whether the stage ran successfully. They are
 separate from the review verdicts (`PASS`, `UNRESOLVED`, or `BLOCKED`); read the

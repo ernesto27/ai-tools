@@ -44,6 +44,8 @@ type Run struct {
 	summary           *os.File
 	summaryEntries    int
 	changeSummaryPath string
+	stageAgent        string
+	stageModel        string
 	path              string
 	header            string
 	err               error
@@ -205,6 +207,7 @@ func (r *Run) StartStage(name string) {
 	}
 	r.attempts[name]++
 	r.changeSummaryPath = ""
+	r.stageAgent, r.stageModel = "", ""
 	filename := fmt.Sprintf("%02d-%s.log", index, name)
 	if r.attempts[name] > 1 {
 		filename = fmt.Sprintf("%02d-%s-%d.log", index, name, r.attempts[name])
@@ -231,6 +234,17 @@ func (r *Run) Details(agent, model, provider string) {
 	defer r.mu.Unlock()
 	r.sectionLocked(fmt.Sprintf("Agent: %s\nModel: %s\nProvider: %s\nInternal commands: saved when visible in output; structured capture unavailable\n",
 		agent, model, provider))
+}
+
+// RuntimeSelection replaces both fields with the last started attempt's
+// runtime metadata. Empty values deliberately discard earlier selections.
+// Configured defaults passed to Details are not runtime evidence.
+func (r *Run) RuntimeSelection(agent, model string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.active != "" && !r.closed {
+		r.stageAgent, r.stageModel = agent, model
+	}
 }
 
 func (r *Run) Prompt(prompt string) {
@@ -504,10 +518,10 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 	}
 
 	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    %s\n   Duration:  %s\n",
+		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n",
 		r.summaryEntries+1,
 		strings.ToUpper(strings.ReplaceAll(name, "-", " ")),
-		outcome(stageErr), formatDuration(elapsed),
+		outcome(stageErr), selectionName(r.stageAgent), selectionName(r.stageModel), formatDuration(elapsed),
 	)
 	changes := "Change summary unavailable."
 	readReport := false
@@ -539,6 +553,7 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 		return fmt.Errorf("write stage summary: %w", err)
 	}
 	r.summaryEntries++
+	r.stageAgent, r.stageModel = "", ""
 	if readReport {
 		if err := os.Remove(r.changeSummaryPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: remove stage change summary: %v\n", err)
@@ -546,6 +561,14 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 		r.changeSummaryPath = ""
 	}
 	return nil
+}
+
+func selectionName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, "\r\n\t") {
+		return "unavailable"
+	}
+	return value
 }
 
 // RecordSkippedStage notes a disabled stage in the summary without numbering

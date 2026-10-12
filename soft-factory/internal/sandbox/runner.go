@@ -503,12 +503,9 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.WaitDelay = 20 * time.Second
 	cmd.Stdin = os.Stdin
 
-	// launchedAgent only filters which runtime startup record is accepted;
-	// it is never reported as the selection.
-	var launchedAgent string
 	if options.Log != nil {
-		var agent, model, provider string
-		agent, model, provider, launchedAgent = selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		selection, agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		options.Log.Selection(selection.Agent, selection.Model)
 		options.Log.Details(agent, model, provider)
 		options.Log.Command(cmd.Path, options.Args)
 		options.Log.Prompt(options.Prompt)
@@ -529,20 +526,9 @@ func execute(options ExecuteOptions) (string, error) {
 		stdout = io.MultiWriter(options.Log.Stream("stdout"), stdout)
 		stderr = io.MultiWriter(options.Log.Stream("stderr"), stderr)
 	}
-	var selection *selectionWriter
-	if options.Log != nil {
-		selection = newSelectionWriter(stdout, options.Log, launchedAgent)
-		if options.ReportName != "" {
-			stderr = selection
-		}
-		stdout = selection
-	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	runErr := cmd.Run()
-	if selection != nil {
-		selection.flush()
-	}
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}
@@ -577,12 +563,11 @@ func execute(options ExecuteOptions) (string, error) {
 
 // selectionDetails reads only supported selection fields. Provider means the
 // selected sandbox agent, not its underlying API backend. Do not copy the
-// configuration into logs: it may also contain API keys. launched is the bare
-// agent name, resolved as agent-sandbox does (stage override passed as -a,
-// then the run/resume section, then the shared field), or empty if unknown.
-func selectionDetails(section string, stage config.Stage, override config.StageConfig) (agent, model, provider, launched string) {
+// configuration into logs: it may also contain API keys. Selection contains
+// plain configured names: stage overrides, then run/resume, then shared fields.
+func selectionDetails(section string, stage config.Stage, override config.StageConfig) (selection config.StageConfig, agent, model, provider string) {
 	agent = "unavailable (no configured selection)"
-	model = "unavailable (sandbox/agent default; see runtime output)"
+	model = "unavailable (no configured model)"
 	provider = "unavailable (no configured agent)"
 	var agentValue, modelValue string
 	agentSource, modelSource := "agent-sandbox.json: agent", "agent-sandbox.json: model"
@@ -608,10 +593,10 @@ func selectionDetails(section string, stage config.Stage, override config.StageC
 	if override.Model != "" {
 		modelValue, modelSource = override.Model, stageSource+".model"
 	}
+	selection = config.StageConfig{Agent: agentValue, Model: modelValue}
 	if agentValue != "" {
 		agent = agentValue + " (configured: " + agentSource + ")"
 		provider = agentValue + " (" + agentSource + ")"
-		launched = agentValue
 	}
 	if modelValue != "" {
 		model = modelValue + " (configured: " + modelSource + ")"

@@ -96,7 +96,7 @@ func TestSummaryLifecycle(t *testing.T) {
 	checkContents(want)
 }
 
-func TestSummaryRuntimeSelectionLifecycle(t *testing.T) {
+func TestSummarySelectionLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandContinue, stageNames)
 	if err != nil {
@@ -110,14 +110,14 @@ func TestSummaryRuntimeSelectionLifecycle(t *testing.T) {
 		{"implementation", "codex", "final-model", nil},
 		{"code-review", "", "", errors.New("failed before launch")},
 		{"security-review", "claude", "", context.Canceled},
-		{"risk-classification", "", "runtime-model", nil},
+		{"risk-classification", "", "configured-model", nil},
 	} {
 		run.StartStage(tt.stage)
-		// Configured details never populate the summary, even after a known stage.
-		run.Details("configured-agent", "configured-model", "configured-provider")
+		// Detailed provenance is separate from the plain summary names.
+		run.Details("details-agent", "details-model", "details-provider")
 		if tt.agent != "" || tt.model != "" {
-			run.RuntimeSelection("earlier-agent", "earlier-model")
-			run.RuntimeSelection(tt.agent, tt.model)
+			run.Selection("earlier-agent", "earlier-model")
+			run.Selection(tt.agent, tt.model)
 		}
 		run.FinishStage(tt.err)
 		if err := run.RecordStageResult(tt.stage, time.Second, tt.err); err != nil {
@@ -129,7 +129,7 @@ func TestSummaryRuntimeSelectionLifecycle(t *testing.T) {
 		}
 		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
 			i+1, strings.ToUpper(strings.ReplaceAll(tt.stage, "-", " ")), outcome(tt.err), selectionName(tt.agent), selectionName(tt.model))
-		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "configured-") {
+		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "details-") {
 			t.Fatalf("unexpected summary: %s", data)
 		}
 	}
@@ -178,7 +178,7 @@ func TestSelectionNameRejectsUnsafeValues(t *testing.T) {
 	}
 	defer run.Finish(nil)
 	run.StartStage("implementation")
-	run.RuntimeSelection("claude x", "model\x1b]0;title\x07")
+	run.Selection("claude x", "model\x1b]0;title\x07")
 	run.FinishStage(nil)
 	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
 		t.Fatal(err)

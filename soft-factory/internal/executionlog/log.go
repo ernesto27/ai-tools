@@ -238,10 +238,9 @@ func (r *Run) Details(agent, model, provider string) {
 		agent, model, provider))
 }
 
-// RuntimeSelection replaces both fields with the last started attempt's
-// runtime metadata. Empty values deliberately discard earlier selections.
-// Configured defaults passed to Details are not runtime evidence.
-func (r *Run) RuntimeSelection(agent, model string) {
+// Selection records the resolved configuration for the latest sandbox attempt.
+// Empty values deliberately discard earlier selections.
+func (r *Run) Selection(agent, model string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.active != "" && !r.closed {
@@ -565,12 +564,12 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 	return nil
 }
 
-// selectionNameLimit bounds a runtime agent or model name in bytes; real
+// selectionNameLimit bounds a configured agent or model name in bytes; real
 // names are far shorter.
 const selectionNameLimit = 200
 
-// selectionName renders a runtime name as one plain line. Names come from
-// runtime output, so values that could alter the summary layout or a terminal
+// selectionName renders a configured name as one plain line. Names come from
+// configuration, so values that could alter the summary layout or a terminal
 // (control characters, including JSON-decoded escapes, line or paragraph
 // separators, invalid UTF-8) or that exceed the length limit are reported as
 // unavailable instead.

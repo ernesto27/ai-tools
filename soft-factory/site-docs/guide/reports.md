@@ -80,8 +80,8 @@ Stage logs identify the configured agent and model and where each value came
 from. A [stage override](configuration.md#stage-agents-and-models) names its
 Factory setting, for example
 `software-factory.json: stages.codeReview.model`; inherited values name their
-setting in `agent-sandbox.json`. If no model is configured, the log refers to
-the sandbox or agent default and its runtime output.
+setting in `agent-sandbox.json`. If no model is configured, the log says
+`unavailable (no configured model)`.
 
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
@@ -92,19 +92,14 @@ the entry says `Change summary unavailable.` Disabled stages are listed as
 skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.
 
-`Agent:` and `Model:` appear between `Status:` and `Duration:`, with names
-only. Each sandbox launch is one attempt, and only its first startup record
-counts; similar text the agent prints later cannot change the values. A later
-attempt's startup record replaces earlier selections, even when it changes
-agents. Configuration is not proof of runtime selection.
-Unknown values appear independently as `unavailable`, without failing the
-workflow. Currently Soft Factory recognizes Codex's startup header and Claude's
-streaming initialization event. When the configured agent is known, only that
-agent's kind of startup record is accepted; it is never shown as the value.
-Other agents, missing startup records, and output formats it cannot recognize
-produce `unavailable`. The sandbox has no
-uniform metadata interface; these fields do not infer selections from defaults
-or change reports. No attempt history is included.
+`Agent:` and `Model:` appear between `Status:` and `Duration:`, with configured
+names only. Each field is resolved independently: a stage override in
+`software-factory.json`, then the `run` or `resume` section in
+`agent-sandbox.json`, then its shared value. An explicitly empty sandbox section
+value clears the shared value. Unset values appear as `unavailable`; agent
+defaults are not inferred from output. Each sandbox attempt replaces both
+fields, and subprocess output cannot change them. Detailed logs retain
+configuration provenance. No attempt history is included in the summary.
 
 ```text
 1. IMPLEMENTATION

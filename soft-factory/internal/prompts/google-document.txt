@@ -1,0 +1,5 @@
+# Google Doc: {{.Name}}
+
+Folder: {{.FolderName}}
+Source: https://docs.google.com/document/d/{{.ID}}/edit
+

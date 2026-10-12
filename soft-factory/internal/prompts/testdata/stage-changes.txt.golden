@@ -1,0 +1,15 @@
+
+
+## Stage change summary
+
+As your final action, write a short plain-text summary to "VALUE_ReportPath {{literal}} 100%".
+Use this absolute container path even if you work in a project subdirectory.
+Use at most two short lines, without headings or bullets.
+Do not exceed two lines; do not write a full report in this file.
+Describe only implementation changes made during this stage execution,
+including corrections made by fixer subagents. Do not repeat earlier stages'
+changes. If no code changes were made, write "No code changes made."
+This temporary reporting file is explicitly allowed even for read-only
+assessment stages; it is not an implementation change. Do not include it
+or other factory report files in your change description. Preserve the
+stage's normal final report and output; this file supplements them.

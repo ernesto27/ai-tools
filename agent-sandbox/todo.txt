@@ -1,4 +1,5 @@
 [x] - should be able to add in json global values as model,  branch, etc, hn
+[] - add globlar branch in json
 [x] - container sandbox should commit changes
 [] - command to get list of providers, models , pricing
 [x] - should docker have .git folder always

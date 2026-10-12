@@ -1,8 +1,9 @@
 [] - option for verbose output in terminal, default true
 [] - move prompt text to txt files
 [] - branch of task name should be set here
+[] - add assert test lib
 [] - check how review is made, if not found errors in first round should stop, not run 3
-[] - i want to be able to config specific model, agent in every stage
+[x] - i want to be able to config specific model, agent in every stage
 [] - review only analysize code changes, not readme or docs
 [] - config file should not be required, now return an error
 [] - i want agent-sandbox.json props json added in software-factory.json

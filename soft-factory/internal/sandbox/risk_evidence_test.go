@@ -43,7 +43,10 @@ func TestRiskReviewEvidence(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := riskReviewEvidence(tc.reports, tc.disabled)
+			got, err := riskReviewEvidence(tc.reports, tc.disabled)
+			if err != nil {
+				t.Fatal(err)
+			}
 			for _, want := range tc.want {
 				if !strings.Contains(got, want) {
 					t.Errorf("evidence missing %q:\n%s", want, got)

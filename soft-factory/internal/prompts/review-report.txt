@@ -1,0 +1,16 @@
+
+
+## Final review report file
+
+Before completing this stage, write the final review report to {{printf "%q" .ReportPath}}.
+Use this absolute container path even if you work in a project subdirectory.
+This temporary reporting file is allowed and must not be committed.
+Use at most 40 short lines and 6,000 characters. Include:
+- Status: PASS, UNRESOLVED, or BLOCKED.
+- Number of rounds completed.
+- Corrections made during this stage.
+- Remaining findings with severity, location, and impact.
+- Checks performed, failed checks, and verification gaps.
+Preserve important unresolved findings and missing verification. Do not include
+commands, diffs, terminal output, intermediate rounds, or the original prompt.
+Write this file even when the review is BLOCKED. Keep your normal final answer.

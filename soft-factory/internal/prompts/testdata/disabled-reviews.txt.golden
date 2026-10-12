@@ -1,0 +1,4 @@
+
+These review stages were disabled in software-factory.json and did not run:
+VALUE_Stages {{literal}} 100%. Do not look for or rely on their reports from earlier runs. Inspect the
+changes directly and record the missing review evidence as a verification gap.

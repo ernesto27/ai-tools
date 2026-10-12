@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"soft-factory/internal/prompts"
 )
 
 const (
@@ -396,28 +398,18 @@ func (r *Run) failLocked(err error) {
 }
 
 // StageChangesPrompt asks for a short report without changing logging-disabled runs.
-func (r *Run) StageChangesPrompt(prompt string) (string, string) {
+func (r *Run) StageChangesPrompt(prompt string) (string, string, error) {
 	if r == nil {
-		return prompt, ""
+		return prompt, "", nil
 	}
 	filename := ".soft-factory-stage-changes-" + rand.Text() + ".txt"
-	prompt += fmt.Sprintf(`
-
-## Stage change summary
-
-As your final action, write a short plain-text summary to %q.
-Use this absolute container path even if you work in a project subdirectory.
-Use at most two short lines, without headings or bullets.
-Do not exceed two lines; do not write a full report in this file.
-Describe only implementation changes made during this stage execution,
-including corrections made by fixer subagents. Do not repeat earlier stages'
-changes. If no code changes were made, write "No code changes made."
-This temporary reporting file is explicitly allowed even for read-only
-assessment stages; it is not an implementation change. Do not include it
-or other factory report files in your change description. Preserve the
-stage's normal final report and output; this file supplements them.
-`, ContainerReportPath(filename))
-	return prompt, filename
+	instructions, err := prompts.Render("stage-changes.txt", map[string]any{
+		"ReportPath": ContainerReportPath(filename),
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return prompt + instructions, filename, nil
 }
 
 // RegisterStageChanges locates the report after the sandbox creates its worktree.

@@ -9,6 +9,7 @@ import (
 
 	"soft-factory/internal/config"
 	"soft-factory/internal/googledrive"
+	"soft-factory/internal/prompts"
 )
 
 func Build(ctx context.Context, cfg config.Config, baseDir string) (string, error) {
@@ -20,7 +21,11 @@ func Build(ctx context.Context, cfg config.Config, baseDir string) (string, erro
 			return "", fmt.Errorf("read supporting document: %w", err)
 		}
 
-		fmt.Fprintf(&result, "# Document: %s\n\n", path)
+		header, err := prompts.Render("document.txt", map[string]any{"Path": path})
+		if err != nil {
+			return "", err
+		}
+		result.WriteString(header)
 		result.WriteString(document)
 		result.WriteString("\n\n")
 	}
@@ -37,13 +42,13 @@ func Build(ctx context.Context, cfg config.Config, baseDir string) (string, erro
 			}
 
 			for _, document := range documents {
-				fmt.Fprintf(
-					&result,
-					"# Google Doc: %s\n\nFolder: %s\nSource: https://docs.google.com/document/d/%s/edit\n\n",
-					document.Name,
-					document.FolderName,
-					document.ID,
-				)
+				header, err := prompts.Render("google-document.txt", map[string]any{
+					"Name": document.Name, "FolderName": document.FolderName, "ID": document.ID,
+				})
+				if err != nil {
+					return "", err
+				}
+				result.WriteString(header)
 				result.WriteString(document.Text)
 				result.WriteString("\n\n")
 			}
@@ -56,11 +61,11 @@ func Build(ctx context.Context, cfg config.Config, baseDir string) (string, erro
 					return "", err
 				}
 
-				fmt.Fprintf(
-					&result,
-					"# Google Doc: \nSource: https://docs.google.com/document/d/%s/edit\n\n",
-					documentID,
-				)
+				header, err := prompts.Render("google-document-url.txt", map[string]any{"ID": documentID})
+				if err != nil {
+					return "", err
+				}
+				result.WriteString(header)
 
 				documentContent, err := client.ExportText(ctx, documentID)
 				if err != nil {

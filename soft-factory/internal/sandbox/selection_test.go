@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,6 +201,104 @@ func TestExecuteSelectionLaterAttempt(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, _ = execute(ExecuteOptions{Args: []string{"run"}, Context: context.Background(), Log: run, Stage: config.StageImplementation})
+	}
+	run.FinishStage(nil)
+	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
+		t.Fatal(err)
+	}
+	assertSelectionSummary(t, run, "claude", "claude-runtime", "SUCCEEDED")
+}
+
+func TestRuntimeSelectionIncrementalClaudeInit(t *testing.T) {
+	// Several lines in each object, so the budget, not line discard, applies.
+	oversizedObject := "{\"a\":[\n" + strings.Repeat("1,\n", selectionBufferLimit/3) + "1]}\n"
+	for _, tt := range []struct {
+		name, launched, output, agent, model string
+	}{
+		{"model before type", "", "{\"model\":\"early-model\",\n\"type\":\"system\",\n\"subtype\":\"init\"}\n", "claude", "early-model"},
+		{"structural characters in strings", "", "{\"note\":\"},{\\\"model\\\":\\\"x\\\"\",\n\"type\":\"system\",\"subtype\":\"init\",\"model\":\"real\"}\n", "claude", "real"},
+		{"nested model only", "", `{"type":"system","subtype":"init","meta":{"model":"nested"}}`, "claude", "unavailable"},
+		{"nested and top-level model", "", `{"type":"system","subtype":"init","meta":{"model":"nested","list":[{"model":"x"}]},"model":"top"}`, "claude", "top"},
+		{"malformed member ends fields", "", "{\"bad\" 1,\n\"type\":\"system\",\"subtype\":\"init\",\"model\":\"m\"}\n", "unavailable", "unavailable"},
+		{"trailing field before new object", "", "{\"type\":\"system\",\n\"subtype\":\"init\"\n" + spoofedClaude, "claude", "unavailable"},
+		{"trailing field at end", "", "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"last\"", "claude", "last"},
+		{"non-init objects before init", "claude", `{"type":"assistant","model":"x"}` + "\n" + claudeStartup, "claude", "claude-runtime"},
+		// An oversized object before any startup record ends observation.
+		{"oversized object before init", "", oversizedObject + claudeStartup, "unavailable", "unavailable"},
+		{"oversized object before header", "", oversizedObject + codexStartup, "unavailable", "unavailable"},
+		{"oversized init keeps fields", "claude", "{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"kept\",\n\"a\":[\n" + strings.Repeat("1,\n", selectionBufferLimit/3) + "1]}\n" + spoofedClaude, "claude", "kept"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertObservedSelection(t, tt.launched, tt.output, tt.agent, tt.model)
+		})
+	}
+}
+
+func TestRuntimeSelectionBoundedPreLockWork(t *testing.T) {
+	for _, tt := range []struct {
+		name, launched, prefix, line string
+	}{
+		// Each line extends one never-ending candidate object.
+		{"open array", "", "{\"a\":[\n", "1,\n"},
+		{"open member", "claude", "{\"type\"\n", "\n"},
+		{"open string lines", "", "{\"a\":[\n", "\"" + strings.Repeat("x", 100) + "\",\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			run := newSelectionLog(t)
+			run.StartStage("implementation")
+			w := newSelectionWriter(io.Discard, run, tt.launched)
+			start := time.Now()
+			if _, err := w.Write([]byte(tt.prefix)); err != nil {
+				t.Fatal(err)
+			}
+			// About 1 MB in line-sized writes, which once cost quadratic work.
+			for written := 0; written < 1<<20; written += len(tt.line) {
+				if _, err := w.Write([]byte(tt.line)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, record := range []string{spoofedClaude, codexStartup} {
+				if _, err := w.Write([]byte(record)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			w.flush()
+			if elapsed := time.Since(start); elapsed > 5*time.Second {
+				t.Fatalf("pre-lock observation took %v", elapsed)
+			}
+			if w.state != selectionLocked {
+				t.Fatalf("writer still observing after budget: state %d", w.state)
+			}
+			run.FinishStage(nil)
+			if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
+				t.Fatal(err)
+			}
+			assertSelectionSummary(t, run, "unavailable", "unavailable", "SUCCEEDED")
+		})
+	}
+}
+
+func TestRuntimeSelectionRestartedObjectsStayLinear(t *testing.T) {
+	// Many separate large candidates, each under the budget, are each scanned
+	// once; the writer keeps waiting and still accepts the real record.
+	run := newSelectionLog(t)
+	run.StartStage("implementation")
+	w := newSelectionWriter(io.Discard, run, "")
+	object := "{\"a\":[\n" + strings.Repeat("1,\n", selectionBufferLimit/4) + "1]}\n"
+	start := time.Now()
+	for written := 0; written < 1<<20; written += len(object) {
+		for _, line := range strings.SplitAfter(object, "\n") {
+			if _, err := w.Write([]byte(line)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := w.Write([]byte(claudeStartup)); err != nil {
+		t.Fatal(err)
+	}
+	w.flush()
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("pre-lock observation took %v", elapsed)
 	}
 	run.FinishStage(nil)
 	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {

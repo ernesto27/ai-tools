@@ -51,11 +51,28 @@ type selectionWriter struct {
 	log         *executionlog.Run
 	launched    string // "" when undetermined: accept either record kind
 	line        []byte
-	object      []byte
 	discard     bool
 	state       selectionState
 	separator   bool
 	headerLines int
+	object      claudeObject
+}
+
+// claudeObject scans one candidate top-level JSON object incrementally. Each
+// byte is scanned once, and each top-level member is decoded once when it
+// ends, so the work per output byte stays constant however the object is
+// split across lines or writes.
+type claudeObject struct {
+	active    bool
+	size      int // bytes of the object's lines, bounded by selectionBufferLimit
+	depth     int
+	inString  bool
+	escaped   bool
+	invalid   bool   // a malformed member ends field extraction
+	member    []byte // current top-level member, without its separator
+	eventType string
+	subtype   string
+	model     string
 }
 
 func newSelectionWriter(out io.Writer, log *executionlog.Run, launched string) *selectionWriter {
@@ -80,7 +97,7 @@ func (w *selectionWriter) Write(p []byte) (int, error) {
 		} else if !w.discard {
 			if len(w.line) == selectionBufferLimit {
 				w.line = w.line[:0]
-				w.object = nil
+				w.endObject()
 				w.discard = true
 				if w.state != selectionPending {
 					// An oversized line cannot continue a startup record.
@@ -98,13 +115,16 @@ func (w *selectionWriter) flush() {
 	if w.state != selectionLocked && len(w.line) != 0 && !w.discard {
 		w.observeLine(string(w.line))
 	}
-	w.line, w.object = nil, nil
+	if w.state != selectionLocked {
+		w.endObject()
+	}
+	w.line = nil
 }
 
 // lock ends observation once the first startup record is complete.
 func (w *selectionWriter) lock() {
 	w.state = selectionLocked
-	w.line, w.object = nil, nil
+	w.line, w.object = nil, claudeObject{}
 }
 
 func (w *selectionWriter) observeLine(line string) {
@@ -114,7 +134,13 @@ func (w *selectionWriter) observeLine(line string) {
 		w.observeCodexHeader(line)
 	case selectionPending:
 		if w.launched != "claude" && codexVersion.MatchString(line) {
-			w.state, w.separator, w.headerLines, w.object = selectionCodex, false, 0, nil
+			// A version line ends any candidate object; its complete trailing
+			// field may still identify an earlier Claude init event.
+			if w.endObject(); w.state == selectionClaude {
+				w.lock()
+				return
+			}
+			w.state, w.separator, w.headerLines = selectionCodex, false, 0
 			w.log.RuntimeSelection("codex", "")
 			return
 		}
@@ -149,56 +175,123 @@ func (w *selectionWriter) observeClaudeInit(line string) {
 	// Only top-level JSON objects are candidates. Nested model fields and
 	// assistant text cannot be mistaken for a Claude initialization record.
 	if strings.HasPrefix(line, "{") {
-		if w.state == selectionClaude {
-			// A new top-level object means the init event ended truncated.
+		// A new top-level object ends any earlier candidate, which may still
+		// complete an init event through its trailing field.
+		if w.endObject(); w.state == selectionClaude {
+			// The init event ended truncated.
 			w.lock()
 			return
 		}
-		w.object = w.object[:0]
-	} else if len(w.object) == 0 {
+		w.object = claudeObject{active: true, member: w.object.member[:0]}
+	} else if !w.object.active {
 		return
 	}
-	if len(w.object)+len(line)+1 > selectionBufferLimit {
-		w.object = nil
-		if w.state == selectionClaude {
-			w.lock()
-		}
+	if w.object.size+len(line)+1 > selectionBufferLimit {
+		// An oversized object is not a startup record. Stop observing rather
+		// than keep scanning output that has supplied no selection, so the
+		// pre-lock work stays bounded and the selection stays as recorded.
+		w.endObject()
+		w.lock()
 		return
 	}
-	w.object = append(w.object, line...)
-	w.object = append(w.object, '\n')
-	// Read complete top-level fields even if interruption truncates the rest
-	// of an init event. Fields on later lines complete the same event.
-	decoder := json.NewDecoder(bytes.NewReader(w.object))
-	_, err := decoder.Token() // opening object delimiter
-	var eventType, subtype, model string
-	for err == nil && decoder.More() {
-		var key json.Token
-		key, err = decoder.Token()
-		if err != nil {
-			break
+	w.object.size += len(line) + 1
+	w.scanClaudeObject(line)
+}
+
+// scanClaudeObject advances the candidate object through one line (and its
+// newline). Complete top-level fields are read even if interruption truncates
+// the rest of an init event; fields on later lines complete the same event.
+func (w *selectionWriter) scanClaudeObject(line string) {
+	o := &w.object
+	for i := 0; i <= len(line); i++ {
+		c := byte('\n')
+		if i < len(line) {
+			c = line[i]
 		}
-		var value json.RawMessage
-		if err = decoder.Decode(&value); err != nil {
-			break
+		if o.inString {
+			o.member = append(o.member, c)
+			switch {
+			case o.escaped:
+				o.escaped = false
+			case c == '\\':
+				o.escaped = true
+			case c == '"':
+				o.inString = false
+			}
+			continue
 		}
+		switch c {
+		case '"':
+			o.inString = true
+		case '{', '[':
+			o.depth++
+			if o.depth == 1 {
+				continue // the object's opening brace
+			}
+		case '}', ']':
+			o.depth--
+			if o.depth == 0 {
+				if c == ']' {
+					o.invalid = true
+				}
+				w.claudeMember(true)
+				w.object = claudeObject{member: o.member[:0]}
+				if w.state == selectionClaude {
+					w.lock()
+				}
+				return
+			}
+		case ',':
+			if o.depth == 1 {
+				w.claudeMember(false)
+				continue
+			}
+		}
+		o.member = append(o.member, c)
+	}
+}
+
+// endObject abandons the candidate object after reading its complete
+// trailing field, if any.
+func (w *selectionWriter) endObject() {
+	if w.object.active && w.object.depth == 1 && !w.object.inString {
+		w.claudeMember(true)
+	}
+	w.object = claudeObject{member: w.object.member[:0]}
+}
+
+// claudeMember decodes the completed top-level member and reports the
+// selection once the object is recognized as an init event. last reports
+// that no separator followed the member, so it may be empty.
+func (w *selectionWriter) claudeMember(last bool) {
+	o := &w.object
+	member := bytes.TrimSpace(o.member)
+	o.member = o.member[:0]
+	if o.invalid {
+		return
+	}
+	if len(member) == 0 {
+		o.invalid = !last
+		return
+	}
+	var field map[string]json.RawMessage
+	wrapped := append(append(append(make([]byte, 0, len(member)+2), '{'), member...), '}')
+	if err := json.Unmarshal(wrapped, &field); err != nil || len(field) != 1 {
+		o.invalid = true
+		return
+	}
+	for key, value := range field {
 		switch key {
 		case "type":
-			_ = json.Unmarshal(value, &eventType)
+			_ = json.Unmarshal(value, &o.eventType)
 		case "subtype":
-			_ = json.Unmarshal(value, &subtype)
+			_ = json.Unmarshal(value, &o.subtype)
 		case "model":
-			_ = json.Unmarshal(value, &model)
+			_ = json.Unmarshal(value, &o.model)
 		}
 	}
-	if eventType == "system" && subtype == "init" {
+	if o.eventType == "system" && o.subtype == "init" {
 		w.state = selectionClaude
-		w.log.RuntimeSelection("claude", model)
-	}
-	if json.Valid(w.object) {
-		w.object = nil
-		if w.state == selectionClaude {
-			w.lock()
-		}
+		w.log.RuntimeSelection("claude", o.model)
 	}
 }

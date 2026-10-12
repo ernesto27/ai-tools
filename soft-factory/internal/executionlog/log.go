@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -563,9 +565,21 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 	return nil
 }
 
+// selectionNameLimit bounds a runtime agent or model name in bytes; real
+// names are far shorter.
+const selectionNameLimit = 200
+
+// selectionName renders a runtime name as one plain line. Names come from
+// runtime output, so values that could alter the summary layout or a terminal
+// (control characters, including JSON-decoded escapes, line or paragraph
+// separators, invalid UTF-8) or that exceed the length limit are reported as
+// unavailable instead.
 func selectionName(value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "\r\n\t") {
+	if value == "" || len(value) > selectionNameLimit || !utf8.ValidString(value) ||
+		strings.ContainsFunc(value, func(r rune) bool {
+			return unicode.IsControl(r) || r == ' ' || r == ' '
+		}) {
 		return "unavailable"
 	}
 	return value

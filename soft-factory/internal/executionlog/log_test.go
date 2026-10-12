@@ -145,6 +145,53 @@ func TestSummaryRuntimeSelectionLifecycle(t *testing.T) {
 	}
 }
 
+func TestSelectionNameRejectsUnsafeValues(t *testing.T) {
+	for _, tt := range []struct {
+		name, value, want string
+	}{
+		{"plain", "gpt-5.2-codex", "gpt-5.2-codex"},
+		{"trimmed", "  claude-opus  ", "claude-opus"},
+		{"at limit", strings.Repeat("m", selectionNameLimit), strings.Repeat("m", selectionNameLimit)},
+		{"empty", " ", "unavailable"},
+		{"newline", "model\n   Model: injected", "unavailable"},
+		{"tab", "model\tname", "unavailable"},
+		{"escape", "model\x1b[2A\x1b[2Kforged", "unavailable"},
+		{"nul", "model\x00", "unavailable"},
+		{"delete", "model\x7f", "unavailable"},
+		{"c1 control", "model\u009bforged", "unavailable"},
+		{"line separator", "model forged", "unavailable"},
+		{"paragraph separator", "model forged", "unavailable"},
+		{"invalid utf8", "model\xff", "unavailable"},
+		{"over limit", strings.Repeat("m", selectionNameLimit+1), "unavailable"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := selectionName(tt.value); got != tt.want {
+				t.Fatalf("selectionName(%q) = %q; want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+
+	prepareLogTestDirectory(t)
+	run, err := NewRun("feature", CommandRun, stageNames)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer run.Finish(nil)
+	run.StartStage("implementation")
+	run.RuntimeSelection("claude x", "model\x1b]0;title\x07")
+	run.FinishStage(nil)
+	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "   Agent:     unavailable\n   Model:     unavailable\n") || strings.ContainsAny(string(data), "\x1b ") {
+		t.Fatalf("unsafe selection reached summary: %q", data)
+	}
+}
+
 func TestStageChangeReports(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

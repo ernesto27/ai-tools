@@ -93,12 +93,16 @@ skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.
 
 `Agent:` and `Model:` appear between `Status:` and `Duration:`, with names
-only. Runtime startup records replace earlier selections when an attempt
-restarts or changes agents. Configuration is not proof of runtime selection.
+only. Each sandbox launch is one attempt, and only its first startup record
+counts; similar text the agent prints later cannot change the values. A later
+attempt's startup record replaces earlier selections, even when it changes
+agents. Configuration is not proof of runtime selection.
 Unknown values appear independently as `unavailable`, without failing the
 workflow. Currently Soft Factory recognizes Codex's startup header and Claude's
-streaming initialization event. Other agents, missing startup records, and
-output formats it cannot recognize produce `unavailable`. The sandbox has no
+streaming initialization event. When the configured agent is known, only that
+agent's kind of startup record is accepted; it is never shown as the value.
+Other agents, missing startup records, and output formats it cannot recognize
+produce `unavailable`. The sandbox has no
 uniform metadata interface; these fields do not infer selections from defaults
 or change reports. No attempt history is included.
 

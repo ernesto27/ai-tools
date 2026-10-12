@@ -503,8 +503,12 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.WaitDelay = 20 * time.Second
 	cmd.Stdin = os.Stdin
 
+	// launchedAgent only filters which runtime startup record is accepted;
+	// it is never reported as the selection.
+	var launchedAgent string
 	if options.Log != nil {
-		agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		var agent, model, provider string
+		agent, model, provider, launchedAgent = selectionDetails(options.Args[0], options.Stage, options.StageConfig)
 		options.Log.Details(agent, model, provider)
 		options.Log.Command(cmd.Path, options.Args)
 		options.Log.Prompt(options.Prompt)
@@ -527,7 +531,7 @@ func execute(options ExecuteOptions) (string, error) {
 	}
 	var selection *selectionWriter
 	if options.Log != nil {
-		selection = &selectionWriter{out: stdout, log: options.Log}
+		selection = newSelectionWriter(stdout, options.Log, launchedAgent)
 		if options.ReportName != "" {
 			stderr = selection
 		}
@@ -573,8 +577,10 @@ func execute(options ExecuteOptions) (string, error) {
 
 // selectionDetails reads only supported selection fields. Provider means the
 // selected sandbox agent, not its underlying API backend. Do not copy the
-// configuration into logs: it may also contain API keys.
-func selectionDetails(section string, stage config.Stage, override config.StageConfig) (agent, model, provider string) {
+// configuration into logs: it may also contain API keys. launched is the bare
+// agent name, resolved as agent-sandbox does (stage override passed as -a,
+// then the run/resume section, then the shared field), or empty if unknown.
+func selectionDetails(section string, stage config.Stage, override config.StageConfig) (agent, model, provider, launched string) {
 	agent = "unavailable (no configured selection)"
 	model = "unavailable (sandbox/agent default; see runtime output)"
 	provider = "unavailable (no configured agent)"
@@ -605,6 +611,7 @@ func selectionDetails(section string, stage config.Stage, override config.StageC
 	if agentValue != "" {
 		agent = agentValue + " (configured: " + agentSource + ")"
 		provider = agentValue + " (" + agentSource + ")"
+		launched = agentValue
 	}
 	if modelValue != "" {
 		model = modelValue + " (configured: " + modelSource + ")"

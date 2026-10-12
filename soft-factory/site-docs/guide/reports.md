@@ -80,16 +80,35 @@ Stage logs identify the configured agent and model and where each value came
 from. A [stage override](configuration.md#stage-agents-and-models) names its
 Factory setting, for example
 `software-factory.json: stages.codeReview.model`; inherited values name their
-setting in `agent-sandbox.json`. If no model is configured, the log refers to
-the sandbox or agent default and its runtime output.
+setting in `agent-sandbox.json`. If no model is configured, the log says
+`unavailable (no configured model)`.
 
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
-`INTERRUPTED`), duration, a short summary of changes made during that stage,
+`INTERRUPTED`), the final attempt's agent and model, duration, a short summary
+of changes made during that stage,
 and any execution error. If the agent's change summary cannot be collected,
 the entry says `Change summary unavailable.` Disabled stages are listed as
 skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.
+
+`Agent:` and `Model:` appear between `Status:` and `Duration:`, with configured
+names only. Each field is resolved independently: a stage override in
+`software-factory.json`, then the `run` or `resume` section in
+`agent-sandbox.json`, then its shared value. An explicitly empty sandbox section
+value clears the shared value. Unset summary values are left empty; agent
+defaults are not inferred from output. Each sandbox attempt replaces both
+fields, and subprocess output cannot change them. Detailed logs retain
+configuration provenance. No attempt history is included in the summary.
+
+```text
+1. IMPLEMENTATION
+   Status:    SUCCEEDED
+   Agent:     codex
+   Model:     gpt-5
+   Duration:  20 sec
+   Changes:   Created hello.txt containing Hello, world!
+```
 
 Execution statuses describe whether the stage ran successfully. They are
 separate from the review verdicts (`PASS`, `UNRESOLVED`, or `BLOCKED`); read the

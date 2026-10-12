@@ -504,7 +504,8 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.Stdin = os.Stdin
 
 	if options.Log != nil {
-		agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		selection, agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		options.Log.Selection(selection.Agent, selection.Model)
 		options.Log.Details(agent, model, provider)
 		options.Log.Command(cmd.Path, options.Args)
 		options.Log.Prompt(options.Prompt)
@@ -562,10 +563,11 @@ func execute(options ExecuteOptions) (string, error) {
 
 // selectionDetails reads only supported selection fields. Provider means the
 // selected sandbox agent, not its underlying API backend. Do not copy the
-// configuration into logs: it may also contain API keys.
-func selectionDetails(section string, stage config.Stage, override config.StageConfig) (agent, model, provider string) {
+// configuration into logs: it may also contain API keys. Selection contains
+// plain configured names: stage overrides, then run/resume, then shared fields.
+func selectionDetails(section string, stage config.Stage, override config.StageConfig) (selection config.StageConfig, agent, model, provider string) {
 	agent = "unavailable (no configured selection)"
-	model = "unavailable (sandbox/agent default; see runtime output)"
+	model = "unavailable (no configured model)"
 	provider = "unavailable (no configured agent)"
 	var agentValue, modelValue string
 	agentSource, modelSource := "agent-sandbox.json: agent", "agent-sandbox.json: model"
@@ -591,6 +593,7 @@ func selectionDetails(section string, stage config.Stage, override config.StageC
 	if override.Model != "" {
 		modelValue, modelSource = override.Model, stageSource+".model"
 	}
+	selection = config.StageConfig{Agent: agentValue, Model: modelValue}
 	if agentValue != "" {
 		agent = agentValue + " (configured: " + agentSource + ")"
 		provider = agentValue + " (" + agentSource + ")"

@@ -526,8 +526,27 @@ func execute(options ExecuteOptions) (string, error) {
 		stderr = io.MultiWriter(options.Log.Stream("stderr"), stderr)
 	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
+	var selection runtimeSelection
+	stdoutSelection := &selectionStream{selection: &selection}
+	stderrSelection := &selectionStream{selection: &selection}
+	if options.Log != nil {
+		if options.ReportName != "" {
+			// Keep a shared writer and pipe for combined report ordering.
+			cmd.Stdout = io.MultiWriter(stdoutSelection, stdout)
+			cmd.Stderr = cmd.Stdout
+		} else {
+			cmd.Stdout = io.MultiWriter(stdoutSelection, stdout)
+			cmd.Stderr = io.MultiWriter(stderrSelection, stderr)
+		}
+	}
 
 	runErr := cmd.Run()
+	if options.Log != nil && cmd.ProcessState != nil {
+		// Run has drained both pipes, including on failure or interruption.
+		stdoutSelection.flushLine()
+		stderrSelection.flushLine()
+		options.Log.SetStageSelection(selection.agent, selection.model)
+	}
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}

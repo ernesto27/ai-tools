@@ -96,8 +96,8 @@ func TestRuntimeSelectionRecords(t *testing.T) {
 }
 
 func TestRuntimeSelectionLaunchedAgent(t *testing.T) {
-	// A long header that never closes and never reaches its model line.
-	openHeader := "OpenAI Codex v0.100.0\r\n--------\r\n" + strings.Repeat("note: agent output\r\n", codexHeaderLimit) + "model: authored-model\r\n"
+	// Extra header fields do not impose an arbitrary line limit.
+	openHeader := "OpenAI Codex v0.100.0\r\n--------\r\n" + strings.Repeat("note: runtime field\r\n", 20) + "model: runtime-model\r\n"
 	for _, tt := range []struct {
 		name, launched, output, agent, model string
 	}{
@@ -109,8 +109,8 @@ func TestRuntimeSelectionLaunchedAgent(t *testing.T) {
 		{"claude ignores only codex header", "claude", spoofedCodex, "unavailable", "unavailable"},
 		{"undetermined codex", "", codexStartup + spoofedClaude, "codex", "runtime-model"},
 		{"undetermined claude", "", claudeStartup + spoofedCodex, "claude", "claude-runtime"},
-		{"header never closes", "codex", openHeader, "codex", "unavailable"},
-		{"header model at limit", "codex", "OpenAI Codex v0.100.0\r\n--------\r\n" + strings.Repeat("note: x\r\n", codexHeaderLimit-2) + "model: runtime-model\r\n", "codex", "runtime-model"},
+		{"long header", "codex", openHeader, "codex", "runtime-model"},
+		{"header extra fields", "codex", "OpenAI Codex v0.100.0\r\n--------\r\n" + strings.Repeat("note: x\r\n", 3) + "model: runtime-model\r\n", "codex", "runtime-model"},
 		{"osc title before version", "codex", "\x1b]0;codex\x07" + codexStartup, "codex", "runtime-model"},
 		{"osc st before version", "", "\x1b]2;title\x1b\\" + codexStartup, "codex", "runtime-model"},
 	} {

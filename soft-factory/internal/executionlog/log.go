@@ -44,6 +44,8 @@ type Run struct {
 	summary           *os.File
 	summaryEntries    int
 	changeSummaryPath string
+	stageAgent        string
+	stageModel        string
 	path              string
 	header            string
 	err               error
@@ -205,6 +207,7 @@ func (r *Run) StartStage(name string) {
 	}
 	r.attempts[name]++
 	r.changeSummaryPath = ""
+	r.stageAgent, r.stageModel = "", ""
 	filename := fmt.Sprintf("%02d-%s.log", index, name)
 	if r.attempts[name] > 1 {
 		filename = fmt.Sprintf("%02d-%s-%d.log", index, name, r.attempts[name])
@@ -493,6 +496,23 @@ func (r *Run) SetChangeSummaryPath(path string) {
 	r.changeSummaryPath = path
 }
 
+// SetStageSelection replaces the selection with runtime evidence for the latest
+// started attempt. Empty fields deliberately replace any earlier known values.
+// Configured selections belong in Details, not in the stage summary.
+func (r *Run) SetStageSelection(agent, model string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stageAgent, r.stageModel = selectionName(agent), selectionName(model)
+}
+
+func selectionName(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, "\r\n\t") {
+		return "unavailable"
+	}
+	return value
+}
+
 // RecordStageResult reads the stage report and appends a numbered execution result.
 // The report is removed only after its text has been saved successfully.
 func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr error) error {
@@ -504,10 +524,10 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 	}
 
 	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    %s\n   Duration:  %s\n",
+		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n",
 		r.summaryEntries+1,
 		strings.ToUpper(strings.ReplaceAll(name, "-", " ")),
-		outcome(stageErr), formatDuration(elapsed),
+		outcome(stageErr), selectionName(r.stageAgent), selectionName(r.stageModel), formatDuration(elapsed),
 	)
 	changes := "Change summary unavailable."
 	readReport := false

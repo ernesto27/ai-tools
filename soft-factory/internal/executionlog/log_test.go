@@ -70,10 +70,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -136,6 +136,51 @@ func TestStageChangeReports(t *testing.T) {
 				t.Fatalf("report remains after recording: %v", err)
 			}
 		})
+	}
+}
+
+func TestStageSelectionLifecycle(t *testing.T) {
+	prepareLogTestDirectory(t)
+	run, err := NewRun("feature", CommandRun, stageNames)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { run.Finish(nil) })
+	run.StartStage("implementation")
+	// Configured details must never become runtime evidence in the summary.
+	run.Details("configured (source)", "configured-model (source)", "provider")
+	run.SetStageSelection("codex", "first-model")
+	run.SetStageSelection("claude", "final-model")
+	run.FinishStage(nil)
+	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
+		t.Fatal(err)
+	}
+	run.StartStage("code-review")
+	run.FinishStage(context.Canceled)
+	if err := run.RecordStageResult("code-review", time.Second, context.Canceled); err != nil {
+		t.Fatal(err)
+	}
+	run.StartStage("security-review")
+	run.SetStageSelection("", "known-model")
+	run.FinishStage(nil)
+	if err := run.RecordStageResult("security-review", time.Second, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.RecordSkippedStage("Skipping disabled stage: riskClassification"); err != nil {
+		t.Fatal(err)
+	}
+	run.Finish(nil)
+	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "SOFTWARE FACTORY — RUN SUMMARY\n" + separator + "\n\n" +
+		"1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     claude\n   Model:     final-model\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n\n" +
+		"2. CODE REVIEW\n   Status:    INTERRUPTED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     context canceled\n\n" +
+		"3. SECURITY REVIEW\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     known-model\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n\n" +
+		"Skipping disabled stage: riskClassification\n\n" + separator + "\n"
+	if string(data) != want {
+		t.Fatalf("summary = %q; want %q", data, want)
 	}
 }
 

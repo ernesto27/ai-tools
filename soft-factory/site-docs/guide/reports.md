@@ -85,8 +85,16 @@ the sandbox or agent default and its runtime output.
 
 Start with `summary.log` for a quick view of the first four stages that ran.
 Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
-`INTERRUPTED`), duration, a short summary of changes made during that stage,
-and any execution error. If the agent's change summary cannot be collected,
+`INTERRUPTED`), the final started attempt's agent and model, duration, a short
+summary of changes made during that stage, and any execution error. `Agent:`
+and `Model:` appear after `Status:` and before `Duration:`, with names only.
+Retries and fallbacks replace earlier selections; no attempt history is shown.
+These fields use runtime startup metadata rather than configured defaults.
+Currently, Soft Factory recognizes the Codex startup banner and Claude's
+session initialization event. Other agents, missing startup output, and
+failures before launch report `unavailable` for each undetermined field.
+Missing metadata does not change the stage's execution status.
+If the agent's change summary cannot be collected,
 the entry says `Change summary unavailable.` Disabled stages are listed as
 skipped without an executed-stage entry. The final walkthrough has its own
 Markdown file and no execution-summary entry.

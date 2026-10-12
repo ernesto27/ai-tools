@@ -96,7 +96,7 @@ Markdown file and no execution-summary entry.
 names only. Each field is resolved independently: a stage override in
 `software-factory.json`, then the `run` or `resume` section in
 `agent-sandbox.json`, then its shared value. An explicitly empty sandbox section
-value clears the shared value. Unset values appear as `unavailable`; agent
+value clears the shared value. Unset summary values are left empty; agent
 defaults are not inferred from output. Each sandbox attempt replaces both
 fields, and subprocess output cannot change them. Detailed logs retain
 configuration provenance. No attempt history is included in the summary.

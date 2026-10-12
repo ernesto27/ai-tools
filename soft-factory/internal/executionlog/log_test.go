@@ -70,10 +70,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     unavailable\n   Model:     unavailable\n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -128,7 +128,7 @@ func TestSummarySelectionLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
-			i+1, strings.ToUpper(strings.ReplaceAll(tt.stage, "-", " ")), outcome(tt.err), selectionName(tt.agent), selectionName(tt.model))
+			i+1, strings.ToUpper(strings.ReplaceAll(tt.stage, "-", " ")), outcome(tt.err), tt.agent, tt.model)
 		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "details-") {
 			t.Fatalf("unexpected summary: %s", data)
 		}
@@ -142,53 +142,6 @@ func TestSummarySelectionLifecycle(t *testing.T) {
 	}
 	if strings.Count(string(data), "   Agent:") != 4 || strings.Count(string(data), "   Model:") != 4 || !strings.HasSuffix(string(data), "Skipping disabled stage: codeReview\n\n") {
 		t.Fatalf("skipped stage added result fields: %s", data)
-	}
-}
-
-func TestSelectionNameRejectsUnsafeValues(t *testing.T) {
-	for _, tt := range []struct {
-		name, value, want string
-	}{
-		{"plain", "gpt-5.2-codex", "gpt-5.2-codex"},
-		{"trimmed", "  claude-opus  ", "claude-opus"},
-		{"at limit", strings.Repeat("m", selectionNameLimit), strings.Repeat("m", selectionNameLimit)},
-		{"empty", " ", "unavailable"},
-		{"newline", "model\n   Model: injected", "unavailable"},
-		{"tab", "model\tname", "unavailable"},
-		{"escape", "model\x1b[2A\x1b[2Kforged", "unavailable"},
-		{"nul", "model\x00", "unavailable"},
-		{"delete", "model\x7f", "unavailable"},
-		{"c1 control", "model\u009bforged", "unavailable"},
-		{"line separator", "model forged", "unavailable"},
-		{"paragraph separator", "model forged", "unavailable"},
-		{"invalid utf8", "model\xff", "unavailable"},
-		{"over limit", strings.Repeat("m", selectionNameLimit+1), "unavailable"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := selectionName(tt.value); got != tt.want {
-				t.Fatalf("selectionName(%q) = %q; want %q", tt.value, got, tt.want)
-			}
-		})
-	}
-
-	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", CommandRun, stageNames)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer run.Finish(nil)
-	run.StartStage("implementation")
-	run.Selection("claude x", "model\x1b]0;title\x07")
-	run.FinishStage(nil)
-	if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "   Agent:     unavailable\n   Model:     unavailable\n") || strings.ContainsAny(string(data), "\x1b ") {
-		t.Fatalf("unsafe selection reached summary: %q", data)
 	}
 }
 

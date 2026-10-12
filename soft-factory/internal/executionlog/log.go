@@ -14,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 )
 
 const (
@@ -522,7 +520,7 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n",
 		r.summaryEntries+1,
 		strings.ToUpper(strings.ReplaceAll(name, "-", " ")),
-		outcome(stageErr), selectionName(r.stageAgent), selectionName(r.stageModel), formatDuration(elapsed),
+		outcome(stageErr), r.stageAgent, r.stageModel, formatDuration(elapsed),
 	)
 	changes := "Change summary unavailable."
 	readReport := false
@@ -562,26 +560,6 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 		r.changeSummaryPath = ""
 	}
 	return nil
-}
-
-// selectionNameLimit bounds a configured agent or model name in bytes; real
-// names are far shorter.
-const selectionNameLimit = 200
-
-// selectionName renders a configured name as one plain line. Names come from
-// configuration, so values that could alter the summary layout or a terminal
-// (control characters, including JSON-decoded escapes, line or paragraph
-// separators, invalid UTF-8) or that exceed the length limit are reported as
-// unavailable instead.
-func selectionName(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || len(value) > selectionNameLimit || !utf8.ValidString(value) ||
-		strings.ContainsFunc(value, func(r rune) bool {
-			return unicode.IsControl(r) || r == ' ' || r == ' '
-		}) {
-		return "unavailable"
-	}
-	return value
 }
 
 // RecordSkippedStage notes a disabled stage in the summary without numbering

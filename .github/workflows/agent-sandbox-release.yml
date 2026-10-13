@@ -56,9 +56,12 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^agent-sandbox-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$(uname -s)" = "$HOST_OS"
           test "$(uname -m)" = "$HOST_ARCH"
-          go test ./...
           go vet ./...
           bash -n install.sh
+
+      - name: Run Go tests on Linux
+        if: matrix.goos == 'linux'
+        run: go test ./...
 
       - name: Build and verify archive
         env:

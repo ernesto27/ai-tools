@@ -5,6 +5,7 @@ package config
 type Config struct {
 	Run         *Section `json:"run"`
 	Resume      *Section `json:"resume"`
+	Branch      string   `json:"branch"`
 	Model       string   `json:"model"`
 	Agent       string   `json:"agent"`
 	BaseImage   string   `json:"baseImage"`

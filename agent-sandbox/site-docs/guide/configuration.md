@@ -8,6 +8,7 @@ directories for it. Worktree management commands do not read this file.
 
 ```json
 {
+  "branch": "fix-go-tests",
   "agent": "codex",
   "baseImage": "golang:1.26-alpine",
   "push": false,
@@ -16,15 +17,15 @@ directories for it. Worktree management commands do not read this file.
     "query": "run go test ./... and fix failures"
   },
   "resume": {
-    "branch": "fix-go-tests",
     "query": "add a regression test for the fix"
   }
 }
 ```
 
-With this configuration, `agent-sandbox run -b fix-go-tests` supplies the
-branch explicitly and uses the saved agent, image, and prompt.
-`agent-sandbox resume` then continues that branch using its section.
+With this configuration, `agent-sandbox run` uses the shared `fix-go-tests`
+branch and the saved agent, image, and prompt. `agent-sandbox resume` then
+continues that branch using its section. A section's `branch` or an explicit
+`-b` / `--branch` flag overrides the shared branch.
 
 ## Understand precedence
 
@@ -55,7 +56,7 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 | Location | Fields |
 | --- | --- |
-| Shared root | `agent`, `model`, `baseImage`, `push`, `pr`, `hn` |
+| Shared root | `branch`, `agent`, `model`, `baseImage`, `push`, `pr`, `hn` |
 | `run` and `resume` | `branch`, `agent`, `model`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `apiKey` |
 | `run` only | `reviewers` |
 

@@ -6,19 +6,15 @@ REPO="ernesto27/ai-tools"
 BINARY="agent-sandbox"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
 
-# --- OS check ---
+# --- Platform check ---
 OS="$(uname -s)"
-if [ "$OS" != "Linux" ]; then
-    echo "error: only Linux is supported at this time (detected: $OS)" >&2
-    exit 1
-fi
-
-# --- Architecture check ---
 ARCH="$(uname -m)"
-case "$ARCH" in
-    x86_64) ASSET="agent-sandbox_linux_amd64.tar.gz" ;;
+case "$OS/$ARCH" in
+    Linux/x86_64) ASSET="agent-sandbox_linux_amd64.tar.gz" ;;
+    Darwin/x86_64) ASSET="agent-sandbox_darwin_amd64.tar.gz" ;;
+    Darwin/arm64) ASSET="agent-sandbox_darwin_arm64.tar.gz" ;;
     *)
-        echo "error: unsupported architecture '$ARCH' (only x86_64 is available)" >&2
+        echo "error: unsupported platform '$OS/$ARCH' (supported: Linux/x86_64, Darwin/x86_64, Darwin/arm64)" >&2
         exit 1
         ;;
 esac
@@ -33,8 +29,12 @@ else
     exit 1
 fi
 
-if ! command -v sha256sum >/dev/null 2>&1; then
-    echo "error: sha256sum is required" >&2
+if command -v sha256sum >/dev/null 2>&1; then
+    CHECKSUM=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+    CHECKSUM=(shasum -a 256)
+else
+    echo "error: sha256sum or shasum is required" >&2
     exit 1
 fi
 
@@ -65,8 +65,10 @@ echo "Downloading ${BINARY} from ${DOWNLOAD_URL} ..."
 "${DOWNLOAD[@]}" "${DOWNLOAD_URL}.sha256" > "$TMP_DIR/$ASSET.sha256"
 
 EXPECTED_SHA="$(awk 'NR == 1 {print $1}' "$TMP_DIR/$ASSET.sha256")"
-ACTUAL_SHA="$(sha256sum "$TMP_DIR/$ASSET")"
-if [[ ! "$EXPECTED_SHA" =~ ^[[:xdigit:]]{64}$ ]] || [[ "${EXPECTED_SHA,,}" != "${ACTUAL_SHA%% *}" ]]; then
+ACTUAL_SHA="$("${CHECKSUM[@]}" "$TMP_DIR/$ASSET")"
+# macOS ships Bash 3.2, which does not support lowercase parameter expansion.
+EXPECTED_SHA_LOWER="$(printf '%s' "$EXPECTED_SHA" | tr '[:upper:]' '[:lower:]')"
+if [[ ! "$EXPECTED_SHA" =~ ^[[:xdigit:]]{64}$ ]] || [[ "$EXPECTED_SHA_LOWER" != "${ACTUAL_SHA%% *}" ]]; then
     echo "error: release archive checksum verification failed" >&2
     exit 1
 fi

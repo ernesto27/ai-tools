@@ -10,6 +10,7 @@ service_account*.json
 client_secret_*.json
 drive-token*.json
 task.txt
+!internal/prompts/task.txt
 .env
 .agents/skills/mynameskill/
 .agents/skills/test-code-review/

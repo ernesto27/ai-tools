@@ -200,7 +200,7 @@ func ReviewChanges(input TaskContext) error {
 		return errors.Join(err, locateErr)
 	}
 	source = resolvedSource
-	destination := filepath.Join(input.Log.Path(), "05-review-changes.md")
+	destination := filepath.Join(input.Log.Path(), "05-"+string(config.StageReviewChanges)+".md")
 	archiveErr := archiveReviewReport(source, destination)
 	if archiveErr != nil {
 		return errors.Join(err, archiveErr)
@@ -294,6 +294,15 @@ func review(input TaskContext, stage config.Stage, skillPath, additionalSkill st
 		ChangeSummaryFile: changesFilename,
 	}
 	_, runErr := execute(options)
+	if runErr == nil && input.Log != nil {
+		source, archiveErr := executionlog.StageReportPath(input.Context, input.Branch, reviewFilename)
+		if archiveErr == nil {
+			archiveErr = input.Log.ArchiveReview(stage, source)
+		}
+		if archiveErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: archive %s review evidence: %v\n", stage, archiveErr)
+		}
+	}
 	return reviewFilename, runErr
 }
 
@@ -647,7 +656,7 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 		ChangeSummaryFile: changesFilename,
 	}
 	if input.Log == nil {
-		options.ReportName = "risk-classification"
+		options.ReportName = string(config.StageRiskClassification)
 	}
 	_, err = execute(options)
 

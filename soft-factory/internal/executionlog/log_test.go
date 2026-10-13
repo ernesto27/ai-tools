@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"soft-factory/internal/config"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -43,7 +45,7 @@ func TestFormatDuration(t *testing.T) {
 
 func TestSummaryLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", CommandRun, stageNames)
+	run, err := NewRun("feature", CommandRun, config.Stages)
 	if err != nil {
 		t.Fatalf("NewRun: %v", err)
 	}
@@ -65,15 +67,15 @@ func TestSummaryLifecycle(t *testing.T) {
 	checkContents(want)
 
 	entries := []struct {
-		stage   string
+		stage   config.Stage
 		elapsed time.Duration
 		err     error
 		line    string
 	}{
 		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"code-review", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"security-review", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -90,7 +92,7 @@ func TestSummaryLifecycle(t *testing.T) {
 	if _, err := file.WriteString("unexpected\n"); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("write after Finish = %v; want closed file error", err)
 	}
-	if err := run.RecordStageResult("security-review", time.Second, nil); err == nil {
+	if err := run.RecordStageResult("securityReview", time.Second, nil); err == nil {
 		t.Fatal("record after Finish: expected an error")
 	}
 	checkContents(want)
@@ -98,19 +100,20 @@ func TestSummaryLifecycle(t *testing.T) {
 
 func TestSummarySelectionLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", CommandContinue, stageNames)
+	run, err := NewRun("feature", CommandContinue, config.Stages)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer run.Finish(nil)
 	for i, tt := range []struct {
-		stage, agent, model string
-		err                 error
+		stage        config.Stage
+		agent, model string
+		err          error
 	}{
 		{"implementation", "codex", "final-model", nil},
-		{"code-review", "", "", errors.New("failed before launch")},
-		{"security-review", "claude", "", context.Canceled},
-		{"risk-classification", "", "configured-model", nil},
+		{"codeReview", "", "", errors.New("failed before launch")},
+		{"securityReview", "claude", "", context.Canceled},
+		{"riskClassification", "", "configured-model", nil},
 	} {
 		run.StartStage(tt.stage)
 		// Detailed provenance is separate from the plain summary names.
@@ -128,7 +131,7 @@ func TestSummarySelectionLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
-			i+1, strings.ToUpper(strings.ReplaceAll(tt.stage, "-", " ")), outcome(tt.err), tt.agent, tt.model)
+			i+1, stageHeading(tt.stage), outcome(tt.err), tt.agent, tt.model)
 		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "details-") {
 			t.Fatalf("unexpected summary: %s", data)
 		}
@@ -159,7 +162,7 @@ func TestStageChangeReports(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
-			run, err := NewRun("feature", CommandRun, stageNames)
+			run, err := NewRun("feature", CommandRun, config.Stages)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -190,7 +193,7 @@ func TestStageChangeReports(t *testing.T) {
 
 func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", CommandRun, stageNames)
+	run, err := NewRun("feature", CommandRun, config.Stages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +216,7 @@ func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 
 func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	prepareLogTestDirectory(t)
-	run, err := NewRun("feature", CommandRun, stageNames)
+	run, err := NewRun("feature", CommandRun, config.Stages)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +228,7 @@ func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	}
 	run.SetChangeSummaryPath(report)
 	run.FinishStage(nil)
-	run.StartStage("code-review")
+	run.StartStage("codeReview")
 	if run.changeSummaryPath != "" {
 		t.Fatal("new stage retained earlier report path")
 	}
@@ -234,7 +237,7 @@ func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	run.SetChangeSummaryPath(link)
-	if err := run.RecordStageResult("code-review", time.Second, nil); err != nil {
+	if err := run.RecordStageResult("codeReview", time.Second, nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
@@ -249,10 +252,10 @@ func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 func TestHeaderListsOnlyPlannedStages(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		planned []string
+		planned []config.Stage
 		want    string
 	}{
-		{"disabled stage omitted", []string{"implementation", "code-review", "risk-classification"}, "implementation, code-review, risk-classification"},
+		{"disabled stage omitted", []config.Stage{config.StageImplementation, config.StageCodeReview, config.StageRiskClassification}, "implementation, codeReview, riskClassification"},
 		{"none planned", nil, "none"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -372,7 +375,7 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 	parent := filepath.Join("logs", "Feature-logs._-9-")
 	paths := make(map[string]int)
 	for i, command := range []string{CommandRun, CommandContinue, CommandContinue, CommandRun} {
-		run, err := NewRun("Feature/logs._-9é", command, []string{"implementation"})
+		run, err := NewRun("Feature/logs._-9é", command, []config.Stage{config.StageImplementation})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -398,7 +401,7 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 	}
 	for path, invocation := range paths {
 		entries, err := os.ReadDir(path)
-		if err != nil || len(entries) != 2 {
+		if err != nil || len(entries) != 3 {
 			t.Fatalf("artifacts in %s = %v, error = %v", path, entries, err)
 		}
 		data, err := os.ReadFile(filepath.Join(path, "01-implementation.log"))

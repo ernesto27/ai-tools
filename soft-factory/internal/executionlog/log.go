@@ -11,10 +11,13 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
+	"soft-factory/internal/config"
 	"soft-factory/internal/prompts"
 )
 
@@ -23,6 +26,10 @@ const (
 	CommandRun = "run"
 	// CommandContinue identifies a continued workflow invocation.
 	CommandContinue = "continue"
+
+	statusInterrupted = "INTERRUPTED"
+	statusFailed      = "FAILED"
+	StatusSucceeded   = "SUCCEEDED"
 
 	logDirectory = "logs"
 	separator    = "=================================================="
@@ -35,8 +42,6 @@ const (
 func ContainerReportPath(filename string) string {
 	return path.Join(containerWorktree, filename)
 }
-
-var stageNames = []string{"implementation", "code-review", "security-review", "risk-classification"}
 
 // Run owns one directory of log files. Writes are serialized and best effort: after creation,
 // logging failures warn once and never become workflow errors.
@@ -51,19 +56,21 @@ type Run struct {
 	path              string
 	header            string
 	err               error
-	attempts          map[string]int
-	active            string
+	attempts          map[config.Stage]int
+	active            config.Stage
 	stream            string
 	newline           bool
 	closed            bool
 	ready             bool
+	stageStatus       *StageStatus
+	resuming          bool
 }
 
 // NewRun initializes a private invocation directory under the branch's log folder.
 // command identifies the invocation as "run" or "continue".
 // planned lists, in order, the stage labels this run will execute; stages
 // disabled for the run are omitted from the header.
-func NewRun(branch, command string, planned []string) (*Run, error) {
+func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
 	}
@@ -81,7 +88,7 @@ func NewRun(branch, command string, planned []string) (*Run, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
-	plannedStages := strings.Join(planned, ", ")
+	plannedStages := stageList(planned)
 	if plannedStages == "" {
 		plannedStages = "none"
 	}
@@ -95,19 +102,28 @@ func NewRun(branch, command string, planned []string) (*Run, error) {
 		return nil, fmt.Errorf("create summary: %w", err)
 	}
 
+	stageStatus, err := NewStageStatus(path, true)
+	if err != nil {
+		file.Close()
+		return nil, fmt.Errorf("create stage status: %w", err)
+	}
+
 	_, writeErr := fmt.Fprintf(file, "SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator)
 	if writeErr != nil {
 		file.Close()
+		stageStatus.Close()
 		return nil, fmt.Errorf("write summary header: %w", writeErr)
 	}
 
 	return &Run{
-			path:     path,
-			header:   header,
-			summary:  file,
-			attempts: make(map[string]int),
-			newline:  true,
-			ready:    true},
+			path:        path,
+			header:      header,
+			summary:     file,
+			attempts:    make(map[config.Stage]int),
+			newline:     true,
+			ready:       true,
+			stageStatus: stageStatus,
+		},
 		nil
 }
 
@@ -194,40 +210,42 @@ func (r *Run) Message(message string) {
 	r.sectionLocked(message + "\n")
 }
 
-func (r *Run) StartStage(name string) {
+func (r *Run) StartStage(stage config.Stage) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	index := 0
-	for i, stage := range stageNames {
-		if stage == name {
-			index = i + 1
-		}
-	}
+	index := slices.Index(config.Stages, stage) + 1
 	if index == 0 || r.active != "" || r.closed {
-		r.failLocked(fmt.Errorf("cannot start execution log stage %q", name))
+		r.failLocked(fmt.Errorf("cannot start execution log stage %q", stage))
 		return
 	}
-	r.attempts[name]++
+	r.attempts[stage]++
 	r.changeSummaryPath = ""
 	r.stageAgent, r.stageModel = "", ""
-	filename := fmt.Sprintf("%02d-%s.log", index, name)
-	if r.attempts[name] > 1 {
-		filename = fmt.Sprintf("%02d-%s-%d.log", index, name, r.attempts[name])
+	filename := fmt.Sprintf("%02d-%s.log", index, stage)
+	if r.attempts[stage] > 1 && !r.resuming {
+		filename = fmt.Sprintf("%02d-%s-%d.log", index, stage, r.attempts[stage])
 	}
 	var file *os.File
 	if r.err == nil {
 		var err error
-		file, err = os.OpenFile(filepath.Join(r.path, filename), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+		if r.resuming {
+			flags = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+		}
+		file, err = os.OpenFile(filepath.Join(r.path, filename), flags, 0600)
 		if err != nil {
 			r.failLocked(fmt.Errorf("create stage log %q: %w", filename, err))
 		}
 	}
-	r.active, r.stream = name, ""
+	r.active, r.stream = stage, ""
 	r.file = file
 	r.newline = true
+	if r.resuming {
+		r.writeLocked("\n" + separator + "\nRESUMED STAGE\n")
+	}
 	r.writeLocked(r.header)
 	r.sectionLocked(fmt.Sprintf("%s\nSTAGE %d: %s\n%s\nStarted: %s\n",
-		separator, index, strings.ToUpper(name), separator, timestamp()))
+		separator, index, stageHeading(stage), separator, timestamp()))
 }
 
 // Details appends known metadata and its provenance before subprocess launch.
@@ -323,6 +341,11 @@ func (r *Run) Finish(err error) {
 			r.failLocked(fmt.Errorf("close summary: %w", closeErr))
 		}
 		r.summary = nil
+	}
+	if r.stageStatus != nil {
+		if err := r.stageStatus.Close(); err != nil {
+			r.failLocked(err)
+		}
 	}
 	r.closed = true
 }
@@ -500,7 +523,7 @@ func (r *Run) SetChangeSummaryPath(path string) {
 
 // RecordStageResult reads the stage report and appends a numbered execution result.
 // The report is removed only after its text has been saved successfully.
-func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr error) error {
+func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stageErr error) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -508,11 +531,17 @@ func (r *Run) RecordStageResult(name string, elapsed time.Duration, stageErr err
 		return fmt.Errorf("summary file is closed or unavailable")
 	}
 
+	status := outcome(stageErr)
+	err := r.stageStatus.append(stage, status)
+	if err != nil {
+		return err
+	}
+
 	entry := fmt.Sprintf(
 		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n",
 		r.summaryEntries+1,
-		strings.ToUpper(strings.ReplaceAll(name, "-", " ")),
-		outcome(stageErr), r.stageAgent, r.stageModel, formatDuration(elapsed),
+		stageHeading(stage),
+		status, r.stageAgent, r.stageModel, formatDuration(elapsed),
 	)
 	changes := "Change summary unavailable."
 	readReport := false
@@ -593,12 +622,12 @@ func timestamp() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 
 func outcome(err error) string {
 	if errors.Is(err, context.Canceled) {
-		return "INTERRUPTED"
+		return statusInterrupted
 	}
 	if err != nil {
-		return "FAILED"
+		return statusFailed
 	}
-	return "SUCCEEDED"
+	return StatusSucceeded
 }
 
 func quote(value string) string {
@@ -606,4 +635,24 @@ func quote(value string) string {
 		return value
 	}
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+// stageHeading formats camelCase identifiers for human-readable summaries.
+func stageHeading(stage config.Stage) string {
+	var heading strings.Builder
+	for index, char := range string(stage) {
+		if index > 0 && unicode.IsUpper(char) {
+			heading.WriteByte(' ')
+		}
+		heading.WriteRune(unicode.ToUpper(char))
+	}
+	return heading.String()
+}
+
+func stageList(stages []config.Stage) string {
+	names := make([]string, len(stages))
+	for index, stage := range stages {
+		names[index] = string(stage)
+	}
+	return strings.Join(names, ", ")
 }

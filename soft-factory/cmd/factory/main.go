@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,8 +39,11 @@ func main() {
 type workflowOptions struct {
 	IssueURL string
 	// Implement runs the implementation stage before the reviews.
-	Implement bool
-	Continue  bool
+	Implement  bool
+	Continue   bool
+	ResumePath string
+	StartStage config.Stage
+	Branch     string
 }
 
 func runWorkflow(opts workflowOptions) (runErr error) {
@@ -49,6 +54,10 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	cfg, err := config.Load(factoryConfigFile)
 	if err != nil {
 		return err
+	}
+
+	shouldRun := func(stage config.Stage) bool {
+		return opts.StartStage == "" || slices.Index(config.Stages, stage) >= slices.Index(config.Stages, opts.StartStage)
 	}
 
 	var loadedSkills sandbox.ProjectSkills
@@ -66,7 +75,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 
 	for _, entry := range entries {
 		// Disabled stages never read their skill files.
-		if entry.name == "" || cfg.StageDisabled(entry.stage) {
+		if entry.name == "" || cfg.StageDisabled(entry.stage) || !shouldRun(entry.stage) {
 			continue
 		}
 
@@ -85,9 +94,12 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
-	branch, err := workflowBranch(opts)
-	if err != nil {
-		return err
+	branch := opts.Branch
+	if branch == "" {
+		branch, err = workflowBranch(opts)
+		if err != nil {
+			return err
+		}
 	}
 	var runLog *executionlog.Run
 	if opts.Implement {
@@ -96,8 +108,15 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 			command = executionlog.CommandContinue
 		}
 		var err error
-		runLog, err = executionlog.NewRun(branch, command, plannedStageLabels(cfg))
+		if opts.ResumePath != "" {
+			runLog, err = executionlog.OpenRun(opts.ResumePath, branch, plannedStages(cfg))
+		} else {
+			runLog, err = executionlog.NewRun(branch, command, plannedStages(cfg))
+		}
 		if err != nil {
+			if opts.ResumePath != "" {
+				return fmt.Errorf("open recovery logs: %w", err)
+			}
 			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 		} else {
 			fmt.Printf("Execution logs: %s\n", runLog.Path())
@@ -131,31 +150,44 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		Config:       cfg,
 	}
 
-	if opts.Implement {
-		if err := runStage(input, cfg, config.StageImplementation, "implementation", "Starting implementation...", func() error {
+	if opts.Implement && shouldRun(config.StageImplementation) {
+		if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
 			return sandbox.Run(input)
 		}); err != nil {
 			return err
 		}
 	}
 
-	// Only reviews that run in this invocation contribute report files.
+	// Reviews may come from this attempt or an earlier successful stage.
 	var reports []string
 	var disabledReviews []config.Stage
 	reviews := []struct {
 		stage   config.Stage
-		name    string
 		message string
 		review  func(sandbox.TaskContext) (string, error)
 	}{
-		{config.StageCodeReview, "code-review", "\nStarting code review and corrections...", sandbox.Review},
-		{config.StageSecurityReview, "security-review", "\nStarting security review and corrections...", sandbox.SecurityReview},
+		{config.StageCodeReview, "\nStarting code review and corrections...", sandbox.Review},
+		{config.StageSecurityReview, "\nStarting security review and corrections...", sandbox.SecurityReview},
 	}
 	for _, review := range reviews {
 		if cfg.StageDisabled(review.stage) {
 			disabledReviews = append(disabledReviews, review.stage)
 		}
-		if err := runStage(input, cfg, review.stage, review.name, review.message, func() error {
+		if !shouldRun(review.stage) {
+			if !cfg.StageDisabled(review.stage) && shouldRun(config.StageRiskClassification) && !cfg.StageDisabled(config.StageRiskClassification) {
+				filename := ".soft-factory-stage-changes-" + rand.Text() + "-review.txt"
+				worktree, err := executionlog.WorktreeForBranch(ctx, branch)
+				if err != nil {
+					return err
+				}
+				if err := runLog.RestoreReview(opts.ResumePath, review.stage, filepath.Join(worktree, filename)); err != nil {
+					return fmt.Errorf("restore %s evidence: %w", review.stage, err)
+				}
+				reports = append(reports, filename)
+			}
+			continue
+		}
+		if err := runStage(input, cfg, review.stage, review.message, func() error {
 			report, err := review.review(input)
 			reports = append(reports, report)
 			return err
@@ -164,16 +196,18 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		}
 	}
 
-	if err := runStage(input, cfg, config.StageRiskClassification, "risk-classification", "\nStarting risk classification...", func() error {
-		return sandbox.RiskClassification(input, reports, disabledReviews)
-	}); err != nil {
-		return err
+	if shouldRun(config.StageRiskClassification) {
+		if err := runStage(input, cfg, config.StageRiskClassification, "\nStarting risk classification...", func() error {
+			return sandbox.RiskClassification(input, reports, disabledReviews)
+		}); err != nil {
+			return err
+		}
 	}
 	if cfg.StageDisabled(config.StageRiskClassification) {
 		// Risk classification normally removes this run's review reports.
 		sandbox.RemoveReviewReports(input, reports)
 	}
-	if !opts.Implement {
+	if !opts.Implement || !shouldRun(config.StageReviewChanges) {
 		return nil
 	}
 	if err := input.Context.Err(); err != nil {
@@ -183,13 +217,15 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		skipStage(input, config.StageReviewChanges)
 		return nil
 	}
-	fmt.Println("\nStarting final change walkthrough...")
-	if err := sandbox.ReviewChanges(input); err != nil {
-		if input.Context.Err() != nil {
+	if err := runStage(input, cfg, config.StageReviewChanges, "\nStarting final change walkthrough...", func() error {
+		return sandbox.ReviewChanges(input)
+	}); err != nil {
+		if input.Context.Err() != nil || opts.ResumePath != "" {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "Warning: final change walkthrough unavailable: %v; continuing execution.\n", err)
 	}
+
 	return nil
 }
 
@@ -203,35 +239,25 @@ func workflowBranch(opts workflowOptions) (string, error) {
 	if opts.Implement && !opts.Continue {
 		section = settings.Run
 	}
-	if section == nil || section.Branch == nil {
-		return "", nil
+	if section != nil && section.Branch != nil {
+		return *section.Branch, nil
 	}
-	return *section.Branch, nil
+	return settings.Branch, nil
 }
 
-// plannedStageLabels lists the internal log labels of the logged stages that
-// are enabled for this run, in pipeline order.
-func plannedStageLabels(cfg config.Config) []string {
-	var labels []string
-	for _, stage := range []struct {
-		stage config.Stage
-		label string
-	}{
-		{config.StageImplementation, "implementation"},
-		{config.StageCodeReview, "code-review"},
-		{config.StageSecurityReview, "security-review"},
-		{config.StageRiskClassification, "risk-classification"},
-	} {
-		if !cfg.StageDisabled(stage.stage) {
-			labels = append(labels, stage.label)
+// plannedStages lists enabled stage identifiers in pipeline order.
+func plannedStages(cfg config.Config) []config.Stage {
+	var stages []config.Stage
+	for _, stage := range config.Stages {
+		if !cfg.StageDisabled(stage) {
+			stages = append(stages, stage)
 		}
 	}
-	return labels
+	return stages
 }
 
-// runStage executes an enabled stage. name is the internal log label for the
-// public stage identifier; a disabled stage is skipped without running execute.
-func runStage(input sandbox.TaskContext, cfg config.Config, stage config.Stage, name, message string, execute func() error) error {
+// runStage executes an enabled stage; disabled stages skip execute.
+func runStage(input sandbox.TaskContext, cfg config.Config, stage config.Stage, message string, execute func() error) error {
 	if err := input.Context.Err(); err != nil {
 		return err
 	}
@@ -240,7 +266,7 @@ func runStage(input sandbox.TaskContext, cfg config.Config, stage config.Stage, 
 		return nil
 	}
 	if input.Log != nil {
-		input.Log.StartStage(name)
+		input.Log.StartStage(stage)
 		input.Log.Message(message)
 	}
 	fmt.Println(message)
@@ -255,7 +281,7 @@ func runStage(input sandbox.TaskContext, cfg config.Config, stage config.Stage, 
 	if input.Log != nil {
 		input.Log.FinishStage(err)
 
-		if logErr := input.Log.RecordStageResult(name, elapsed, err); logErr != nil {
+		if logErr := input.Log.RecordStageResult(stage, elapsed, err); logErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: save stage summary: %v\n", logErr)
 		}
 	}

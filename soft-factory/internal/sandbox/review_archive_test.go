@@ -21,7 +21,7 @@ func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 	}
 	defer run.Finish(nil)
 	source := "agent-report.md"
-	destination := filepath.Join(run.Path(), "05-review-changes.md")
+	destination := filepath.Join(run.Path(), "05-reviewChanges.md")
 	if filepath.Dir(run.Path()) != filepath.Join("logs", "feature-logs") || !strings.HasPrefix(filepath.Base(run.Path()), "continue-") {
 		t.Fatalf("unexpected walkthrough directory: %s", run.Path())
 	}
@@ -53,7 +53,7 @@ func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 
 func TestArchiveReviewReportRejectsInvalidSource(t *testing.T) {
 	dir := t.TempDir()
-	destination := filepath.Join(dir, "05-review-changes.md")
+	destination := filepath.Join(dir, "05-reviewChanges.md")
 	for _, source := range []string{filepath.Join(dir, "missing.md"), filepath.Join(dir, "empty.md"), filepath.Join(dir, "link.md")} {
 		switch filepath.Base(source) {
 		case "empty.md":

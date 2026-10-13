@@ -160,7 +160,12 @@ func TestStagePromptIntegration(t *testing.T) {
 						input.Log = run
 						t.Cleanup(func() { run.Finish(nil) })
 						if stage != "review-changes" {
-							run.StartStage(stage)
+							run.StartStage(map[string]config.Stage{
+								"implementation":      config.StageImplementation,
+								"code-review":         config.StageCodeReview,
+								"security-review":     config.StageSecurityReview,
+								"risk-classification": config.StageRiskClassification,
+							}[stage])
 						}
 					}
 					var project *ProjectSkill
@@ -220,7 +225,7 @@ func TestStagePromptIntegration(t *testing.T) {
 							t.Fatal("missing walkthrough path")
 						}
 						want = frozen("review-changes.txt", map[string]string{"ReportPath": path, "Skill": bundledSkills[stage], "AdditionalSkill": additional, "Task": task, "HostEvidence": hostEvidence})
-						report, err := os.ReadFile(filepath.Join(input.Log.Path(), "05-review-changes.md"))
+						report, err := os.ReadFile(filepath.Join(input.Log.Path(), "05-reviewChanges.md"))
 						if err != nil || string(report) != "No code changes made.\n" {
 							t.Fatalf("archive = %q, %v", report, err)
 						}

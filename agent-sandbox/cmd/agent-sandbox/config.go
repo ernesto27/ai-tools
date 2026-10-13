@@ -52,7 +52,14 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 		flags.Reviewers = section.Reviewers
 	}
 
-	// An explicit flag wins; a section model overrides the shared JSON model.
+	// Explicit flags win; section values override shared JSON defaults.
+	if !cmd.Flags().Changed(flagBranch) {
+		flags.Branch = config.Branch
+		if section != nil && section.Branch != nil {
+			flags.Branch = *section.Branch
+		}
+	}
+
 	if !cmd.Flags().Changed(flagModel) {
 		flags.Model = config.Model
 		if section != nil && section.Model != nil {
@@ -93,9 +100,6 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 	}
 
 	if section != nil {
-		if section.Branch != nil && !cmd.Flags().Changed(flagBranch) {
-			flags.Branch = *section.Branch
-		}
 		if section.APIKey != nil {
 			flags.APIKey = *section.APIKey
 		}
@@ -149,7 +153,7 @@ func readLocalConfig() (config.Config, error) {
 	}
 
 	for name, value := range root {
-		if name == flagModel || name == flagAgent || name == flagBaseImage {
+		if name == flagBranch || name == flagModel || name == flagAgent || name == flagBaseImage {
 			var field string
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 				return config.Config{}, fmt.Errorf("%s: %s must be a JSON string", localConfigFile, name)

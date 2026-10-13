@@ -98,7 +98,7 @@ The branch is the name shown by `worktree-list`. When combined with `--push`
 or `--pr`, the agent must commit its changes before ending the session.
 
 `run` and `resume` read `./agent-sandbox.json` if it exists in the directory
-where they are invoked. The JSON root accepts `agent`, `model`, `baseImage`,
+where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `baseImage`,
 `push`, `pr`, and `hn` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`,
 `baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
@@ -115,6 +115,7 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 ```json
 {
+  "branch": "fix-login",
   "agent": "codex",
   "model": "gpt-6.1-sol",
   "baseImage": "golang:1.26-alpine",
@@ -128,14 +129,15 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
     "reviewers": ["alice", "bob"]
   },
   "resume": {
-    "branch": "fix-login",
     "query": "add a regression test"
   }
 }
 ```
 
 With this file, `agent-sandbox run` uses the `run` section; `resume` uses the
-`resume` section. You can also pass `-q "another task"` to override the JSON
+`resume` section. Both use the shared `fix-login` branch unless overridden
+in their section or with `-b` / `--branch`.
+You can also pass `-q "another task"` to override the JSON
 query. Worktree management commands do not read this file.
 
 ### GitHub pull requests

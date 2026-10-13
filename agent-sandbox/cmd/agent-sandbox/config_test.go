@@ -291,42 +291,48 @@ func TestLocalConfigFieldsAndValidation(t *testing.T) {
 }
 
 func TestRunAndResumeBranchPrecedence(t *testing.T) {
-	for _, tt := range []struct {
-		name    string
-		section string
-		args    []string
-		want    string
+	tests := []struct {
+		name   string
+		config string
+		args   []string
+		want   string
 	}{
-		{name: "run uses JSON branch", section: "run", want: "json-branch"},
-		{name: "run CLI branch wins", section: "run", args: []string{"--branch", "cli-branch"}, want: "cli-branch"},
-		{name: "resume uses JSON branch", section: "resume", want: "json-branch"},
-		{name: "resume CLI branch wins", section: "resume", args: []string{"-b", "cli-branch"}, want: "cli-branch"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			config := `{"run":{"branch":"json-branch","agent":"codex","query":"task"},` +
-				`"resume":{"branch":"json-branch","agent":"codex","query":"task"}}`
-			if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			var flags runFlags
-			cmd := &cobra.Command{}
-			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
-			flags.bind(cmd)
-			if err := cmd.Flags().Parse(tt.args); err != nil {
-				t.Fatal(err)
-			}
-			if err := configRunArgs(tt.section, &flags)(cmd, cmd.Flags().Args()); err != nil {
-				t.Fatal(err)
-			}
-			opts, err := sandbox.NewOptions(flags.Options)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if opts.Branch != tt.want {
-				t.Fatalf("branch = %q, want %q", opts.Branch, tt.want)
-			}
-		})
+		{name: "root branch without section", config: `{"branch":"shared-branch"}`, want: "shared-branch"},
+		{name: "root branch with section", config: `{"branch":"shared-branch","%s":{}}`, want: "shared-branch"},
+		{name: "section overrides root", config: `{"branch":"shared-branch","%s":{"branch":"section-branch"}}`, want: "section-branch"},
+		{name: "section branch without root", config: `{"%s":{"branch":"section-branch"}}`, want: "section-branch"},
+		{name: "empty section overrides root", config: `{"branch":"shared-branch","%s":{"branch":""}}`},
+		{name: "long CLI flag overrides both levels", config: `{"branch":"shared-branch","%s":{"branch":"section-branch"}}`, args: []string{"--branch", "cli-branch"}, want: "cli-branch"},
+		{name: "short CLI flag overrides both levels", config: `{"branch":"shared-branch","%s":{"branch":"section-branch"}}`, args: []string{"-b", "cli-branch"}, want: "cli-branch"},
+		{name: "CLI flag overrides root without section", config: `{"branch":"shared-branch"}`, args: []string{"-b", "cli-branch"}, want: "cli-branch"},
+		{name: "empty CLI overrides both levels", config: `{"branch":"shared-branch","%s":{"branch":"section-branch"}}`, args: []string{"--branch="}},
+		{name: "empty root", config: `{"branch":""}`},
+		{name: "no configured branch", config: `{}`},
+	}
+	for _, section := range []string{"run", "resume"} {
+		for _, tt := range tests {
+			t.Run(section+"/"+tt.name, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				config := strings.ReplaceAll(tt.config, "%s", section)
+				if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				var flags runFlags
+				cmd := &cobra.Command{}
+				cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
+				flags.bind(cmd)
+				args := append([]string{"--agent", "codex", "--query", "task"}, tt.args...)
+				if err := cmd.Flags().Parse(args); err != nil {
+					t.Fatal(err)
+				}
+				if err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args()); err != nil {
+					t.Fatal(err)
+				}
+				if flags.Branch != tt.want {
+					t.Fatalf("branch = %q, want %q", flags.Branch, tt.want)
+				}
+			})
+		}
 	}
 }
 
@@ -401,6 +407,11 @@ func TestTopLevelConfigTypes(t *testing.T) {
 		field   string
 		wantErr string
 	}{
+		{name: "branch null", field: `"branch":null`, wantErr: "branch must be a JSON string"},
+		{name: "branch number", field: `"branch":1`, wantErr: "branch must be a JSON string"},
+		{name: "branch boolean", field: `"branch":false`, wantErr: "branch must be a JSON string"},
+		{name: "branch object", field: `"branch":{}`, wantErr: "branch must be a JSON string"},
+		{name: "branch array", field: `"branch":[]`, wantErr: "branch must be a JSON string"},
 		{name: "model null", field: `"model":null`, wantErr: "model must be a JSON string"},
 		{name: "agent number", field: `"agent":1`, wantErr: "agent must be a JSON string"},
 		{name: "baseImage boolean", field: `"baseImage":false`, wantErr: "baseImage must be a JSON string"},

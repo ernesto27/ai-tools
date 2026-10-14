@@ -248,8 +248,9 @@ base reference.
 
 The base must provide `apk` (Alpine), `apt-get` (Debian/Ubuntu), `dnf`
 (Fedora/RHEL/UBI/Amazon Linux), or `microdnf` (UBI minimal). Other bases fail
-during the build. Alpine installs Node.js from its packages; other bases use
-Node.js 22 from NodeSource.
+during the build. A single Dockerfile serves both default and derived images.
+When both Node.js and npm are already available, they are reused. Otherwise,
+Alpine installs them from its packages; other bases use Node.js 22 from NodeSource.
 
 On RHEL, the image must have enabled repositories and, where applicable, a
 valid subscription: the sandbox does not mount host credentials. It does not
@@ -331,7 +332,8 @@ available on `resume`, `run-tui`, and `resume-tui`. It does not replace `-f` /
 `--filePrompt`, which reads the instructions themselves from a file.
 
 Default and derived images include Poppler tools for PDF text extraction and
-inspection. Cached default images lacking these tools are rebuilt automatically.
+inspection. PDF tools are installed when images are built; there is no runtime
+probe or automatic rebuild for missing PDF tools.
 Files are read when requested by the prompt; they are not automatically converted.
 
 ## Manage worktrees created by the sandbox

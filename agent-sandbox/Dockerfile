@@ -4,14 +4,14 @@ FROM ${BASE_IMAGE}
 USER 0
 RUN set -eu; \
     if command -v apk >/dev/null 2>&1; then \
-        apk add --no-cache bash ripgrep ca-certificates curl git poppler-utils; \
+        apk add --no-cache bash ripgrep ca-certificates curl git poppler-utils python3; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             apk add --no-cache nodejs npm; \
         fi; \
     elif command -v apt-get >/dev/null 2>&1; then \
         apt-get update; \
         apt-get install -y --no-install-recommends \
-            bash ca-certificates curl git poppler-utils ripgrep; \
+            bash ca-certificates curl git poppler-utils ripgrep python3; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             apt-get install -y --no-install-recommends gnupg; \
             mkdir -p /etc/apt/keyrings; \
@@ -27,7 +27,7 @@ RUN set -eu; \
         || command -v microdnf >/dev/null 2>&1; then \
         if command -v dnf >/dev/null 2>&1; then rpm_pm=dnf; \
         else rpm_pm=microdnf; fi; \
-        "$rpm_pm" install -y bash ca-certificates curl git poppler-utils ripgrep; \
+        "$rpm_pm" install -y bash ca-certificates curl git poppler-utils ripgrep python3; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             rpm_arch="$(uname -m)"; \
             case "$rpm_arch" in \
@@ -50,6 +50,10 @@ RUN set -eu; \
         "$rpm_pm" clean all; \
     else \
         echo "unsupported base image: apk, apt-get, dnf, or microdnf is required" >&2; exit 1; \
+    fi; \
+    if ! command -v python >/dev/null 2>&1; then \
+        mkdir -p /usr/local/bin; \
+        ln -s "$(command -v python3)" /usr/local/bin/python; \
     fi
 RUN set -eu; \
     printf '\n# Keep the base image toolchain available to login shells.\nPATH=%s\nexport PATH\n' "$PATH" >> /etc/profile

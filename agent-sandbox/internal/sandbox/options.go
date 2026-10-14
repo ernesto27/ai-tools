@@ -28,6 +28,7 @@ type Options struct {
 	CommitMessage string
 	FilePrompt    string
 	Images        []string
+	Files         []string
 	HostNetwork   bool
 
 	// prBase is a fetched remote snapshot supplied by execution, not a CLI option.
@@ -70,6 +71,12 @@ func NewOptions(opts Options) (Options, error) {
 		opts.Images = images
 	}
 
+	files, err := resolveAttachmentPaths(opts.Files, "--file")
+	if err != nil {
+		return Options{}, err
+	}
+	opts.Files = files
+
 	if opts.Branch == "" {
 		randomBranch, err := generateBranchName()
 		if err != nil {
@@ -94,16 +101,23 @@ func NewOptions(opts Options) (Options, error) {
 // client-side path, and rejecting unusable files before worktree creation
 // avoids leaving an otherwise successful sandbox run without its attachments.
 func resolveImagePaths(images []string) ([]string, error) {
-	resolved := make([]string, 0, len(images))
-	for _, image := range images {
-		path, err := filepath.Abs(image)
+	return resolveAttachmentPaths(images, "--image")
+}
+
+func resolveAttachmentPaths(files []string, flag string) ([]string, error) {
+	resolved := make([]string, 0, len(files))
+	for _, file := range files {
+		if file == "" {
+			return nil, usageErrorf("%s path must not be empty", flag)
+		}
+		path, err := filepath.Abs(file)
 		if err != nil {
-			return nil, usageErrorf("resolving --image %q: %v", image, err)
+			return nil, usageErrorf("resolving %s %q: %v", flag, file, err)
 		}
 
 		info, err := os.Stat(path)
 		if err != nil || !info.Mode().IsRegular() {
-			return nil, usageErrorf("--image %q must be an existing regular file", image)
+			return nil, usageErrorf("%s %q must be an existing regular file", flag, file)
 		}
 		resolved = append(resolved, path)
 	}
@@ -120,6 +134,7 @@ func AgentNames() []string {
 // FullPrompt is the prompt handed to the agent: the user's instruction plus the
 // house rules for a sandbox run.
 func (o Options) FullPrompt() string {
+	o.Prompt += fileAttachmentManifest(o.Files)
 	if o.PR || o.Push {
 		message := "Choose one short commit message based on the actual changes."
 		if o.CommitMessage != "" {

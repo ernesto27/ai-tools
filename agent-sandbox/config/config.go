@@ -9,6 +9,7 @@ type Config struct {
 	Model       string   `json:"model"`
 	Agent       string   `json:"agent"`
 	BaseImage   string   `json:"baseImage"`
+	File        []string `json:"file"`
 	Push        bool     `json:"push"`
 	PR          bool     `json:"pr"`
 	HostNetwork bool     `json:"hn"`
@@ -29,6 +30,7 @@ type Section struct {
 	HostNetwork   *bool     `json:"hn"`
 	CommitMessage *string   `json:"commitMessage"`
 	FilePrompt    *string   `json:"filePrompt"`
+	File          *[]string `json:"file"`
 	Image         *[]string `json:"image"`
 	Reviewers     []string  `json:"reviewers"`
 }

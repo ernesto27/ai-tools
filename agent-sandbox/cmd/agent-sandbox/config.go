@@ -98,6 +98,12 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 			flags.HostNetwork = *section.HostNetwork
 		}
 	}
+	if !cmd.Flags().Changed(flagFile) {
+		flags.Files = config.File
+		if section != nil && section.File != nil {
+			flags.Files = *section.File
+		}
+	}
 
 	if section != nil {
 		if section.APIKey != nil {
@@ -153,6 +159,12 @@ func readLocalConfig() (config.Config, error) {
 	}
 
 	for name, value := range root {
+		if name == flagFile {
+			if err := validateConfigField("", name, value); err != nil {
+				return config.Config{}, err
+			}
+			continue
+		}
 		if name == flagBranch || name == flagModel || name == flagAgent || name == flagBaseImage {
 			var field string
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
@@ -205,7 +217,10 @@ func normalizeReviewers(reviewers []string) []string {
 }
 
 func validateConfigField(section, key string, value json.RawMessage) error {
-	fieldName := section + "." + key
+	fieldName := key
+	if section != "" {
+		fieldName = section + "." + key
+	}
 	switch key {
 	case configReviewers:
 		if section != "run" {
@@ -234,7 +249,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 			return fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, fieldName)
 		}
-	case flagImage:
+	case flagImage, flagFile:
 		var images []json.RawMessage
 		if string(value) == "null" || json.Unmarshal(value, &images) != nil {
 			return fmt.Errorf("%s: %s must be an array of JSON strings", localConfigFile, fieldName)

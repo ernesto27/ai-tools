@@ -87,7 +87,10 @@ before container creation; the shared config is required. Missing optional
 worktree config files are not created or protected. Git commits and history
 remain available, but the separate worktree does not isolate other shared Git
 metadata or inherited Git environment variables. Supported image attachments
-receive separate read-only mounts.
+receive separate read-only mounts. Generic `--file` attachments are mounted for
+all agents outside the worktree under numbered directories that preserve
+basenames. [files.go](../internal/sandbox/files.go) supplies the same container
+paths to mounts and the initial prompt manifest.
 `HostNetwork` enables Docker host networking only when requested.
 
 ## Commit and publication flow
@@ -125,7 +128,11 @@ review requests before reporting success; missing requests remain an error.
 
 [embed.go](../embed.go) embeds [Dockerfile](../Dockerfile) so the binary can
 build the default image without a checkout. [baseimage.go](../internal/sandbox/baseimage.go)
-generates Dockerfiles for supported external bases and selects their derived images.
+uses the same embedded Dockerfile with `BASE_IMAGE` for external bases and
+selects their derived images.
+Default and derived images install Poppler PDF tools at build time, without
+a runtime probe or rebuild fallback for missing PDF tools. Derived tags hash
+the Dockerfile template.
 Image preparation compares the selected agent's installed version with
 `npm view <package> version` on every run or resume and rebuilds on a mismatch,
 pinning its `BuildArg` and retaining the external base when applicable.
@@ -168,8 +175,7 @@ flags in `RunE` rather than `MarkFlagRequired`, which bypasses those hooks.
 
 Implement `Agent` under [internal/agent](../internal/agent/agent.go) and add it
 to `registry`, whose order determines CLI display order. Add the matching
-version argument and npm install to both [Dockerfile](../Dockerfile) and the
-external-base template in [baseimage.go](../internal/sandbox/baseimage.go).
+version argument and npm install to the shared [Dockerfile](../Dockerfile).
 `Container` validates and mounts host configuration. Implement `APIKeyAgent`
 only if the agent supports isolated key authentication. `DefaultModel()`
 returning an empty string leaves model selection to the agent; Codex and Claude

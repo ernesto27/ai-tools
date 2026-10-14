@@ -68,7 +68,7 @@ This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
 
@@ -84,6 +84,7 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `-q`, `--query` | Instructions for the agent. |
 | `-c`, `--commitMessage` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
 | `-f`, `--filePrompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
+| `--file <path>` | Optional and repeatable. Mounts any existing regular file read-only for every agent. Filenames are preserved under `/agent-sandbox-files/<number>/`; a filename-to-container-path list is added to the prompt. |
 | `--image <file>` | Optional and repeatable. Attaches images to the initial prompt for Codex or Claude Code. Each path must be an existing regular file on the host; opencode and pi ignore it. Use `--` before the text prompt so Codex does not interpret it as another image. |
 
 Without `-p`/`--push` or `--pr`, changes remain uncommitted in the worktree.
@@ -99,10 +100,10 @@ or `--pr`, the agent must commit its changes before ending the session.
 
 `run` and `resume` read `./agent-sandbox.json` if it exists in the directory
 where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `baseImage`,
-`push`, `pr`, and `hn` as values shared by both commands.
+`push`, `pr`, `hn`, and `file` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`,
 `baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
-`image`, plus the `apiKey` field. `apiKey` is available only in JSON: there is
+`image` and `file` (arrays of paths), plus the `apiKey` field. For `file`, CLI values replace the section array, which replaces the root array; arrays are not combined, and a section’s empty array clears the root files. Explicit CLI image lists replace their section JSON lists. `apiKey` is available only in JSON: there is
 no equivalent command-line option. For each field, an explicit command-line
 option takes precedence, followed by the section value, then the root value.
 A section's `false` or empty string also overrides the shared value.
@@ -240,7 +241,7 @@ agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q "run gofmt a
 
 The first run creates a local derived image and installs the tools needed to
 run the agents: Node.js, npm, Bash, Codex, Claude Code, opencode, pi, ripgrep,
-CA certificates, curl, and Git. Later runs reuse that image for the same base
+CA certificates, curl, Git, and Poppler PDF tools (`pdftotext` and `pdfinfo`). Later runs reuse that image for the same base
 and check the selected agent's version on npm. If it differs from the installed
 version, they rebuild the image with that version and retain the selected
 base reference.
@@ -313,6 +314,25 @@ agent-sandbox run -a claude \
   --image "/home/user/Pictures/reference.png" \
   -q "compare these screenshots and implement the resulting UI"
 ```
+
+Mount reference files for any agent, and refer to their names in the prompt:
+
+```bash
+agent-sandbox run -a claude \
+  --file "/home/user/Documents/spec.pdf" \
+  --file "/home/user/Documents/sample.csv" \
+  -q 'read "spec.pdf" and "sample.csv", then implement the requested feature'
+```
+
+The prompt lists each file's container path. Duplicate filenames have separate
+numbered directories; use their container paths to distinguish them. Paths are
+resolved from the invocation directory, including JSON paths. `--file` is also
+available on `resume`, `run-tui`, and `resume-tui`. It does not replace `-f` /
+`--filePrompt`, which reads the instructions themselves from a file.
+
+Default and derived images include Poppler tools for PDF text extraction and
+inspection. Cached default images lacking these tools are rebuilt automatically.
+Files are read when requested by the prompt; they are not automatically converted.
 
 ## Manage worktrees created by the sandbox
 

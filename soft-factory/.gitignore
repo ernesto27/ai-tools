@@ -18,3 +18,4 @@ task.txt
 .agents/skills/test-risk-classification/
 .agents/skills/test-review-changes/
 .claude/skills/claude-review/
+*.pdf

@@ -1,5 +1,6 @@
 [] - option for verbose output in terminal, default true
 [x] - move prompt text to txt files
+[] - suuport to PDF files in documents
 [] - branch of task name should be set here
 [] - add assert test lib
 [] - check how review is made, if not found errors in first round should stop, not run 3

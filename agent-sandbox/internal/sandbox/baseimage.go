@@ -11,94 +11,24 @@ import (
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
-// baseSandboxDockerfile derives a runnable image for every registered agent
-// from a user-selected base without assuming anything about its name. The
-// package-manager check is deliberately inside the build: OCI image metadata
-// has no portable package-manager field, while the command that will install
-// the tools is the source of truth.
-const baseSandboxDockerfile = `ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
-
-USER 0
-RUN set -eu; \
-    if command -v apk >/dev/null 2>&1; then \
-        apk add --no-cache bash nodejs npm ripgrep ca-certificates curl git; \
-    elif command -v apt-get >/dev/null 2>&1; then \
-        apt-get update; \
-        apt-get install -y --no-install-recommends \
-            bash ca-certificates curl git gnupg ripgrep; \
-        mkdir -p /etc/apt/keyrings; \
-        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-            | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
-        echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
-            > /etc/apt/sources.list.d/nodesource.list; \
-        apt-get update; \
-        apt-get install -y --no-install-recommends nodejs; \
-        rm -rf /var/lib/apt/lists/*; \
-    elif command -v dnf >/dev/null 2>&1 \
-        || command -v microdnf >/dev/null 2>&1; then \
-        if command -v dnf >/dev/null 2>&1; then rpm_pm=dnf; \
-        else rpm_pm=microdnf; fi; \
-        "$rpm_pm" install -y bash ca-certificates curl git ripgrep; \
-        rpm_arch="$(uname -m)"; \
-        case "$rpm_arch" in \
-            x86_64|aarch64) ;; \
-            *) echo "unsupported RPM architecture: $rpm_arch" >&2; exit 1 ;; \
-        esac; \
-        mkdir -p /etc/yum.repos.d; \
-        printf '%s\n' \
-            '[nodesource-nodejs]' \
-            "name=Node.js Packages for Linux RPM based distros - $rpm_arch" \
-            "baseurl=https://rpm.nodesource.com/pub_22.x/nodistro/nodejs/$rpm_arch" \
-            'priority=9' \
-            'enabled=1' \
-            'gpgcheck=1' \
-            'gpgkey=https://rpm.nodesource.com/gpgkey/ns-operations-public.key' \
-            'module_hotfixes=1' \
-            > /etc/yum.repos.d/nodesource-nodejs.repo; \
-        "$rpm_pm" install -y nodejs; \
-        "$rpm_pm" clean all; \
-    else \
-        echo "unsupported base image: apk, apt-get, dnf, or microdnf is required" >&2; exit 1; \
-    fi
-RUN set -eu; \
-    printf '\n# Keep the base image toolchain available to login shells.\nPATH=%s\nexport PATH\n' "$PATH" >> /etc/profile
-
-ARG CODEX_VERSION=latest
-RUN npm install --global "@openai/codex@${CODEX_VERSION}"
-
-ARG CLAUDE_CODE_VERSION=latest
-RUN npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
-
-ARG OPENCODE_VERSION=latest
-RUN npm install --global "opencode-ai@${OPENCODE_VERSION}"
-
-ARG PI_VERSION=latest
-RUN npm install --global --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}"
-
-RUN mkdir -p /agent-sandbox-images
-
-WORKDIR /workspace
-CMD ["bash"]
-`
-
 const externalImagePrefix = "agent-sandbox-base-"
 
-// imageClient selects the embedded image for normal runs and a generated image
-// for an external base. The generated image gets a tag made from the complete
-// reference and the generated definition. Docker tag syntax therefore cannot
+// imageClient uses the same embedded Dockerfile for default and derived
+// images. A derived image gets a tag made from the complete base reference
+// and the shared definition. Docker tag syntax therefore cannot
 // be affected by registry slashes, ports, or arbitrary valid image-reference
 // punctuation, and a changed bootstrap definition cannot reuse an older image
 // that lacks its new runtime requirements.
 func imageClient(opts Options, options ...docker.Option) (*docker.Client, error) {
-	if opts.BaseImage == "" {
-		return docker.New(imageName, agentsandbox.Dockerfile, options...)
+	name := imageName
+	if opts.BaseImage != "" {
+		name = externalImageName(opts.BaseImage)
 	}
-	return docker.New(externalImageName(opts.BaseImage), baseSandboxDockerfile, options...)
+	return docker.New(name, agentsandbox.Dockerfile, options...)
 }
 
 func externalImageName(baseImage string) string {
-	digest := sha256.Sum256([]byte(baseImage + "\x00" + baseSandboxDockerfile))
+	digest := sha256.Sum256([]byte(baseImage + "\x00" + agentsandbox.Dockerfile))
 	return externalImagePrefix + hex.EncodeToString(digest[:])
 }
 

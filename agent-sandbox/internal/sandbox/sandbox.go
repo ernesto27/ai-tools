@@ -255,6 +255,7 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 
 	runOpts.Entrypoint = opts.Agent.Binary()
 	imagePaths := addImageMounts(&runOpts, opts)
+	addFileMounts(&runOpts, opts.Files)
 	if opts.APIKey != "" {
 		runOpts.Args = opts.Agent.(agent.APIKeyAgent).APIKeyArgs(opts.Model, opts.FullPrompt(), imagePaths)
 	} else {

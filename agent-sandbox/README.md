@@ -68,7 +68,7 @@ This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
 
@@ -77,6 +77,7 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `-b`, `--branch` | Optional. Branch for the separate worktree; generated if omitted. |
 | `-a`, `--agent` | Required. One of `codex`, `claude`, `opencode`, or `pi`. |
 | `-m`, `--model` | Optional. Overrides the model selected by the agent. |
+| `--effort` | Optional. Agent effort; defaults to `high`. Passed through without checking supported levels. |
 | `-i`, `--baseImage` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
 | `--hn` | Optional. Shares the host network with the container, without port restrictions. Disabled by default; see the risks under "Host networking". |
 | `-p`, `--push` | The agent creates the commit inside the container. If it finishes successfully and leaves the worktree clean, the host runs `git push --set-upstream origin <branch>` without creating a PR. |
@@ -99,9 +100,9 @@ The branch is the name shown by `worktree-list`. When combined with `--push`
 or `--pr`, the agent must commit its changes before ending the session.
 
 `run` and `resume` read `./agent-sandbox.json` if it exists in the directory
-where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `baseImage`,
+where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `effort`, `baseImage`,
 `push`, `pr`, `hn`, and `file` as values shared by both commands.
-Each section accepts the long option names `branch`, `agent`, `model`,
+Each section accepts the long option names `branch`, `agent`, `model`, `effort`,
 `baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
 `image` and `file` (arrays of paths), plus the `apiKey` field. For `file`, CLI values replace the section array, which replaces the root array; arrays are not combined, and a section’s empty array clears the root files. Explicit CLI image lists replace their section JSON lists. `apiKey` is available only in JSON: there is
 no equivalent command-line option. For each field, an explicit command-line
@@ -119,6 +120,7 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
   "branch": "fix-login",
   "agent": "codex",
   "model": "gpt-6.1-sol",
+  "effort": "high",
   "baseImage": "golang:1.26-alpine",
   "push": false,
   "pr": false,
@@ -268,6 +270,31 @@ When `--model` is omitted, Codex uses `gpt-6.1-sol` and Claude Code uses
 `claude-opus-5-5`. opencode and pi let their own configuration select the model.
 Values of `--model` are passed directly to the agent: for example, `gpt-5.6-sol`
 for Codex, `sonnet` for Claude Code, and `provider/model` for opencode or pi.
+
+### Effort
+
+All four agents default to `high`. Set `--effort` per invocation, or set the
+global `effort` string in `./agent-sandbox.json` for a shared default:
+
+```json
+{
+  "effort": "low"
+}
+```
+
+Precedence is explicit CLI flag, then the `run` or `resume` section, then the
+global JSON value, then `high`. Leading and trailing whitespace is trimmed;
+an empty or whitespace-only value resets effort to `high`.
+The same rules apply to `run-tui` and `resume-tui`.
+
+```bash
+agent-sandbox run -a codex --effort low -q "inspect this repository"
+```
+
+The value is passed to Codex's `model_reasoning_effort`, Claude's `--effort`,
+opencode's `--variant`, or pi's `--thinking`. Supported levels depend on the
+agent and model; the agent reports unsupported values and its exit status is
+propagated. The sandbox does not validate levels or modify host agent settings.
 
 ## Examples
 

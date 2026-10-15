@@ -24,6 +24,7 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-b`, `--branch` | Task branch. Generated for new tasks if omitted; required for resumes. |
 | `-a`, `--agent` | `codex`, `claude`, `opencode`, or `pi`; required unless supplied by JSON. |
 | `-m`, `--model` | Override the model selected for the agent. |
+| `--effort` | Agent effort. Defaults to `high`; the agent checks supported levels. |
 | `-q`, `--query` | Task instructions. |
 | `-f`, `--filePrompt` | Read task instructions from a file, instead of `-q`. |
 | `-i`, `--baseImage` | Build the sandbox image from a compatible external base. |

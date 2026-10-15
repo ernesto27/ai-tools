@@ -257,9 +257,9 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	imagePaths := addImageMounts(&runOpts, opts)
 	addFileMounts(&runOpts, opts.Files)
 	if opts.APIKey != "" {
-		runOpts.Args = opts.Agent.(agent.APIKeyAgent).APIKeyArgs(opts.Model, opts.FullPrompt(), imagePaths)
+		runOpts.Args = opts.Agent.(agent.APIKeyAgent).APIKeyArgs(opts.Model, opts.Effort, opts.FullPrompt(), imagePaths)
 	} else {
-		runOpts.Args = opts.Agent.Args(opts.Model, opts.FullPrompt(), imagePaths)
+		runOpts.Args = opts.Agent.Args(opts.Model, opts.Effort, opts.FullPrompt(), imagePaths)
 	}
 	runOpts.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	runOpts.Mounts = append(runOpts.Mounts, docker.Mount{Host: worktreeDir, Container: workspace})

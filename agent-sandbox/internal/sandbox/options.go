@@ -13,6 +13,9 @@ import (
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/utils"
 )
 
+// DefaultEffort preserves the existing effort level for every supported agent.
+const DefaultEffort = "high"
+
 // Options is one invocation of the sandbox.
 type Options struct {
 	Branch        string
@@ -20,6 +23,7 @@ type Options struct {
 	Agent         agent.Agent
 	APIKey        string
 	Model         string
+	Effort        string
 	BaseImage     string
 	Push          bool
 	PR            bool
@@ -38,7 +42,7 @@ type Options struct {
 }
 
 // NewOptions turns the values the command line carried into one invocation,
-// resolving the agent name and filling in the model the agent defaults to. The
+// resolving the agent name and filling in its model and effort defaults. The
 // command line itself is parsed by the caller; what is left here is the part
 // that needs to know the agents, which is why an unusable name comes back as a
 // UsageError rather than as a plain failure.
@@ -50,6 +54,12 @@ func NewOptions(opts Options) (Options, error) {
 	selected, err := agent.Lookup(opts.AgentName)
 	if err != nil {
 		return Options{}, UsageError{err}
+	}
+	// Normalize after merging so empty or whitespace-only overrides reset an
+	// inherited effort value to the shared default.
+	opts.Effort = strings.TrimSpace(opts.Effort)
+	if opts.Effort == "" {
+		opts.Effort = DefaultEffort
 	}
 	// An empty model is not an omission to report: it means the agent resolves
 	// the model itself, and DefaultModel says so by returning an empty string.

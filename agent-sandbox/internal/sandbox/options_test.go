@@ -11,6 +11,38 @@ import (
 	"testing"
 )
 
+func TestNewOptionsEffort(t *testing.T) {
+	for _, agentName := range AgentNames() {
+		for _, tc := range []struct {
+			name   string
+			effort string
+			want   string
+		}{
+			{name: "default", want: "high"},
+			{name: "whitespace only", effort: " \t\n ", want: "high"},
+			{name: "override", effort: "low", want: "low"},
+			{name: "trim", effort: " low ", want: "low"},
+			{name: "keep case", effort: " HIGH ", want: "HIGH"},
+			{name: "unknown", effort: "custom", want: "custom"},
+		} {
+			t.Run(agentName+"/"+tc.name, func(t *testing.T) {
+				got, err := NewOptions(Options{
+					AgentName: agentName,
+					Branch:    "feature",
+					Prompt:    "inspect",
+					Effort:    tc.effort,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got.Effort != tc.want {
+					t.Fatalf("effort = %q, want %q", got.Effort, tc.want)
+				}
+			})
+		}
+	}
+}
+
 func TestFullPromptCommitRules(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

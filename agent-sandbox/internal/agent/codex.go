@@ -56,20 +56,20 @@ func (codex) APIKeyContainer(key string) docker.RunOptions {
 
 // APIKeyArgs selects a provider that reads the key for this process from its
 // environment. The provider settings contain no secret and require no login.
-func (c codex) APIKeyArgs(model, prompt string, images []string) []string {
-	return codexArgs(model, prompt, images, true)
+func (c codex) APIKeyArgs(model, effort, prompt string, images []string) []string {
+	return codexArgs(model, effort, prompt, images, true)
 }
 
-func (codex) Args(model, prompt string, images []string) []string {
-	return codexArgs(model, prompt, images, false)
+func (codex) Args(model, effort, prompt string, images []string) []string {
+	return codexArgs(model, effort, prompt, images, false)
 }
 
-func codexArgs(model, prompt string, images []string, apiKey bool) []string {
+func codexArgs(model, effort, prompt string, images []string, apiKey bool) []string {
 	args := []string{"--dangerously-bypass-approvals-and-sandbox"}
 	if model != "" {
 		args = append(args, "--model", model)
 	}
-	args = append(args, "--config", `model_reasoning_effort="high"`)
+	args = append(args, "--config", `model_reasoning_effort="`+effort+`"`)
 	if apiKey {
 		args = append(args,
 			"--config", `model_provider="agent_sandbox_api"`,

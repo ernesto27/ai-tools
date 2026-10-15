@@ -39,8 +39,8 @@ func (p pi) Container(home string) (docker.RunOptions, error) {
 	}, nil
 }
 
-func (pi) Args(model, prompt string, _ []string) []string {
-	args := []string{"-p", "--thinking", "high"}
+func (pi) Args(model, effort, prompt string, _ []string) []string {
+	args := []string{"-p", "--thinking", effort}
 	if model != "" {
 		args = append(args, "--model", model)
 	}

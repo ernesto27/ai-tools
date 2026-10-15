@@ -66,6 +66,12 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 			flags.Model = *section.Model
 		}
 	}
+	if !cmd.Flags().Changed(flagEffort) {
+		flags.Effort = config.Effort
+		if section != nil && section.Effort != nil {
+			flags.Effort = *section.Effort
+		}
+	}
 
 	if !cmd.Flags().Changed(flagAgent) {
 		flags.AgentName = config.Agent
@@ -165,7 +171,7 @@ func readLocalConfig() (config.Config, error) {
 			}
 			continue
 		}
-		if name == flagBranch || name == flagModel || name == flagAgent || name == flagBaseImage {
+		if name == flagBranch || name == flagModel || name == flagEffort || name == flagAgent || name == flagBaseImage {
 			var field string
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 				return config.Config{}, fmt.Errorf("%s: %s must be a JSON string", localConfigFile, name)
@@ -239,7 +245,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", localConfigFile, fieldName, i)
 			}
 		}
-	case flagBranch, flagAgent, flagModel, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, configAPIKey:
+	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, configAPIKey:
 		var field string
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 			return fmt.Errorf("%s: %s must be a JSON string", localConfigFile, fieldName)

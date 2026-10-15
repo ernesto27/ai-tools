@@ -10,6 +10,7 @@ directories for it. Worktree management commands do not read this file.
 {
   "branch": "fix-go-tests",
   "agent": "codex",
+  "effort": "high",
   "baseImage": "golang:1.26-alpine",
   "push": false,
   "pr": false,
@@ -56,8 +57,8 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 | Location | Fields |
 | --- | --- |
-| Shared root | `branch`, `agent`, `model`, `baseImage`, `push`, `pr`, `hn` |
-| `run` and `resume` | `branch`, `agent`, `model`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `apiKey` |
+| Shared root | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn` |
+| `run` and `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `apiKey` |
 | `run` only | `reviewers` |
 
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
@@ -67,3 +68,20 @@ is being used.
 
 `apiKey` and `reviewers` are JSON-only fields. See [authentication](authentication.md)
 for keys and [publishing](publishing.md#request-reviewers) for reviewers.
+
+## Set effort globally
+
+Set the root-level `effort` string to share a default across all agents and
+all four execution commands:
+
+```json
+{
+  "effort": "low"
+}
+```
+
+An explicit `--effort` overrides a section's `effort`, which overrides the root
+value. Leading and trailing whitespace is trimmed. Omitted, empty, or
+whitespace-only effort resolves to `high`. Values are passed through without
+checking allowed levels. The agent
+reports unsupported values for its selected model.

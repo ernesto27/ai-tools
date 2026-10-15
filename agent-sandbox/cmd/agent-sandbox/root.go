@@ -19,6 +19,7 @@ type commandState struct {
 const (
 	flagAgent         = "agent"
 	flagModel         = "model"
+	flagEffort        = "effort"
 	flagBaseImage     = "baseImage"
 	flagPush          = "push"
 	flagPR            = "pr"
@@ -121,6 +122,7 @@ type runFlags struct {
 func (f *runFlags) bind(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.AgentName, flagAgent, "a", "", "agent to run ("+strings.Join(sandbox.AgentNames(), "|")+")")
 	cmd.Flags().StringVarP(&f.Model, flagModel, "m", "", "model to use (default: the agent's own)")
+	cmd.Flags().StringVar(&f.Effort, flagEffort, "", "agent effort (default: "+sandbox.DefaultEffort+"; supported values depend on the agent and model)")
 	cmd.Flags().StringVarP(&f.BaseImage, flagBaseImage, "i", "", "Alpine base image for the agent sandbox (for example golang:1.26-alpine)")
 	cmd.Flags().StringVarP(&f.Prompt, flagQuery, "q", "", "instruction for the agent")
 	cmd.Flags().BoolVarP(&f.Push, flagPush, "p", false, "commit the agent's work and push the branch")

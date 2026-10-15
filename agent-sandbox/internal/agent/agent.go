@@ -34,15 +34,16 @@ type Agent interface {
 	// Args is the agent's command line inside the container. images are absolute
 	// paths inside the container; agents that do not support initial image
 	// attachments ignore them. An empty model means the flag is left out so the
-	// agent picks its own.
-	Args(model, prompt string, images []string) []string
+	// agent picks its own. Effort is resolved by the caller and passed through
+	// without checking which levels the agent or model supports.
+	Args(model, effort, prompt string, images []string) []string
 }
 
 // APIKeyAgent is implemented by agents that can use a key for one container
 // run without relying on or changing credentials stored on the host.
 type APIKeyAgent interface {
 	APIKeyContainer(key string) docker.RunOptions
-	APIKeyArgs(model, prompt string, images []string) []string
+	APIKeyArgs(model, effort, prompt string, images []string) []string
 }
 
 // registry keeps the agents in the order they are offered on the command line.

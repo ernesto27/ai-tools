@@ -36,6 +36,12 @@ cmd/agent-sandbox -> config
   builds, throwaway probes (`Output`), and attached execution (`Run`).
 - [internal/agent](../internal/agent/agent.go) defines agent-specific commands,
   models, authentication, and container options. It depends on Docker option types.
+  Effort resolves in `sandbox.NewOptions` to the shared `sandbox.DefaultEffort`
+  constant (`high`) when empty, after CLI and JSON overrides are merged and
+  leading and trailing whitespace is trimmed.
+  `Args` and `APIKeyArgs` receive the resolved effort;
+  each adapter builds its own argument without validating allowed levels or
+  adding effort escaping.
 - [internal/github](../internal/github/github.go) wraps host-side GitHub CLI
   authentication and pull request operations, including creation-time reviewer
   requests and read-only confirmation after an ambiguous create failure.

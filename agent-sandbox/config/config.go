@@ -7,6 +7,7 @@ type Config struct {
 	Resume      *Section `json:"resume"`
 	Branch      string   `json:"branch"`
 	Model       string   `json:"model"`
+	Effort      string   `json:"effort"`
 	Agent       string   `json:"agent"`
 	BaseImage   string   `json:"baseImage"`
 	File        []string `json:"file"`
@@ -23,6 +24,7 @@ type Section struct {
 	Agent         *string   `json:"agent"`
 	APIKey        *string   `json:"apiKey"`
 	Model         *string   `json:"model"`
+	Effort        *string   `json:"effort"`
 	BaseImage     *string   `json:"baseImage"`
 	Query         *string   `json:"query"`
 	Push          *bool     `json:"push"`

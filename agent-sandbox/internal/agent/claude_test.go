@@ -19,11 +19,11 @@ func TestClaudeArgsStreamJSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, mode := range []struct {
 				name string
-				args func(string, string, []string) []string
+				args func(string, string, string, []string) []string
 			}{{"host login", claude{}.Args}, {"API key", claude{}.APIKeyArgs}} {
 				t.Run(mode.name, func(t *testing.T) {
 					want := append([]string{"--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", "bypassPermissions", "--effort", "high"}, tc.wantTail...)
-					if got := mode.args(tc.model, tc.prompt, tc.images); !reflect.DeepEqual(got, want) {
+					if got := mode.args(tc.model, "high", tc.prompt, tc.images); !reflect.DeepEqual(got, want) {
 						t.Fatalf("Args() = %q, want %q", got, want)
 					}
 				})

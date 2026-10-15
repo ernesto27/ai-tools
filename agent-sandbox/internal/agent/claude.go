@@ -61,16 +61,16 @@ func (claude) APIKeyContainer(key string) docker.RunOptions {
 	}
 }
 
-func (c claude) APIKeyArgs(model, prompt string, images []string) []string {
-	return c.Args(model, prompt, images)
+func (c claude) APIKeyArgs(model, effort, prompt string, images []string) []string {
+	return c.Args(model, effort, prompt, images)
 }
 
-func (claude) Args(model, prompt string, images []string) []string {
+func (claude) Args(model, effort, prompt string, images []string) []string {
 	// Streaming events expose tool activity and partial messages while Claude
 	// works, rather than leaving the terminal quiet until its final response.
 	args := []string{
 		"--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-		"--permission-mode", "bypassPermissions", "--effort", "high",
+		"--permission-mode", "bypassPermissions", "--effort", effort,
 	}
 	if model != "" {
 		args = append(args, "--model", model)

@@ -39,6 +39,20 @@ agent-sandbox run -a pi -q "inspect the test failures and fix their cause"
 use their own configuration when you omit it. Model availability depends on
 your provider account.
 
+## Choose effort
+
+All agents default to `high`. Override it for a single task:
+
+```bash
+agent-sandbox run -a codex --effort low -q "inspect this repository"
+```
+
+You can also set a shared `effort` in [JSON configuration](configuration.md#set-effort-globally).
+The value goes to Codex's `model_reasoning_effort`, Claude's `--effort`,
+opencode's `--variant`, or pi's `--thinking`. Supported values depend on the
+agent and model; unsupported values are reported by the agent with its normal
+exit status.
+
 ## Use the terminal UI
 
 Use `run-tui` or `resume-tui` for a terminal view with execution output and

@@ -47,17 +47,23 @@ A successful command exit does not guarantee every finding was resolved.
 ## A workflow failed or was interrupted
 
 Inspect the stage log and `summary.log` in the printed execution-log directory.
-Set `resume.branch` to that run's branch, then use `software-factory continue`
-to run implementation and subsequent enabled stages again, or
+Set `resume.branch` to that run's branch, then use
+`software-factory resume <path>` with the invocation directory to recover from
+the last saved stage. Keep the task in `run.filePrompt`, or pass `--jira` again
+for a Jira task. Recovery needs the original summary, stage status, and any
+earlier review evidence needed for risk classification.
+
+If those files are unavailable, use `software-factory continue` to run
+implementation and subsequent enabled stages in a new invocation, or
 `software-factory review` to run only reviews and risk classification.
-Keep the task in `run.filePrompt`, or pass `--jira` again for a Jira task.
-See [continuing work](workflow.md#continue-an-existing-task) and
+See [resuming a run](workflow.md#resume-a-failed-or-interrupted-run) and
 [execution logs](reports.md#execution-logs).
 
 ## The final walkthrough is missing
 
 The standalone `review` command does not run the walkthrough. Default and
 `continue` workflows warn if walkthrough generation or saving fails, keeping
-the result of earlier stages. Check whether `reviewChanges` is disabled,
+the result of earlier stages. During `resume`, a walkthrough failure returns
+an error so recovery can be retried. Check whether `reviewChanges` is disabled,
 then check terminal warnings and [reports](reports.md). If execution logging
 is unavailable, the workflow can proceed but cannot save the final walkthrough.

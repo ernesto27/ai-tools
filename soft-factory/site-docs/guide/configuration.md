@@ -184,7 +184,7 @@ model. When changing agents, ensure any inherited model is compatible with
 the new agent, or set both fields.
 
 The default workflow inherits `run` settings for implementation and `resume`
-settings for later stages. `continue` and `review` inherit `resume` settings.
+settings for later stages. `continue`, `review`, and `resume <path>` inherit `resume` settings.
 Soft Factory passes overrides as command-line arguments and leaves
 `agent-sandbox.json` unchanged. Branch, task, authentication, and other sandbox
 settings still come from the existing configuration.
@@ -192,12 +192,13 @@ settings still come from the existing configuration.
 ### `agent-sandbox.json`: defaults and task
 
 The default workflow uses `run` settings for implementation and `resume`
-settings for later stages. `continue` and `review` use `resume` settings.
+settings for later stages. `continue`, `review`, and `resume <path>` use
+`resume` settings.
 The [stage overrides](#stage-agents-and-models) take priority over agent and
 model defaults from this file.
 Soft Factory selects one branch for every stage: `run.branch` for the default
-workflow, or `resume.branch` for `review` and `continue`, overriding the branch
-in each Agent Sandbox invocation. Set both branches to the same value when
+workflow, or `resume.branch` for `review`, `continue`, and `resume <path>`.
+It overrides the branch in each Agent Sandbox invocation. Set both branches to the same value when
 you want to review or continue the task you just implemented.
 
 Soft Factory reads this file using agent-sandbox's shared configuration types.

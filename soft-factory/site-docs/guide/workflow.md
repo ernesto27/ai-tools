@@ -14,7 +14,10 @@ Choose agents and models independently for each stage with
 [`stages` in configuration](configuration.md#stage-agents-and-models).
 Omitted settings inherit the defaults from `agent-sandbox.json`.
 
-Each code or security review follows **review → corrections when needed → verification**, with up to three rounds. Failures before the final walkthrough stop the workflow. A walkthrough failure warns and does not change the exit status.
+Each code or security review follows **review → corrections when needed → verification**,
+with up to three rounds. Failures before the final walkthrough stop the
+workflow. A walkthrough failure warns and does not change the exit status
+for default and `continue` runs; during `resume`, it returns an error.
 
 ## Review existing changes
 
@@ -50,3 +53,39 @@ only reviews and risk classification, use `software-factory review` instead.
 Keep the original task in `run.filePrompt`, or supply `--jira` again when
 continuing a Jira task. Supporting documents and enabled stages still apply.
 See [configuration](configuration.md#disabling-stages) to skip selected stages.
+
+## Resume a failed or interrupted run
+
+To recover from the last saved stage, pass the invocation folder printed by
+that run:
+
+```bash
+software-factory resume logs/fix-login/run-2026-10-08_19-38-48.007046183
+```
+
+Run this from the original project directory, with `resume.branch` set to the
+sandbox branch used by that run. The path selects the logs; it does not restore
+the branch or configuration. Soft Factory reads the current configuration,
+supporting documents, and task from `run.filePrompt`. For a Jira task, pass
+`--jira` again:
+
+```bash
+software-factory resume logs/eng-123/run-2026-10-08_19-38-48.007046183 --jira 'https://your-company.atlassian.net/browse/ENG-123'
+```
+
+The last entry in `stage_status.txt` determines where recovery starts. A
+`SUCCEEDED` entry advances to the next stage; a `FAILED` or `INTERRUPTED`
+entry retries that stage. An empty status file starts at implementation.
+If the final walkthrough is already recorded as successful, the command
+returns without running stages. Current `disabledStages` settings still apply.
+
+Unlike `continue`, `resume` reuses the same invocation directory and appends
+to its stage logs and summary. Keep `summary.log`, `stage_status.txt`, and the
+archived `codeReview.txt` and `securityReview.txt` reports together. When earlier
+reviews are skipped during recovery, their archived evidence is restored for
+risk classification. Missing required evidence stops recovery.
+
+A missing status file prevents recovery, including for older log folders that
+predate it. Use `continue` to start a fresh invocation, or `review` to rerun
+only reviews and risk classification. See [reports](reports.md#execution-logs)
+for the saved files.

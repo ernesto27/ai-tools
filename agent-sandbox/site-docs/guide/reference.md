@@ -29,6 +29,7 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-f`, `--filePrompt` | Read task instructions from a file, instead of `-q`. |
 | `-i`, `--baseImage` | Build the sandbox image from a compatible external base. |
 | `--image` | Attach an image to Codex or Claude Code; repeat for multiple files. |
+| `--file` | Mount a regular file read-only for any agent; repeat for multiple files. See [reference files](environment.md#mount-reference-files). |
 | `-p`, `--push` | Ask the agent to commit, then push from the host. |
 | `--pr` | Commit and publish from the host. Initial runs create or reuse a PR; resumes require an open PR and append a session checklist. |
 | `-c`, `--commitMessage` | Exact commit message to use with `--push` or `--pr`. |

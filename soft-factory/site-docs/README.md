@@ -13,5 +13,7 @@ npm run docs:preview
 The production base is `/ai-tools/soft-factory/`. The shared workflow at
 `.github/workflows/agent-sandbox-docs.yml` builds both documentation sites,
 keeps Agent Sandbox at the Pages root, and adds Soft Factory at `soft-factory/`.
-A push to `master` affecting either site triggers deployment; pull requests
-build both sites without deploying. Generated files and dependencies are ignored.
+Pushing a stable `agent-sandbox-vMAJOR.MINOR.PATCH` tag deploys both sites from
+that tagged commit. Manual deployment from `master` is also available through
+**Actions → AI Tools Documentation → Run workflow**. Branch pushes and pull
+requests do not trigger this workflow. Generated files and dependencies are ignored.

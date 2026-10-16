@@ -2,16 +2,8 @@ name: AI Tools Documentation
 
 on:
   push:
-    branches: [master]
-    paths:
-      - agent-sandbox/site-docs/**
-      - soft-factory/site-docs/**
-      - .github/workflows/agent-sandbox-docs.yml
-  pull_request:
-    paths:
-      - agent-sandbox/site-docs/**
-      - soft-factory/site-docs/**
-      - .github/workflows/agent-sandbox-docs.yml
+    tags:
+      - 'agent-sandbox-v*'
   workflow_dispatch:
 
 permissions:
@@ -32,6 +24,12 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Validate release tag
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: '[[ "$RELEASE_TAG" =~ ^agent-sandbox-v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -57,16 +55,16 @@ jobs:
           cp -a agent-sandbox/site-docs/guide/.vitepress/dist/. _site/
           cp -a soft-factory/site-docs/guide/.vitepress/dist/. _site/soft-factory/
       - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
         uses: actions/configure-pages@v5
       - name: Upload website
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
         uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
     needs: build
     runs-on: ubuntu-latest
     permissions:

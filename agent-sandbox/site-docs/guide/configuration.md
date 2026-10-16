@@ -57,17 +57,37 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 | Location | Fields |
 | --- | --- |
-| Shared root | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn` |
-| `run` and `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `apiKey` |
+| Shared root | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn`, `file` |
+| `run` and `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `file`, `apiKey` |
 | `run` only | `reviewers` |
 
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
-of strings for `image` and `reviewers`. Unknown fields, `null`, and wrong
+of strings for `image`, `file`, and `reviewers`. Unknown fields, `null`, and wrong
 types are rejected. Both command sections are validated even when only one
 is being used.
 
 `apiKey` and `reviewers` are JSON-only fields. See [authentication](authentication.md)
 for keys and [publishing](publishing.md#request-reviewers) for reviewers.
+
+## Share reference files
+
+Use `file` to mount reference files for any agent:
+
+```json
+{
+  "file": ["/path/to/spec.pdf", "/path/to/sample.csv"],
+  "resume": {
+    "file": []
+  }
+}
+```
+
+An explicit CLI `--file` list replaces the section's array, which replaces
+the root array. Arrays are not combined; an empty section array clears the
+root files. CLI `--image` lists also replace their section arrays.
+Relative paths in either array resolve from the invocation directory.
+See [reference-file attachments](environment.md#mount-reference-files) for
+container paths and PDF tools.
 
 ## Set effort globally
 

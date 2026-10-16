@@ -83,6 +83,10 @@ is already published. Correct the reported problem and retry `resume --pr`.
 Reviewer requests apply to new PRs from `run`, so resolve missing reviewer
 requests separately on GitHub if creation partially succeeded.
 
+If the push succeeded but the PR description update failed, committed changes
+are already remote. The failed checklist is not saved or replayed on the next
+resume; recover the missing description text manually on GitHub.
+
 ## I cannot delete a worktree
 
 Run from your original repository, outside the worktree being removed. Wait

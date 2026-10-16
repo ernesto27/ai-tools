@@ -44,6 +44,9 @@ agent-sandbox run -b fix-login -a codex --pr \
 `--pr` includes the push; you do not need `--push`. The agent prepares the
 title and body during the same session, using the full branch comparison.
 A new PR is created ready for review, rather than as a draft.
+Publication requires a successful agent exit and a clean worktree. If there
+are no reviewable differences against the base, the initial run skips both
+the push and PR creation.
 
 If an open PR already exists for the same repository, head branch, and base,
 the tool prints its URL and preserves its title, body, and draft status.
@@ -57,6 +60,17 @@ agent-sandbox resume -b fix-login -a codex --pr \
 
 The original base is retained for later resumes. Detached starts and older
 records without a stored base cannot use `--pr`.
+
+`resume --pr` requires an existing open PR for the recorded head and base.
+After a successful agent exit with a clean worktree, it pushes and appends a
+checklist of this session's committed changes to the current PR description.
+Earlier text, the title, draft status, and reviewers are preserved. If the
+agent reports no net session changes, it pushes without editing the description.
+`resume-tui --pr` behaves the same way.
+
+If PR creation or a description update fails after pushing, the branch stays
+published and the command reports an error. Failed description updates are
+not saved or replayed on the next resume. See [publication recovery](troubleshooting.md#push-or-pr-creation-fails).
 
 ## Request reviewers
 

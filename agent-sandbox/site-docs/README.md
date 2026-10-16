@@ -49,13 +49,18 @@ The repository has one Pages site. This workflow publishes the guide at
 `https://ernesto27.github.io/ai-tools/`, using the repository's project URL.
 Check for an existing Pages site before enabling or replacing a deployment.
 
-1. Commit the documentation and `.github/workflows/agent-sandbox-docs.yml`,
-   then push or merge them into `master`.
+1. Commit the documentation and `.github/workflows/agent-sandbox-docs.yml`
+   before creating the release tag.
 2. In `ernesto27/ai-tools`, open **Settings → Pages → Build and deployment**
    and select **GitHub Actions** as the source.
-3. Open **Actions → Agent Sandbox Documentation → Run workflow**, choose
-   `master`, and run it if the initial push ran before Pages was enabled.
-4. Wait for `build` and `deploy` to succeed. The `github-pages` deployment
+3. In **Settings → Environments → github-pages → Deployment branches and tags**,
+   select **Selected branches and tags**. Keep a **Branch** rule for `master`
+   and add a **Tag** rule for `agent-sandbox-v*`. Branch rules do not allow
+   tags with the same name pattern; the tag rule must be added separately.
+4. Push a stable `agent-sandbox-vMAJOR.MINOR.PATCH` tag, or open
+   **Actions → AI Tools Documentation → Run workflow** and select `master`
+   for a manual deployment.
+5. Wait for `build` and `deploy` to succeed. The `github-pages` deployment
    environment reports the published URL.
 
 This uses GitHub's [custom Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).

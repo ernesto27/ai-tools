@@ -57,10 +57,10 @@ jobs:
           cp -a soft-factory/site-docs/guide/.vitepress/dist/. _site/soft-factory/
       - name: Configure GitHub Pages
         if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/agent-sandbox-v') || startsWith(github.ref, 'refs/tags/software-factory-v'))) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload website
         if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/agent-sandbox-v') || startsWith(github.ref, 'refs/tags/software-factory-v'))) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 

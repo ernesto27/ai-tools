@@ -24,8 +24,8 @@ cmd/agent-sandbox -> config
   [install.sh](../install.sh) with Bash to install the latest release, independently
   of sandbox execution and configuration.
 - [config](../config/config.go) exposes the public `Config` and `Section` JSON
-  types without dependencies. The CLI owns file loading, validation, reviewer
-  normalization, and flag merging.
+  types and a `DefaultModel` accessor backed by `internal/agent`. The CLI owns
+  file loading, validation, reviewer normalization, and flag merging.
 - [internal/sandbox](../internal/sandbox/sandbox.go) orchestrates image preparation,
   worktree creation or reuse, container execution, and publication.
   [Runtime](../internal/sandbox/runtime.go) routes output and execution events

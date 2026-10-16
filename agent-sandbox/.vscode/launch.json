@@ -18,6 +18,26 @@
 
   "configurations": [
     {
+      "name": "run: agent --folder",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/agent-sandbox",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "args": [
+        "run",
+        "--branch",
+        "${input:branch}",
+        "--agent",
+        "${input:agent}",
+        "--folder",
+        "${input:folder}",
+        "--query",
+        "List the files in the mounted reference folder and summarize what they contain. Do not modify any files."
+      ]
+    },
+    {
       // Reads the run defaults from agent-sandbox.json in the workspace root.
       "name": "run: agent-sandbox.json",
       "type": "go",
@@ -134,6 +154,12 @@
   ],
 
   "inputs": [
+    {
+      "id": "folder",
+      "type": "promptString",
+      "description": "Host folder to mount read-only (relative to the workspace or absolute)",
+      "default": "./docs"
+    },
     {
       "id": "branch",
       "type": "promptString",

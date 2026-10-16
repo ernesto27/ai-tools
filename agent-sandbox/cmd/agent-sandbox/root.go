@@ -30,6 +30,7 @@ const (
 	flagCommitMessage = "commitMessage"
 	flagImage         = "image"
 	flagFile          = "file"
+	flagFolder        = "folder"
 )
 
 func newRootCmd() (*cobra.Command, *commandState) {
@@ -131,6 +132,7 @@ func (f *runFlags) bind(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.FilePrompt, flagFilePrompt, "f", "", "path to a file containing the agent prompt")
 	cmd.Flags().StringArrayVar(&f.Images, flagImage, nil, "image to attach to the initial Codex prompt (repeatable)")
 	cmd.Flags().StringArrayVar(&f.Files, flagFile, nil, "file to mount read-only for the agent (repeatable)")
+	cmd.Flags().StringArrayVar(&f.Folders, flagFolder, nil, "folders to mount read-only for the agent")
 	cmd.Flags().BoolVar(&f.HostNetwork, flagHostNetwork, false, "access to host services from container")
 
 	completeFlag(cmd, flagAgent, func(string) ([]string, error) {

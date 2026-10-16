@@ -33,6 +33,7 @@ type Options struct {
 	FilePrompt    string
 	Images        []string
 	Files         []string
+	Folders       []string
 	HostNetwork   bool
 
 	// prBase is a fetched remote snapshot supplied by execution, not a CLI option.
@@ -81,11 +82,17 @@ func NewOptions(opts Options) (Options, error) {
 		opts.Images = images
 	}
 
-	files, err := resolveAttachmentPaths(opts.Files, "--file")
+	files, err := resolveAttachmentPaths(opts.Files, "--file", false)
 	if err != nil {
 		return Options{}, err
 	}
 	opts.Files = files
+
+	folders, err := resolveAttachmentPaths(opts.Folders, "--folder", true)
+	if err != nil {
+		return Options{}, err
+	}
+	opts.Folders = folders
 
 	if opts.Branch == "" {
 		randomBranch, err := generateBranchName()
@@ -111,10 +118,10 @@ func NewOptions(opts Options) (Options, error) {
 // client-side path, and rejecting unusable files before worktree creation
 // avoids leaving an otherwise successful sandbox run without its attachments.
 func resolveImagePaths(images []string) ([]string, error) {
-	return resolveAttachmentPaths(images, "--image")
+	return resolveAttachmentPaths(images, "--image", false)
 }
 
-func resolveAttachmentPaths(files []string, flag string) ([]string, error) {
+func resolveAttachmentPaths(files []string, flag string, directory bool) ([]string, error) {
 	resolved := make([]string, 0, len(files))
 	for _, file := range files {
 		if file == "" {
@@ -126,7 +133,11 @@ func resolveAttachmentPaths(files []string, flag string) ([]string, error) {
 		}
 
 		info, err := os.Stat(path)
-		if err != nil || !info.Mode().IsRegular() {
+		if directory {
+			if err != nil || !info.IsDir() {
+				return nil, usageErrorf("%s %q must be an existing directory", flag, file)
+			}
+		} else if err != nil || !info.Mode().IsRegular() {
 			return nil, usageErrorf("%s %q must be an existing regular file", flag, file)
 		}
 		resolved = append(resolved, path)
@@ -144,7 +155,8 @@ func AgentNames() []string {
 // FullPrompt is the prompt handed to the agent: the user's instruction plus the
 // house rules for a sandbox run.
 func (o Options) FullPrompt() string {
-	o.Prompt += fileAttachmentManifest(o.Files)
+	o.Prompt += fileAttachments.manifest(o.Files)
+	o.Prompt += folderAttachments.manifest(o.Folders)
 	if o.PR || o.Push {
 		message := "Choose one short commit message based on the actual changes."
 		if o.CommitMessage != "" {

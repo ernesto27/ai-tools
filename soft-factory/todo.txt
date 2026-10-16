@@ -1,8 +1,18 @@
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
 [] - add assert test lib
-[] - in summary model appears empty, prbabli happens when use default value
+[x] - in summary model appears empty, prbabli happens when use default value
+[] - in summary risk-classification show status
+4. RISK CLASSIFICATION
+   Status:    SUCCEEDED
+   Agent:     codex
+   Model:     gpt-6.1-sol
+   Duration:  53 sec
+   Changes:   No code changes made.
+
+
 [] - posibilty to use a folder as input promt
+
 [] - eponce@HP250G10-06262:~/code/tenaris-telecom-audit-poc$ software-factory
 Execution logs: logs/PTADF-49-update-cantidad-lineas-gasto/run-2026-10-15_19-32-21.003616448
 Starting implementation...
@@ -10,6 +20,7 @@ error: checking origin GitHub repository: gh repo view: exit status 1: GraphQL: 
 Warning: locate stage change summary: sandbox worktree for branch "PTADF-49-update-cantidad-lineas-gasto" not found in Git worktree list
 Error: execute agent-sandbox: exit status 1
 eponce@HP250G10-06262:~/code/tenaris-telecom-audit-poc$ agent-sandbox worktree-list
+
 [] - check how review is made, if not found errors in first round should stop, not run 3
 [] - review only analysize code changes, not readme or docs
 [] - config file should not be required, now return an error

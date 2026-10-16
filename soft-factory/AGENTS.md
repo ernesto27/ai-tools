@@ -29,6 +29,8 @@ Workflow commands require `agent-sandbox` on `PATH` and local configuration.
 
 Follow idiomatic Go and use `gofmt` tab indentation. Keep package names lowercase, exported identifiers in PascalCase, and unexported identifiers in camelCase. Place reusable logic under `internal/`; keep CLI orchestration in `cmd/factory`. Return contextual errors and wrap underlying errors with `%w`.
 
+Use unnamed return types and explicit values in return statements. Avoid named return parameters and bare returns.
+
 ## Testing Guidelines
 
 No tests or coverage threshold currently exist. Add standard-library `testing` tests beside the relevant source as `*_test.go`, with functions named `TestXxx`. Prefer table-driven cases for configuration validation and document-path handling. Use temporary files and controlled subprocess fixtures when testing filesystem or execution behavior. Run `go test ./...` and `go vet ./...` before submitting code changes.

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	sandboxconfig "github.com/ernesto27/ai-tools/agent-sandbox/config"
+
 	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
 	"soft-factory/internal/prompts"
@@ -456,11 +458,11 @@ func execute(options ExecuteOptions) (string, error) {
 // selectionDetails reads only supported selection fields. Provider means the
 // selected sandbox agent, not its underlying API backend. Do not copy the
 // configuration into logs: it may also contain API keys. Selection contains
-// plain configured names: stage overrides, then run/resume, then shared fields.
-func selectionDetails(section string, stage config.Stage, override config.StageConfig) (selection config.StageConfig, agent, model, provider string) {
-	agent = "unavailable (no configured selection)"
-	model = "unavailable (no configured model)"
-	provider = "unavailable (no configured agent)"
+// plain names: stage overrides, then run/resume, then shared fields and defaults.
+func selectionDetails(section string, stage config.Stage, override config.StageConfig) (config.StageConfig, string, string, string) {
+	agent := "unavailable (no configured selection)"
+	model := "unavailable (no configured model)"
+	provider := "unavailable (no configured agent)"
 	var agentValue, modelValue string
 	agentSource, modelSource := "agent-sandbox.json: agent", "agent-sandbox.json: model"
 	if settings, err := config.LoadSandbox(); err == nil {
@@ -485,15 +487,18 @@ func selectionDetails(section string, stage config.Stage, override config.StageC
 	if override.Model != "" {
 		modelValue, modelSource = override.Model, stageSource+".model"
 	}
-	selection = config.StageConfig{Agent: agentValue, Model: modelValue}
 	if agentValue != "" {
 		agent = agentValue + " (configured: " + agentSource + ")"
 		provider = agentValue + " (" + agentSource + ")"
 	}
 	if modelValue != "" {
 		model = modelValue + " (configured: " + modelSource + ")"
+	} else if defaultModel, err := sandboxconfig.DefaultModel(agentValue); err == nil {
+		modelValue = defaultModel
+		model = defaultModel
 	}
-	return
+	selection := config.StageConfig{Agent: agentValue, Model: modelValue}
+	return selection, agent, model, provider
 }
 
 func saveReport(name string, content []byte) (string, error) {

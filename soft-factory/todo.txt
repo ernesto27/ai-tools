@@ -1,8 +1,8 @@
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
 [] - add assert test lib
-[x] - in summary model appears empty, prbabli happens when use default value
 [] - in summary risk-classification show status
+[] - get some eveidence
 4. RISK CLASSIFICATION
    Status:    SUCCEEDED
    Agent:     codex
@@ -28,6 +28,7 @@ eponce@HP250G10-06262:~/code/tenaris-telecom-audit-poc$ agent-sandbox worktree-l
 [] - do not commit review-changes.md
 [] - think how to send more changes to current finish branch
 [] - integration with GitHub Issues to get task content from an issue URL
+[x] - in summary model appears empty, prbabli happens when use default value
 [x] - suuport to PDF files in documents
 [x] - i want to be able to config specific model, agent in every stage
 [x] - move prompt text to txt files

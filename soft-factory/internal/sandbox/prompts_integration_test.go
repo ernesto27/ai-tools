@@ -55,7 +55,11 @@ func TestPromptSandboxHelper(t *testing.T) {
 	}
 	// Emulate agent-authored reports in the host worktree, never /workspace itself.
 	for _, path := range regexp.MustCompile(`/workspace/\.soft-factory-[A-Za-z0-9._-]+`).FindAllString(capture.Prompt, -1) {
-		if err := os.WriteFile(filepath.Base(path), []byte("No code changes made.\n"), 0600); err != nil {
+		content := "No code changes made.\n"
+		if strings.HasPrefix(filepath.Base(path), ".soft-factory-risk-result-") && strings.HasSuffix(path, ".json") {
+			content = `{"classification":"LOW"}`
+		}
+		if err := os.WriteFile(filepath.Base(path), []byte(content), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -208,6 +212,7 @@ func TestStagePromptIntegration(t *testing.T) {
 						additional = frozen("custom-skill.txt", map[string]string{"Name": project.Name, "Scope": scope, "Content": project.Content})
 					}
 					want := task
+					got := capture.Prompt
 					switch stage {
 					case "code-review", "security-review":
 						want = frozen("review.txt", map[string]string{"Skill": bundledSkills[stage], "AdditionalSkill": additional, "Task": task})
@@ -230,15 +235,28 @@ func TestStagePromptIntegration(t *testing.T) {
 							t.Fatalf("archive = %q, %v", report, err)
 						}
 					}
-					if logged && stage != "review-changes" {
+					if logged && stage == "risk-classification" {
+						path := regexp.MustCompile(`/workspace/\.soft-factory-risk-result-[A-Za-z0-9]+\.json`).FindString(capture.Prompt)
+						if path == "" {
+							t.Fatal("missing structured risk result path")
+						}
+						if !strings.HasPrefix(capture.Prompt, want) {
+							t.Fatal("risk prompt missing assessment instructions")
+						}
+						resultInstructions := strings.TrimPrefix(capture.Prompt, want)
+						if !strings.Contains(resultInstructions, path) || !strings.Contains(resultInstructions, `{"classification":"LOW"}`) {
+							t.Fatal("risk prompt missing structured result contract")
+						}
+						got = strings.TrimSuffix(capture.Prompt, resultInstructions)
+					} else if logged && stage != "review-changes" {
 						path := regexp.MustCompile(`/workspace/\.soft-factory-stage-changes-[A-Za-z0-9]+\.txt`).FindString(capture.Prompt)
 						if path == "" {
 							t.Fatal("missing stage summary path")
 						}
 						want += frozen("stage-changes.txt", map[string]string{"ReportPath": path})
 					}
-					if capture.Prompt != want {
-						t.Fatalf("assembled prompt differs:\ngot %q\nwant %q", capture.Prompt, want)
+					if got != want {
+						t.Fatalf("assembled prompt differs:\ngot %q\nwant %q", got, want)
 					}
 					mode := "resume"
 					if stage == "implementation" {

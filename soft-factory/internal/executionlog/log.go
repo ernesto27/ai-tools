@@ -51,6 +51,7 @@ type Run struct {
 	summary           *os.File
 	summaryEntries    int
 	changeSummaryPath string
+	riskResultPath    string
 	stageAgent        string
 	stageModel        string
 	path              string
@@ -141,7 +142,7 @@ func IgnoreStageReports() error {
 	if err != nil {
 		return fmt.Errorf("open Git exclude file: %w", err)
 	}
-	_, writeErr := fmt.Fprintln(file, "\n.soft-factory-stage-changes-*.txt\n.soft-factory-review-changes-*.md")
+	_, writeErr := fmt.Fprintln(file, "\n.soft-factory-stage-changes-*.txt\n.soft-factory-review-changes-*.md\n.soft-factory-risk-result-*.json")
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return fmt.Errorf("write Git exclude rule: %w", err)
 	}
@@ -220,6 +221,7 @@ func (r *Run) StartStage(stage config.Stage) {
 	}
 	r.attempts[stage]++
 	r.changeSummaryPath = ""
+	r.riskResultPath = ""
 	r.stageAgent, r.stageModel = "", ""
 	filename := fmt.Sprintf("%02d-%s.log", index, stage)
 	if r.attempts[stage] > 1 && !r.resuming {
@@ -543,6 +545,33 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		stageHeading(stage),
 		status, r.stageAgent, r.stageModel, formatDuration(elapsed),
 	)
+	var line string
+	var cleanup func()
+	switch stage {
+	case config.StageRiskClassification:
+		line, cleanup = r.riskResultLocked()
+	case config.StageReviewChanges:
+		// The walkthrough has no additional summary field.
+	default:
+		line, cleanup = r.changeSummaryLocked()
+	}
+	entry += line
+	if stageErr != nil {
+		message := strings.ReplaceAll(stageErr.Error(), "\r\n", "\n")
+		entry += "   Error:     " + strings.ReplaceAll(message, "\n", "\n              ") + "\n"
+	}
+	if _, err := io.WriteString(r.summary, entry+"\n"); err != nil {
+		return fmt.Errorf("write stage summary: %w", err)
+	}
+	r.summaryEntries++
+	r.stageAgent, r.stageModel = "", ""
+	if cleanup != nil {
+		cleanup()
+	}
+	return nil
+}
+
+func (r *Run) changeSummaryLocked() (string, func()) {
 	changes := "Change summary unavailable."
 	readReport := false
 	if r.changeSummaryPath != "" {
@@ -554,33 +583,28 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 			var data []byte
 			data, err = os.ReadFile(r.changeSummaryPath)
 			if err == nil {
+				readReport = true
 				if text := strings.TrimSpace(strings.ReplaceAll(string(data), "\r\n", "\n")); text != "" {
 					changes = text
 				}
-				readReport = true
 			}
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: read stage change summary: %v\n", err)
 		}
 	}
-	entry += "   Changes:   " + strings.ReplaceAll(changes, "\n", "\n              ") + "\n"
-	if stageErr != nil {
-		message := strings.ReplaceAll(stageErr.Error(), "\r\n", "\n")
-		entry += "   Error:     " + strings.ReplaceAll(message, "\n", "\n              ") + "\n"
+	line := "   Changes:   " + strings.ReplaceAll(changes, "\n", "\n              ") + "\n"
+	if !readReport {
+		return line, nil
 	}
-	if _, err := io.WriteString(r.summary, entry+"\n"); err != nil {
-		return fmt.Errorf("write stage summary: %w", err)
+	return line, r.removeChangeSummaryLocked
+}
+
+func (r *Run) removeChangeSummaryLocked() {
+	if err := os.Remove(r.changeSummaryPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: remove stage change summary: %v\n", err)
 	}
-	r.summaryEntries++
-	r.stageAgent, r.stageModel = "", ""
-	if readReport {
-		if err := os.Remove(r.changeSummaryPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: remove stage change summary: %v\n", err)
-		}
-		r.changeSummaryPath = ""
-	}
-	return nil
+	r.changeSummaryPath = ""
 }
 
 // RecordSkippedStage notes a disabled stage in the summary without numbering

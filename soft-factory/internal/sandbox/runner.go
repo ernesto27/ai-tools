@@ -32,6 +32,7 @@ type ExecuteOptions struct {
 	Context           context.Context
 	Log               *executionlog.Run
 	ChangeSummaryFile string
+	RiskResultFile    string
 }
 
 // ProjectSkill holds a project skill loaded during workflow setup.
@@ -187,6 +188,11 @@ func ReviewChanges(input TaskContext) error {
 	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
 
 	args = appendStageArgs(args, input.Config.Stages.ReviewChanges)
+	// The walkthrough keeps subprocess output live-only, so record its
+	// configured selection before executing without a stream logger.
+	selection, agent, model, provider := selectionDetails(args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges)
+	input.Log.Selection(selection.Agent, selection.Model)
+	input.Log.Details(agent, model, provider)
 
 	_, err = execute(ExecuteOptions{
 		Stage:       config.StageReviewChanges,
@@ -426,6 +432,9 @@ func execute(options ExecuteOptions) (string, error) {
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}
+	if options.Log != nil && options.RiskResultFile != "" {
+		options.Log.RegisterRiskResult(ctx, options.Branch, options.RiskResultFile)
+	}
 	if ctx.Err() != nil {
 		runErr = errors.Join(runErr, ctx.Err())
 	}
@@ -637,7 +646,7 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 		return err
 	}
 
-	prompt, changesFilename, err := input.Log.StageChangesPrompt(prompt)
+	prompt, resultFilename, err := input.Log.RiskResultPrompt(prompt)
 	if err != nil {
 		return err
 	}
@@ -651,14 +660,14 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 	args = appendStageArgs(args, input.Config.Stages.RiskClassification)
 
 	options := ExecuteOptions{
-		Stage:             config.StageRiskClassification,
-		StageConfig:       input.Config.Stages.RiskClassification,
-		Args:              args,
-		Branch:            input.Branch,
-		Prompt:            prompt,
-		Context:           input.Context,
-		Log:               input.Log,
-		ChangeSummaryFile: changesFilename,
+		Stage:          config.StageRiskClassification,
+		StageConfig:    input.Config.Stages.RiskClassification,
+		Args:           args,
+		Branch:         input.Branch,
+		Prompt:         prompt,
+		Context:        input.Context,
+		Log:            input.Log,
+		RiskResultFile: resultFilename,
 	}
 	if input.Log == nil {
 		options.ReportName = string(config.StageRiskClassification)

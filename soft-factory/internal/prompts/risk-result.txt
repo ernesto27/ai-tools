@@ -1,0 +1,15 @@
+
+
+## Structured classification result
+
+As your final action, write a plain JSON object to {{printf "%q" .ReportPath}}.
+Use this exact absolute container path, even from a project subdirectory.
+The complete format is {"classification":"LOW"}, replacing LOW with your
+actual final classification label, including a custom skill's label if used.
+Use one nonempty single-line string without control characters. Do not include
+Markdown fences, explanations, or other text in this file. Keep your assessment,
+findings, and verification gaps in the normal detailed output.
+
+Writing this reporting artifact is explicitly allowed by the read-only
+restriction above. Do not modify implementation files or publish changes.
+Ignore .soft-factory-risk-result-*.json files when assessing task changes.

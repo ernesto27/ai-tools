@@ -154,3 +154,54 @@ func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
 		t.Fatalf("expected custom skill validation error for disabled stage, got %v", err)
 	}
 }
+
+func TestUnifiedSandboxConfiguration(t *testing.T) {
+	for _, tt := range []struct {
+		name, input string
+		wantErr     bool
+	}{
+		{"shared and section pointers", `{"documents":["support.md"],"customSkills":{"codeReview":"project"},"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent","model":"stage-model"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
+		{"absent", `{"documents":[]}`, false},
+		{"null", `{"agentSandbox":null}`, false},
+		{"unknown fields are not sandbox JSON validation", `{"agentSandbox":{"unknown":true}}`, false},
+		{"bad JSON", `{"agentSandbox":`, true},
+		{"bad shared type", `{"agentSandbox":{"push":"false"}}`, true},
+		{"bad section type", `{"agentSandbox":{"resume":{"file":false}}}`, true},
+		{"bad Factory property", `{"agentSandbox":{"agent":"anything"},"documents":[""]}`, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(tt.input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			// A legacy file is never a configuration input, even if unified settings are absent.
+			if err := os.WriteFile("agent-sandbox.json", []byte(`not JSON`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load("software-factory.json")
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("load error = %v", err)
+			}
+			if tt.name == "shared and section pointers" {
+				if cfg.AgentSandbox.Agent != "invalid-agent" || cfg.AgentSandbox.Model != "invalid-model" || cfg.AgentSandbox.Resume.Push == nil || *cfg.AgentSandbox.Resume.Push || cfg.AgentSandbox.Resume.Branch == nil || *cfg.AgentSandbox.Resume.Branch != "" || cfg.AgentSandbox.Resume.File == nil || len(*cfg.AgentSandbox.Resume.File) != 0 || cfg.Stages.Implementation.Agent != "stage-agent" || !cfg.SandboxFieldPresent("push") {
+					t.Fatalf("lost unified settings: section pointers or Factory fields")
+				}
+			}
+			if tt.name == "absent" || tt.name == "null" {
+				if cfg.AgentSandbox.Run != nil || cfg.AgentSandbox.Agent != "" {
+					t.Fatal("legacy settings used")
+				}
+			}
+		})
+	}
+}
+
+func TestLegacyOnlyDoesNotSupplyFactoryConfig(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("agent-sandbox.json", []byte(`{}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load("software-factory.json"); err == nil {
+		t.Fatal("legacy-only project unexpectedly loaded")
+	}
+}

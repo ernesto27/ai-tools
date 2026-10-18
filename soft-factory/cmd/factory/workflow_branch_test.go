@@ -1,8 +1,10 @@
 package main
 
 import (
-	"os"
+	"encoding/json"
 	"testing"
+
+	"soft-factory/internal/config"
 )
 
 func TestWorkflowBranch(t *testing.T) {
@@ -25,16 +27,40 @@ func TestWorkflowBranch(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("agent-sandbox.json", []byte(tt.settings), 0600); err != nil {
-				t.Fatal(err)
-			}
-			got, err := workflowBranch(tt.opts)
+			var cfg config.Config
+			err := json.Unmarshal([]byte(`{"agentSandbox":`+tt.settings+`}`), &cfg)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("decode error = %v", err)
 			}
+			if err != nil {
+				return
+			}
+			got, _ := workflowBranch(cfg, tt.opts)
 			if got != tt.want {
 				t.Fatalf("branch = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWorkflowBranchPresence(t *testing.T) {
+	for _, tc := range []struct {
+		settings string
+		wantSet  bool
+	}{
+		{`null`, false}, {`{}`, false}, {`{"branch":""}`, true}, {`{"run":{"branch":""}}`, true},
+	} {
+		var cfg config.Config
+		if err := json.Unmarshal([]byte(`{"agentSandbox":`+tc.settings+`}`), &cfg); err != nil {
+			t.Fatal(err)
+		}
+		branch, set := workflowBranch(cfg, workflowOptions{Implement: true})
+		if branch != "" || set != tc.wantSet {
+			t.Fatalf("branch presence for %s = %q, %t", tc.settings, branch, set)
+		}
+		branch, set = workflowBranch(cfg, workflowOptions{Implement: true, Branch: "explicit"})
+		if branch != "explicit" || !set {
+			t.Fatal("explicit branch override lost")
+		}
 	}
 }

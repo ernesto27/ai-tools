@@ -9,9 +9,17 @@ use `docker info` to verify Docker daemon access.
 
 ## Configuration cannot be loaded
 
-Run from the project folder containing `software-factory.json` and
-`agent-sandbox.json`. Rename older `config.json` files and use the
+Run from the project root containing `software-factory.json`. Use the
 [documented camelCase properties](configuration.md).
+
+The unified format is a breaking change: manually nest the old sandbox object
+under `agentSandbox`, then move `agent-sandbox.json` away. Any entry at the old
+path blocks execution, even a malformed file, directory, or dangling symlink.
+Factory never reads or changes it and never falls back to it. Do not recreate
+it during a run. Settings travel through CLI flags; no sandbox configuration
+JSON is generated. `apiKey` and `reviewers` in either section are temporarily
+ignored. Authenticate the agent on the host. Agent Sandbox reports sandbox
+validation failures; see [migration](configuration.md#breaking-change-migrate-the-sandbox-configuration).
 
 ## The sandbox branch cannot be found
 

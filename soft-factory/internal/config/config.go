@@ -13,9 +13,11 @@ import (
 )
 
 type Config struct {
-	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
-	CustomSkills CustomSkills       `json:"customSkills"`
+	AgentSandbox  sandboxconfig.Config `json:"agentSandbox"`
+	sandboxFields map[string]bool
+	Documents     []string           `json:"documents"`
+	GoogleDrive   *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills  CustomSkills       `json:"customSkills"`
 	// DisabledStages lists stages that must not execute. Load parses it
 	// separately so type errors can name the offending entry.
 	DisabledStages []Stage      `json:"-"`
@@ -72,17 +74,32 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// LoadSandbox decodes the shared types; agent-sandbox owns configuration validation.
-func LoadSandbox() (sandboxconfig.Config, error) {
-	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
+// SandboxFieldPresent preserves shared zero values without mirroring the upstream schema.
+func (c Config) SandboxFieldPresent(name string) bool {
+	return c.sandboxFields[name]
+}
+
+// UnmarshalJSON keeps only shared field presence alongside the upstream values.
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type plain Config
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
 	}
-	var cfg sandboxconfig.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
+	var presence struct {
+		AgentSandbox map[string]json.RawMessage `json:"agentSandbox"`
 	}
-	return cfg, nil
+	if err := json.Unmarshal(data, &presence); err != nil {
+		return err
+	}
+	decoded.sandboxFields = make(map[string]bool, len(presence.AgentSandbox))
+	for name, value := range presence.AgentSandbox {
+		if string(value) != "null" {
+			decoded.sandboxFields[name] = true
+		}
+	}
+	*c = Config(decoded)
+	return nil
 }
 
 func Load(path string) (Config, error) {

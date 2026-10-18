@@ -14,6 +14,7 @@ func newResumeCmd(run func(workflowOptions) error) *cobra.Command {
 	return &cobra.Command{
 		Use:   "resume <path>",
 		Short: "Resume an interrupted workflow from its run log folder",
+		Long:  "Resume an interrupted workflow using current software-factory.json agentSandbox.resume settings.\nThe local task comes from agentSandbox.run.filePrompt. Manually migrate and move\nlegacy agent-sandbox.json away before execution. Settings travel through CLI flags;\nno sandbox configuration JSON is generated. Section apiKey and reviewers are ignored.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := executionlog.RunPath(args[0])

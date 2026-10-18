@@ -245,6 +245,13 @@ key and use host authentication, including its required configuration mounts.
 Nonempty keys are supported only for Codex and Claude Code; other agents report
 a usage error. Keys enter the container environment with a disposable home;
 they are not added to prompts, worktree records, help, or transcript output.
+A `--apiKey` value is part of the host process arguments for the whole run, so
+other local users and processes can read it from the process list (for example
+`ps`), and a literal value may be saved in shell history. Referencing an
+environment variable avoids the history entry but not the process list; on
+shared hosts, prefer the JSON `apiKey` shown below, and keep `agent-sandbox.json`
+readable only by you (for example, `chmod 600 agent-sandbox.json`) and out of
+Git (for example, listed in `.gitignore`).
 
 ```bash
 agent-sandbox run -a codex --apiKey "$OPENAI_API_KEY" -q "inspect this repository"

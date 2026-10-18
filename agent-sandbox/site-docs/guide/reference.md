@@ -45,7 +45,12 @@ Exactly one prompt source must be supplied through flags or JSON.
 Flags override [configuration](configuration.md), including explicit empty values.
 Use camelCase `--apiKey`; `--api-key` is unsupported. Keys use the existing
 [authentication modes](authentication.md) and are not added to prompts, worktree
-records, help, or transcripts. Reviewer usernames are trimmed, validated, and
+records, help, or transcripts. A `--apiKey` value is visible to other local
+users and processes through the process list for the whole run, and a literal
+value may be saved in shell history; on shared hosts, prefer the section's JSON
+`apiKey`, and keep `agent-sandbox.json` readable only by you (for example,
+`chmod 600 agent-sandbox.json`) and out of Git (for example, listed in
+`.gitignore`). Reviewer usernames are trimmed, validated, and
 deduplicated case-insensitively; comma lists and mixed empty entries are usage
 errors. See [reviewer rules](publishing.md#request-reviewers).
 

@@ -40,6 +40,16 @@ to clear a configured key and select host authentication with the required
 configuration mounts above. Use the exact camelCase name; `--api-key` is rejected.
 Nonempty keys for opencode or pi produce a usage error.
 
+A key passed on the command line is part of the `agent-sandbox` process
+arguments for the whole run, so other local users and processes can read it
+from the process list (for example `ps` or `/proc/<pid>/cmdline`). A key typed
+literally may also be saved in shell history; referencing an environment
+variable such as `"$OPENAI_API_KEY"` avoids that, but the expanded value is
+still visible in the process list. On shared hosts, prefer the JSON `apiKey`
+below, and keep `agent-sandbox.json` readable only by you (for example,
+`chmod 600 agent-sandbox.json`) and out of Git (for example, listed in
+`.gitignore`).
+
 Alternatively, create `agent-sandbox.json` in the invocation directory.
 For Codex:
 

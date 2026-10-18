@@ -69,8 +69,11 @@ is being used, including when CLI flags override invalid values.
 All four execution commands accept `--apiKey <key>` and repeatable
 `--reviewers <username>`, without shorthands. The API key flag replaces the
 selected section's key; `--apiKey=""` selects host authentication and its required
-mounts. Nonempty keys are supported only for Codex and Claude Code. See
-[authentication](authentication.md).
+mounts. Nonempty keys are supported only for Codex and Claude Code. Flag values
+are visible in the host process list, so on shared hosts prefer the JSON
+`apiKey`, and keep `agent-sandbox.json` readable only by you (for example,
+`chmod 600 agent-sandbox.json`) and out of Git (for example, listed in
+`.gitignore`). See [authentication](authentication.md).
 
 On `run` and `run-tui`, CLI reviewers replace the JSON list entirely; omitted
 flags use `run.reviewers`. `--reviewers=""` alone clears it. Other empty or

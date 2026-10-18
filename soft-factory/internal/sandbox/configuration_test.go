@@ -36,9 +36,9 @@ func TestSandboxArgumentTransport(t *testing.T) {
 		branch           string
 		branchSet        bool
 	}{
-		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run","reviewers":["secret-reviewer"]}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--pr=false", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
+		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run","reviewers":["secret-reviewer"]}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
 		{name: "resume explicit zeros replace shared", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"shared","branch":"shared","push":true,"pr":true,"hn":true,"file":["shared"],"resume":{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false,"file":[],"image":[],"query":"","filePrompt":"","commitMessage":"","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false", "--query", "", "--filePrompt", "", "--commitMessage", ""}},
-		{name: "explicit shared zeros", settings: `{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false}`, invocation: []string{"run"}, want: []string{"run", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false"}},
+		{name: "shared zeros use sandbox defaults", settings: `{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false}`, invocation: []string{"run"}, want: []string{"run"}},
 		{name: "workflow controls and independent agent override", settings: `{"agent":"shared","model":"shared-model","branch":"shared","push":true,"pr":true,"resume":{"agent":"section","model":"section-model","branch":"section","query":"ignored","filePrompt":"ignored","file":["replacement"]}}`, invocation: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage"}, branch: "workflow", want: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage", "--model", "section-model", "--branch", "workflow", "--file", "replacement"}},
 		{name: "independent model override", settings: `{"agent":"shared","resume":{"agent":"section","model":"old"}}`, invocation: []string{"resume", "-m", "stage-model"}, want: []string{"resume", "-m", "stage-model", "--agent", "section"}},
 		{name: "empty workflow branch overrides resume", settings: `{"resume":{"branch":"other"}}`, invocation: []string{"resume"}, branchSet: true, want: []string{"resume", "--branch", ""}},
@@ -79,55 +79,6 @@ func assertNoConfigArtifacts(t *testing.T) {
 		if strings.Contains(entry.Name(), "agent-sandbox.json") {
 			t.Fatalf("unexpected configuration artifact: %s", entry.Name())
 		}
-	}
-}
-
-func TestLegacyEntriesPreventExecution(t *testing.T) {
-	for _, kind := range []string{"valid", "malformed", "conflicting", "symlink", "directory", "fifo"} {
-		t.Run(kind, func(t *testing.T) {
-			capture := preparePromptSandbox(t)
-			content := []byte(`{"agent":"legacy","apiKey":"never disclose"}`)
-			switch kind {
-			case "symlink":
-				if err := os.Symlink("missing-target", "agent-sandbox.json"); err != nil {
-					t.Fatal(err)
-				}
-			case "directory":
-				if err := os.Mkdir("agent-sandbox.json", 0700); err != nil {
-					t.Fatal(err)
-				}
-			case "fifo":
-				createLegacyFIFO(t)
-			default:
-				if kind == "malformed" {
-					content = []byte(`{malformed secret`)
-				}
-				if err := os.WriteFile("agent-sandbox.json", content, 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			before, err := os.Lstat("agent-sandbox.json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = execute(ExecuteOptions{Config: decodeConfig(t, `{"agent":"embedded"}`), Args: []string{"run"}})
-			if err == nil || !strings.Contains(err.Error(), "migrate") || !strings.Contains(err.Error(), "software-factory.json: agentSandbox") || strings.Contains(err.Error(), "secret") {
-				t.Fatalf("error = %v", err)
-			}
-			if _, err := os.Stat(capture); !os.IsNotExist(err) {
-				t.Fatalf("child launched: %v", err)
-			}
-			after, err := os.Lstat("agent-sandbox.json")
-			if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() || before.Size() != after.Size() || before.ModTime() != after.ModTime() {
-				t.Fatalf("legacy entry changed: %v", err)
-			}
-			if kind == "valid" || kind == "malformed" || kind == "conflicting" {
-				data, err := os.ReadFile("agent-sandbox.json")
-				if err != nil || string(data) != string(content) {
-					t.Fatal("legacy content changed")
-				}
-			}
-		})
 	}
 }
 
@@ -216,22 +167,6 @@ func TestExecutionFailureAndCancellation(t *testing.T) {
 
 			assertNoConfigArtifacts(t)
 		})
-	}
-}
-
-func TestLegacyInspectionError(t *testing.T) {
-	root := t.TempDir()
-	t.Chdir(root)
-	if err := os.Chmod(root, 0000); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chmod(root, 0700)
-	err := requireNoLegacyConfig()
-	if err == nil {
-		t.Skip("process can inspect directories without search permission")
-	}
-	if !errors.Is(err, os.ErrPermission) || !strings.Contains(err.Error(), "inspect legacy agent-sandbox.json") {
-		t.Fatalf("inspection error = %v", err)
 	}
 }
 

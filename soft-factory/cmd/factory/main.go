@@ -237,7 +237,7 @@ func workflowBranch(cfg config.Config, opts workflowOptions) (string, bool) {
 	if section != nil && section.Branch != nil {
 		return *section.Branch, true
 	}
-	return settings.Branch, cfg.SandboxFieldPresent("branch") || settings.Branch != ""
+	return settings.Branch, settings.Branch != ""
 }
 
 // plannedStages lists enabled stage identifiers in pipeline order.

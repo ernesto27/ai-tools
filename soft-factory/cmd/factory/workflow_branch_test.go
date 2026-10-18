@@ -48,7 +48,7 @@ func TestWorkflowBranchPresence(t *testing.T) {
 		settings string
 		wantSet  bool
 	}{
-		{`null`, false}, {`{}`, false}, {`{"branch":""}`, true}, {`{"run":{"branch":""}}`, true},
+		{`null`, false}, {`{}`, false}, {`{"branch":""}`, false}, {`{"run":{"branch":""}}`, true},
 	} {
 		var cfg config.Config
 		if err := json.Unmarshal([]byte(`{"agentSandbox":`+tc.settings+`}`), &cfg); err != nil {

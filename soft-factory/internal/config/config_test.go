@@ -17,20 +17,20 @@ func TestLoadGoogleDrive(t *testing.T) {
 		want    *GoogleDriveConfig
 		wantErr string
 	}{
-		{name: "omitted", data: `{}`},
-		{name: "empty block", data: `{"googleDrive":{}}`, wantErr: "at least one folder or file"},
-		{name: "empty arrays", data: `{"googleDrive":{"folders":[],"files":[]}}`, wantErr: "at least one folder or file"},
-		{name: "folders only", data: `{"googleDrive":{"folders":["test1"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}}},
-		{name: "files only", data: `{"googleDrive":{"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Files: []string{documentURL}}},
-		{name: "files with empty folders", data: `{"googleDrive":{"folders":[],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{}, Files: []string{documentURL}}},
-		{name: "both", data: `{"googleDrive":{"folders":["test1"],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}, Files: []string{documentURL}}},
-		{name: "blank folder with valid file", data: `{"googleDrive":{"folders":[" "],"files":["` + documentURL + `"]}}`, wantErr: "googleDrive.folders[0]"},
-		{name: "blank file", data: `{"googleDrive":{"files":[" "]}}`, wantErr: "googleDrive.files[0]"},
-		{name: "malformed URL", data: `{"googleDrive":{"files":["https://docs.google.com/document/d/%zz"]}}`, wantErr: "googleDrive.files[0]"},
-		{name: "wrong host", data: `{"googleDrive":{"files":["https://example.com/document/d/abc123/edit"]}}`, wantErr: "googleDrive.files[0]"},
-		{name: "missing ID", data: `{"googleDrive":{"files":["https://docs.google.com/document/d//edit"]}}`, wantErr: "googleDrive.files[0]"},
-		{name: "invalid file with folders", data: `{"googleDrive":{"folders":["test1"],"files":["not-a-url"]}}`, wantErr: "googleDrive.files[0]"},
-		{name: "invalid second file", data: `{"googleDrive":{"files":["` + documentURL + `","not-a-url"]}}`, wantErr: "googleDrive.files[1]"},
+		{name: "omitted", data: `{"agentSandbox":{}}`},
+		{name: "empty block", data: `{"agentSandbox":{},"googleDrive":{}}`, wantErr: "at least one folder or file"},
+		{name: "empty arrays", data: `{"agentSandbox":{},"googleDrive":{"folders":[],"files":[]}}`, wantErr: "at least one folder or file"},
+		{name: "folders only", data: `{"agentSandbox":{},"googleDrive":{"folders":["test1"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}}},
+		{name: "files only", data: `{"agentSandbox":{},"googleDrive":{"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Files: []string{documentURL}}},
+		{name: "files with empty folders", data: `{"agentSandbox":{},"googleDrive":{"folders":[],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{}, Files: []string{documentURL}}},
+		{name: "both", data: `{"agentSandbox":{},"googleDrive":{"folders":["test1"],"files":["` + documentURL + `"]}}`, want: &GoogleDriveConfig{Folders: []string{"test1"}, Files: []string{documentURL}}},
+		{name: "blank folder with valid file", data: `{"agentSandbox":{},"googleDrive":{"folders":[" "],"files":["` + documentURL + `"]}}`, wantErr: "googleDrive.folders[0]"},
+		{name: "blank file", data: `{"agentSandbox":{},"googleDrive":{"files":[" "]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "malformed URL", data: `{"agentSandbox":{},"googleDrive":{"files":["https://docs.google.com/document/d/%zz"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "wrong host", data: `{"agentSandbox":{},"googleDrive":{"files":["https://example.com/document/d/abc123/edit"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "missing ID", data: `{"agentSandbox":{},"googleDrive":{"files":["https://docs.google.com/document/d//edit"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "invalid file with folders", data: `{"agentSandbox":{},"googleDrive":{"folders":["test1"],"files":["not-a-url"]}}`, wantErr: "googleDrive.files[0]"},
+		{name: "invalid second file", data: `{"agentSandbox":{},"googleDrive":{"files":["` + documentURL + `","not-a-url"]}}`, wantErr: "googleDrive.files[1]"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -60,7 +60,7 @@ func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
 			t.Run(stage+"/"+name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
 				// Marshal names to preserve backslashes in JSON.
-				data, err := json.Marshal(map[string]any{"customSkills": map[string]string{stage: name}})
+				data, err := json.Marshal(map[string]any{"agentSandbox": map[string]any{}, "customSkills": map[string]string{stage: name}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -84,35 +84,35 @@ func TestLoadDisabledStages(t *testing.T) {
 		want    []Stage
 		wantErr string
 	}{
-		{name: "omitted", data: `{}`},
-		{name: "empty", data: `{"disabledStages":[]}`, want: []Stage{}},
-		{name: "implementation", data: `{"disabledStages":["implementation"]}`, want: []Stage{StageImplementation}},
-		{name: "codeReview", data: `{"disabledStages":["codeReview"]}`, want: []Stage{StageCodeReview}},
-		{name: "securityReview", data: `{"disabledStages":["securityReview"]}`, want: []Stage{StageSecurityReview}},
-		{name: "riskClassification", data: `{"disabledStages":["riskClassification"]}`, want: []Stage{StageRiskClassification}},
-		{name: "reviewChanges", data: `{"disabledStages":["reviewChanges"]}`, want: []Stage{StageReviewChanges}},
+		{name: "omitted", data: `{"agentSandbox":{}}`},
+		{name: "empty", data: `{"agentSandbox":{},"disabledStages":[]}`, want: []Stage{}},
+		{name: "implementation", data: `{"agentSandbox":{},"disabledStages":["implementation"]}`, want: []Stage{StageImplementation}},
+		{name: "codeReview", data: `{"agentSandbox":{},"disabledStages":["codeReview"]}`, want: []Stage{StageCodeReview}},
+		{name: "securityReview", data: `{"agentSandbox":{},"disabledStages":["securityReview"]}`, want: []Stage{StageSecurityReview}},
+		{name: "riskClassification", data: `{"agentSandbox":{},"disabledStages":["riskClassification"]}`, want: []Stage{StageRiskClassification}},
+		{name: "reviewChanges", data: `{"agentSandbox":{},"disabledStages":["reviewChanges"]}`, want: []Stage{StageReviewChanges}},
 		{
 			name: "all",
-			data: `{"disabledStages":["reviewChanges","riskClassification","securityReview","codeReview","implementation"]}`,
+			data: `{"agentSandbox":{},"disabledStages":["reviewChanges","riskClassification","securityReview","codeReview","implementation"]}`,
 			want: []Stage{StageReviewChanges, StageRiskClassification, StageSecurityReview, StageCodeReview, StageImplementation},
 		},
-		{name: "duplicates", data: `{"disabledStages":["codeReview","codeReview"]}`, want: []Stage{StageCodeReview, StageCodeReview}},
-		{name: "malformed JSON", data: `{"disabledStages":["codeReview"`, wantErr: "parse factory configuration"},
-		{name: "null", data: `{"disabledStages":null}`, wantErr: "disabledStages must be an array"},
-		{name: "string", data: `{"disabledStages":"codeReview"}`, wantErr: "disabledStages must be an array"},
-		{name: "number", data: `{"disabledStages":1}`, wantErr: "disabledStages must be an array"},
-		{name: "boolean", data: `{"disabledStages":true}`, wantErr: "disabledStages must be an array"},
-		{name: "object", data: `{"disabledStages":{"codeReview":true}}`, wantErr: "disabledStages must be an array"},
-		{name: "null entry", data: `{"disabledStages":["codeReview",null]}`, wantErr: "disabledStages[1] must be a string"},
-		{name: "number entry", data: `{"disabledStages":[1]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "array entry", data: `{"disabledStages":[["codeReview"]]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "object entry", data: `{"disabledStages":[{}]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "blank", data: `{"disabledStages":[""]}`, wantErr: `disabledStages[0]: unknown stage ""; ` + allowed},
-		{name: "whitespace", data: `{"disabledStages":[" "]}`, wantErr: `disabledStages[0]: unknown stage " "`},
-		{name: "padded", data: `{"disabledStages":[" codeReview"]}`, wantErr: `disabledStages[0]: unknown stage " codeReview"`},
-		{name: "case mismatch", data: `{"disabledStages":["CodeReview"]}`, wantErr: `disabledStages[0]: unknown stage "CodeReview"`},
-		{name: "kebab-case", data: `{"disabledStages":["security-review"]}`, wantErr: `disabledStages[0]: unknown stage "security-review"`},
-		{name: "unknown after valid", data: `{"disabledStages":["codeReview","securityReveiw"]}`, wantErr: `disabledStages[1]: unknown stage "securityReveiw"; ` + allowed},
+		{name: "duplicates", data: `{"agentSandbox":{},"disabledStages":["codeReview","codeReview"]}`, want: []Stage{StageCodeReview, StageCodeReview}},
+		{name: "malformed JSON", data: `{"agentSandbox":{},"disabledStages":["codeReview"`, wantErr: "parse factory configuration"},
+		{name: "null", data: `{"agentSandbox":{},"disabledStages":null}`, wantErr: "disabledStages must be an array"},
+		{name: "string", data: `{"agentSandbox":{},"disabledStages":"codeReview"}`, wantErr: "disabledStages must be an array"},
+		{name: "number", data: `{"agentSandbox":{},"disabledStages":1}`, wantErr: "disabledStages must be an array"},
+		{name: "boolean", data: `{"agentSandbox":{},"disabledStages":true}`, wantErr: "disabledStages must be an array"},
+		{name: "object", data: `{"agentSandbox":{},"disabledStages":{"codeReview":true}}`, wantErr: "disabledStages must be an array"},
+		{name: "null entry", data: `{"agentSandbox":{},"disabledStages":["codeReview",null]}`, wantErr: "disabledStages[1] must be a string"},
+		{name: "number entry", data: `{"agentSandbox":{},"disabledStages":[1]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "array entry", data: `{"agentSandbox":{},"disabledStages":[["codeReview"]]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "object entry", data: `{"agentSandbox":{},"disabledStages":[{}]}`, wantErr: "disabledStages[0] must be a string"},
+		{name: "blank", data: `{"agentSandbox":{},"disabledStages":[""]}`, wantErr: `disabledStages[0]: unknown stage ""; ` + allowed},
+		{name: "whitespace", data: `{"agentSandbox":{},"disabledStages":[" "]}`, wantErr: `disabledStages[0]: unknown stage " "`},
+		{name: "padded", data: `{"agentSandbox":{},"disabledStages":[" codeReview"]}`, wantErr: `disabledStages[0]: unknown stage " codeReview"`},
+		{name: "case mismatch", data: `{"agentSandbox":{},"disabledStages":["CodeReview"]}`, wantErr: `disabledStages[0]: unknown stage "CodeReview"`},
+		{name: "kebab-case", data: `{"agentSandbox":{},"disabledStages":["security-review"]}`, wantErr: `disabledStages[0]: unknown stage "security-review"`},
+		{name: "unknown after valid", data: `{"agentSandbox":{},"disabledStages":["codeReview","securityReveiw"]}`, wantErr: `disabledStages[1]: unknown stage "securityReveiw"; ` + allowed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -146,7 +146,7 @@ func TestLoadDisabledStages(t *testing.T) {
 
 func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
 	t.Chdir(t.TempDir())
-	data := `{"customSkills":{"codeReview":"../escape"},"disabledStages":["codeReview"]}`
+	data := `{"agentSandbox":{},"customSkills":{"codeReview":"../escape"},"disabledStages":["codeReview"]}`
 	if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -161,8 +161,9 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 		wantErr     bool
 	}{
 		{"shared and section pointers", `{"documents":["support.md"],"customSkills":{"codeReview":"project"},"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent","model":"stage-model"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
-		{"absent", `{"documents":[]}`, false},
+		{"absent", `{"documents":[]}`, true},
 		{"null", `{"agentSandbox":null}`, false},
+		{"empty", `{"agentSandbox":{}}`, false},
 		{"unknown fields are not sandbox JSON validation", `{"agentSandbox":{"unknown":true}}`, false},
 		{"bad JSON", `{"agentSandbox":`, true},
 		{"bad shared type", `{"agentSandbox":{"push":"false"}}`, true},
@@ -174,22 +175,21 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 			if err := os.WriteFile("software-factory.json", []byte(tt.input), 0600); err != nil {
 				t.Fatal(err)
 			}
-			// A legacy file is never a configuration input, even if unified settings are absent.
-			if err := os.WriteFile("agent-sandbox.json", []byte(`not JSON`), 0600); err != nil {
-				t.Fatal(err)
-			}
 			cfg, err := Load("software-factory.json")
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("load error = %v", err)
 			}
+			if tt.name == "absent" && !strings.Contains(err.Error(), "agentSandbox is required") {
+				t.Fatalf("missing property error = %v", err)
+			}
 			if tt.name == "shared and section pointers" {
-				if cfg.AgentSandbox.Agent != "invalid-agent" || cfg.AgentSandbox.Model != "invalid-model" || cfg.AgentSandbox.Resume.Push == nil || *cfg.AgentSandbox.Resume.Push || cfg.AgentSandbox.Resume.Branch == nil || *cfg.AgentSandbox.Resume.Branch != "" || cfg.AgentSandbox.Resume.File == nil || len(*cfg.AgentSandbox.Resume.File) != 0 || cfg.Stages.Implementation.Agent != "stage-agent" || !cfg.SandboxFieldPresent("push") {
+				if cfg.AgentSandbox.Agent != "invalid-agent" || cfg.AgentSandbox.Model != "invalid-model" || cfg.AgentSandbox.Resume.Push == nil || *cfg.AgentSandbox.Resume.Push || cfg.AgentSandbox.Resume.Branch == nil || *cfg.AgentSandbox.Resume.Branch != "" || cfg.AgentSandbox.Resume.File == nil || len(*cfg.AgentSandbox.Resume.File) != 0 || cfg.Stages.Implementation.Agent != "stage-agent" {
 					t.Fatalf("lost unified settings: section pointers or Factory fields")
 				}
 			}
-			if tt.name == "absent" || tt.name == "null" {
+			if tt.name == "null" {
 				if cfg.AgentSandbox.Run != nil || cfg.AgentSandbox.Agent != "" {
-					t.Fatal("legacy settings used")
+					t.Fatal("null sandbox settings should be empty")
 				}
 			}
 		})

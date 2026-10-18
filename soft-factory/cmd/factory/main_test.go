@@ -12,7 +12,7 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			t.Setenv("PATH", t.TempDir())
-			data := `{"customSkills":{"` + stage + `":"missing"}}`
+			data := `{"agentSandbox":{},"customSkills":{"` + stage + `":"missing"}}`
 			if err := os.WriteFile(factoryConfigFile, []byte(data), 0644); err != nil {
 				t.Fatal(err)
 			}

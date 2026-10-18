@@ -397,10 +397,7 @@ func execute(options ExecuteOptions) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := requireNoLegacyConfig(); err != nil {
-		return "", err
-	}
-	options.Args = sandboxArgs(options.Config, options.Args, options.Branch, options.BranchSet)
+	options.Args = sandboxArgs(options)
 	cmd := exec.CommandContext(ctx, "agent-sandbox", options.Args...)
 	// Let the sandbox stop its container on interruption before forcing exit.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }

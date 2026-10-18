@@ -21,7 +21,7 @@ All property names use lower camelCase, including nested properties. These are a
 
 | Option | Purpose |
 | --- | --- |
-| `agentSandbox` | Embedded Agent Sandbox shared fields and `run`/`resume` sections; see migration and transport details below. |
+| `agentSandbox` | Embedded Agent Sandbox shared fields and `run`/`resume` sections; see transport details below. |
 | `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
 | `googleDrive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
 | `googleDrive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
@@ -144,32 +144,22 @@ worktree must already exist, and the final walkthrough still runs unless
 document checks still run when every stage is disabled; the command then
 succeeds without starting an agent.
 
-### Breaking change: migrate the sandbox configuration
+### Sandbox settings transport
 
-Factory no longer reads `agent-sandbox.json`: there is no fallback, merge, or
-automatic migration. Manually move the old JSON object into the top-level
-`agentSandbox` property of `software-factory.json`, preserving `documents`,
-`customSkills`, `disabledStages`, `stages`, and other existing Factory settings.
-Then manually move the old file away before running Factory. Factory never
-modifies, renames, or deletes it; any entry at that path (including a directory
-or symlink) prevents sandbox execution without its contents being read.
-
-The unmodified binary always discovers that filename and has no skip-config
-flag. Do not create `agent-sandbox.json` during a Factory run. Factory passes
-supported settings as flags and creates no sandbox configuration JSON files.
-It keeps the project root as the subprocess working directory, so relative
-task, image, and mounted-file paths keep their existing meaning. `--filePrompt`
-selects a task prompt, not a configuration file; no `--config` flag is added.
-Temporary task prompts and stage reports continue to work as before.
+Factory passes supported `agentSandbox` settings as CLI flags and creates no
+sandbox configuration JSON files. It keeps the project root as the subprocess
+working directory, so relative task, image, and mounted-file paths resolve
+from the project root. `--filePrompt` selects a task prompt, not a
+configuration file; no `--config` flag is added.
 
 Section `apiKey` and `reviewers` are temporarily ignored, even when nonempty.
 They are never sent through flags, environment variables, or files, or logged.
 Continue using Agent Sandbox's existing host authentication.
-If `agentSandbox` is omitted or null, Factory supplies no sandbox settings and
-Agent Sandbox applies defaults and command requirements. A missing local task
-path may still cause a contextual Factory file-read error. The original local
-task always comes from `agentSandbox.run.filePrompt`, including continuation,
-standalone review, and recovery, unless `--jira` supplies it.
+`agentSandbox` is required. If it is `null` or `{}`, Factory supplies no sandbox
+settings and Agent Sandbox applies defaults and command requirements. A missing
+local task path may still cause a contextual Factory file-read error. The
+original local task always comes from `agentSandbox.run.filePrompt`, including
+continuation, standalone review, and recovery, unless `--jira` supplies it.
 
 ### `agentSandbox`: agent and task
 
@@ -308,8 +298,7 @@ The repository-root GitHub workflows run tests, vet, formatting checks, and a CL
 
 1. Write your task in `task.txt`.
 2. Create `software-factory.json` using the unified local-task example above.
-3. If migrating, move the old `agent-sandbox.json` entry away manually.
-4. Start the workflow:
+3. Start the workflow:
 
    ```bash
    go run ./cmd/factory

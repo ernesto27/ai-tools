@@ -36,11 +36,9 @@ Create `software-factory.json`:
 }
 ```
 
-This single-file format is a breaking change: manually nest the old sandbox
-JSON object under `agentSandbox`, then move `agent-sandbox.json` away. Any entry
-at that path blocks execution. Factory uses CLI flags and creates no sandbox
+Factory passes `agentSandbox` settings as CLI flags and creates no sandbox
 configuration JSON. Section `apiKey` and `reviewers` are temporarily ignored;
-use host authentication. See [migration details](configuration.md#breaking-change-migrate-the-sandbox-configuration).
+use host authentication. See [transport details](configuration.md#sandbox-settings-transport).
 
 Use the same branch in both sections. Choose a new branch for each new task.
 See [configuration](configuration.md) for agent options and supporting documents.

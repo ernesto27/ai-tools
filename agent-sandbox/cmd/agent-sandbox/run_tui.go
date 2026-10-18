@@ -42,7 +42,7 @@ func newLiveCommand(state *commandState, mode string) *cobra.Command {
 		Use:   use,
 		Short: short,
 		Long: lead +
-			fmt.Sprintf("Uses the same flags and agent-sandbox.json %s defaults as %s.\n", mode, mode) +
+			fmt.Sprintf("Uses the same flags and %s defaults as %s, including --config input.\n", mode, mode) +
 			"Requires terminal input and output. Tab changes focus; arrows and PgUp/PgDn\n" +
 			"scroll; q or Ctrl+C cancels and waits for cleanup. The view closes when\n" +
 			"execution and any requested publication finish.",

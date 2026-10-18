@@ -9,15 +9,16 @@ use `docker info` to verify Docker daemon access.
 
 ## Configuration cannot be loaded
 
-Run from the project folder containing `software-factory.json` and
-`agent-sandbox.json`. Rename older `config.json` files and use the
+Run from the project root containing `software-factory.json`. Breaking change:
+manually move the object from `agent-sandbox.json` into `agentSandbox` in that file;
+the old file is ignored. Rename older `config.json` files and use the
 [documented camelCase properties](configuration.md).
 
 ## The sandbox branch cannot be found
 
-For `review` or `continue`, set `resume.branch` to an existing sandbox branch.
+For `review` or `continue`, set `agentSandbox.resume.branch` to an existing sandbox branch.
 Use `agent-sandbox worktree-list` to list them. In the default workflow,
-disabling implementation still requires the `run.branch` worktree to exist.
+disabling implementation still requires the `agentSandbox.run.branch` worktree to exist.
 
 ## A custom skill cannot be found
 
@@ -47,9 +48,9 @@ A successful command exit does not guarantee every finding was resolved.
 ## A workflow failed or was interrupted
 
 Inspect the stage log and `summary.log` in the printed execution-log directory.
-Set `resume.branch` to that run's branch, then use
+Set `agentSandbox.resume.branch` to that run's branch, then use
 `software-factory resume <path>` with the invocation directory to recover from
-the last saved stage. Keep the task in `run.filePrompt`, or pass `--jira` again
+the last saved stage. Keep the task in `agentSandbox.run.filePrompt`, or pass `--jira` again
 for a Jira task. Recovery needs the original summary, stage status, and any
 earlier review evidence needed for risk classification.
 

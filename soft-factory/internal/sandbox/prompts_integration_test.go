@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
@@ -17,8 +18,12 @@ import (
 )
 
 type promptCapture struct {
-	Args   []string
-	Prompt string
+	Config     json.RawMessage
+	ConfigPath string
+	ConfigMode uint32
+	WorkingDir string
+	Args       []string
+	Prompt     string
 }
 
 // A controlled subprocess receives the same -f file as a real sandbox.
@@ -34,6 +39,25 @@ func TestPromptSandboxHelper(t *testing.T) {
 		}
 	}
 	capture := promptCapture{Args: args}
+	capture.WorkingDir, _ = os.Getwd()
+	for i, arg := range args {
+		if arg == "--config" && i+1 < len(args) {
+			capture.ConfigPath = args[i+1]
+			data, err := os.ReadFile(capture.ConfigPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			capture.Config = data
+			info, err := os.Stat(capture.ConfigPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			capture.ConfigMode = uint32(info.Mode().Perm())
+		}
+	}
+	if capture.ConfigPath == "" {
+		t.Fatal("no explicit configuration handoff")
+	}
 	for i, arg := range args {
 		if arg == "-f" && i+1 < len(args) {
 			text, err := os.ReadFile(args[i+1])
@@ -49,6 +73,9 @@ func TestPromptSandboxHelper(t *testing.T) {
 	}
 	if err := os.WriteFile(os.Getenv("SOFT_FACTORY_CAPTURE"), data, 0600); err != nil {
 		t.Fatal(err)
+	}
+	if os.Getenv("SOFT_FACTORY_PROMPT_WAIT") == "1" {
+		time.Sleep(30 * time.Second)
 	}
 	if os.Getenv("SOFT_FACTORY_PROMPT_FAIL") == "1" {
 		os.Exit(17)
@@ -85,7 +112,7 @@ func preparePromptSandbox(t *testing.T) string {
 	if err := os.WriteFile("task.txt", []byte("file task {{literal}} 100%"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("agent-sandbox.json", []byte(`{"run":{"branch":"main","filePrompt":"task.txt"},"resume":{"branch":"main"}}`), 0600); err != nil {
+	if err := os.WriteFile("software-factory.json", []byte(`{"agentSandbox":{"run":{"branch":"main","filePrompt":"task.txt"},"resume":{"branch":"main"}}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	bin := filepath.Join(root, "bin")
@@ -117,6 +144,12 @@ func readPromptCapture(t *testing.T, path string) promptCapture {
 	var capture promptCapture
 	if err := json.Unmarshal(data, &capture); err != nil {
 		t.Fatal(err)
+	}
+	if capture.ConfigMode != 0600 {
+		t.Fatalf("configuration permissions = %o", capture.ConfigMode)
+	}
+	if _, err := os.Stat(capture.ConfigPath); !os.IsNotExist(err) {
+		t.Fatalf("configuration transport remains: %v", err)
 	}
 	return capture
 }
@@ -155,7 +188,7 @@ func TestStagePromptIntegration(t *testing.T) {
 			for _, custom := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/log=%t/custom=%t", stage, logged, custom), func(t *testing.T) {
 					capturePath := preparePromptSandbox(t)
-					input := TaskContext{TaskOverride: "task {{literal}} <code> 100%", Documents: "document body", Branch: "main"}
+					input := TaskContext{Config: loadPromptConfig(t), TaskOverride: "task {{literal}} <code> 100%", Documents: "document body", Branch: "main"}
 					if logged {
 						run, err := executionlog.NewRun("main", executionlog.CommandRun, nil)
 						if err != nil {
@@ -272,7 +305,7 @@ func TestStagePromptIntegration(t *testing.T) {
 							promptPath = capture.Args[i+1]
 						}
 					}
-					wantArgs = append(wantArgs, "-f", promptPath, "--branch", "main")
+					wantArgs = append(wantArgs, "-f", promptPath, "--branch", "main", "--config", capture.ConfigPath)
 					if strings.Join(capture.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 						t.Fatalf("args %q, want %q", capture.Args, wantArgs)
 					}
@@ -309,7 +342,7 @@ func TestImplementationPromptModes(t *testing.T) {
 	for _, continuing := range []bool{false, true} {
 		t.Run(fmt.Sprintf("continue=%t", continuing), func(t *testing.T) {
 			path := preparePromptSandbox(t)
-			if err := Run(TaskContext{Branch: "main", Continue: continuing}); err != nil {
+			if err := Run(TaskContext{Config: loadPromptConfig(t), Branch: "main", Continue: continuing}); err != nil {
 				t.Fatal(err)
 			}
 			got := readPromptCapture(t, path)
@@ -322,11 +355,12 @@ func TestImplementationPromptModes(t *testing.T) {
 			}
 			wantArgs := []string{"run", "--branch", "main"}
 			if continuing {
-				if len(got.Args) != 5 {
+				if len(got.Args) != 7 {
 					t.Fatalf("args %q", got.Args)
 				}
 				wantArgs = []string{"resume", "-f", got.Args[2], "--branch", "main"}
 			}
+			wantArgs = append(wantArgs, "--config", got.ConfigPath)
 			if strings.Join(got.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 				t.Fatalf("args %q, want %q", got.Args, wantArgs)
 			}
@@ -348,4 +382,13 @@ func TestPromptCleanupAfterSandboxFailure(t *testing.T) {
 			}
 		}
 	}
+}
+
+func loadPromptConfig(t *testing.T) config.Config {
+	t.Helper()
+	cfg, err := config.Load("software-factory.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
 }

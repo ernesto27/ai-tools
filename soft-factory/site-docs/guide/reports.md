@@ -7,7 +7,7 @@ plus a run summary and the final walkthrough.
 | Command | Saved output |
 | --- | --- |
 | `software-factory` | `logs/<sanitized-branch>/run-<UTC-timestamp>/summary.log`, stage `.log` files, and `05-reviewChanges.md` when the walkthrough runs successfully. |
-| `software-factory continue` | The same files in `logs/<sanitized-branch>/continue-<UTC-timestamp>/` for `resume.branch`. |
+| `software-factory continue` | The same files in `logs/<sanitized-branch>/continue-<UTC-timestamp>/` for `agentSandbox.resume.branch`. |
 | `software-factory resume <path>` | Appends stage logs, progress, and summary entries to the supplied invocation folder; saves the walkthrough there. |
 | `software-factory review` | Risk-classification output in `docs/risk-classification-<datetime>.md` when that stage runs; no execution-log directory or final walkthrough. |
 
@@ -35,7 +35,7 @@ Local configuration, credentials, task files, and generated reports are ignored 
 ## Execution logs
 
 Default workflows save logs in `logs/<sanitized-branch>/run-<UTC-timestamp>/`,
-using `run.branch`. `continue` uses `resume.branch` and creates
+using `agentSandbox.run.branch`. `continue` uses `agentSandbox.resume.branch` and creates
 `logs/<sanitized-branch>/continue-<UTC-timestamp>/`. When commands select the
 same branch, their invocations share a branch folder. The parent is created
 when needed, including for a continue without earlier logs. The log root is
@@ -83,7 +83,7 @@ The first four stage logs identify the configured agent and model and where
 each value came from. A [stage override](configuration.md#stage-agents-and-models) names its
 Factory setting, for example
 `software-factory.json: stages.codeReview.model`; inherited values name their
-setting in `agent-sandbox.json`. If no model is configured, the log says
+setting under `software-factory.json: agentSandbox`. If no model is configured, the log says
 `unavailable (no configured model)`.
 
 Start with `summary.log` for a quick view of the stages that ran.
@@ -98,8 +98,8 @@ and its agent, model, and change summary may be unavailable.
 
 `Agent:` and `Model:` appear between `Status:` and `Duration:`, with configured
 names only. Each field is resolved independently: a stage override in
-`software-factory.json`, then the `run` or `resume` section in
-`agent-sandbox.json`, then its shared value. An explicitly empty sandbox section
+`software-factory.json`, then the `agentSandbox.run` or `agentSandbox.resume`
+section in that file, then the shared `agentSandbox` value. An explicitly empty sandbox section
 value clears the shared value. Unset summary values are left empty; agent
 defaults are not inferred from output. Each sandbox attempt replaces both
 fields, and subprocess output cannot change them. Detailed logs retain

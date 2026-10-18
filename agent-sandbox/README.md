@@ -397,3 +397,13 @@ agent-sandbox worktree-delete-all --yes
 (or immediately with `--yes`). Do not run deletion commands from the worktree
 you want to remove.
 `worktree-editor` requires `-b` and opens the branch's worktree in VS Code.
+
+### Explicit configuration input
+
+`agent-sandbox run --config /path/to/config.json` and
+`agent-sandbox resume --config /path/to/config.json` read only the selected file, with the same validation and
+CLI > section > shared precedence as `agent-sandbox.json`. The option also applies
+to TUI commands. Missing explicit files fail without fallback. Relative paths
+remain relative to the working directory. Soft Factory requires this CLI interface
+for its unified `software-factory.json` configuration; update the CLI before or
+alongside Factory. The exported Go configuration schema is unchanged.

@@ -17,6 +17,7 @@ type commandState struct {
 }
 
 const (
+	flagConfig        = "config"
 	flagAgent         = "agent"
 	flagModel         = "model"
 	flagEffort        = "effort"
@@ -87,7 +88,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 		Long: "Run a coding agent in a new sandbox worktree with plain output. Supply the\n" +
 			"branch with -b or --branch; otherwise one is generated. Supply the\n" +
 			"instruction with -q or --query, or -f or --filePrompt. Defaults\n" +
-			"may be set in ./agent-sandbox.json.",
+			"may be set in ./agent-sandbox.json, or an explicit file selected with --config.",
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
 			"  agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q \"run go test ./...\"\n" +
 			"  agent-sandbox run -a codex -f prompt.md",
@@ -121,6 +122,7 @@ type runFlags struct {
 // a new run and a resumed run cannot silently grow different container or
 // publish behavior.
 func (f *runFlags) bind(cmd *cobra.Command) {
+	cmd.Flags().String(flagConfig, "", "read only this configuration file (relative paths still resolve from the working directory)")
 	cmd.Flags().StringVarP(&f.AgentName, flagAgent, "a", "", "agent to run ("+strings.Join(sandbox.AgentNames(), "|")+")")
 	cmd.Flags().StringVarP(&f.Model, flagModel, "m", "", "model to use (default: the agent's own)")
 	cmd.Flags().StringVar(&f.Effort, flagEffort, "", "agent effort (default: "+sandbox.DefaultEffort+"; supported values depend on the agent and model)")

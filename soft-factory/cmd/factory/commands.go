@@ -14,6 +14,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 		Use:           "software-factory",
 		Short:         "Implement a task, review it, classify risk, and explain the final changes.",
 		Version:       version,
+		Long:          "Configure this workflow in project-root software-factory.json, including agentSandbox.\nBreaking change: agent-sandbox.json is no longer read; move its object into agentSandbox.",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -27,7 +28,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of run.filePrompt")
+	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.filePrompt")
 
 	root.AddCommand(&cobra.Command{
 		Use:   "review",

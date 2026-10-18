@@ -5,8 +5,14 @@
 Soft Factory supports **Linux x86_64**.
 
 - Git installed and a project to work on.
-- [Agent Sandbox installed and configured](https://ernesto27.github.io/ai-tools/installation.html).
+- [Agent Sandbox installed](https://ernesto27.github.io/ai-tools/installation.html).
 - Docker running and your chosen coding agent signed in.
+
+Agent Sandbox must support explicit `--config` input for `run` and `resume`.
+Install the CLI released with the unified configuration change before updating
+Factory. If it reports `unknown flag: --config`, run `agent-sandbox update` or
+build the Agent Sandbox CLI from the same repository checkout. Factory never
+falls back to `agent-sandbox.json`.
 
 ## Install Soft Factory
 

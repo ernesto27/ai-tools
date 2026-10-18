@@ -13,9 +13,13 @@ import (
 )
 
 type Config struct {
-	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
-	CustomSkills CustomSkills       `json:"customSkills"`
+	AgentSandbox sandboxconfig.Config `json:"agentSandbox"`
+	// Keep the original object so Agent Sandbox can validate unknown fields and
+	// explicit nulls. Workflow consumers share this immutable loaded snapshot.
+	agentSandboxJSON json.RawMessage
+	Documents        []string           `json:"documents"`
+	GoogleDrive      *GoogleDriveConfig `json:"googleDrive,omitempty"`
+	CustomSkills     CustomSkills       `json:"customSkills"`
 	// DisabledStages lists stages that must not execute. Load parses it
 	// separately so type errors can name the offending entry.
 	DisabledStages []Stage      `json:"-"`
@@ -72,17 +76,14 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// LoadSandbox decodes the shared types; agent-sandbox owns configuration validation.
-func LoadSandbox() (sandboxconfig.Config, error) {
-	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
+// SandboxJSON returns the original embedded object, without losing fields that
+// Agent Sandbox must validate. Omitted and null agentSandbox mean empty settings.
+// A zero Config also supplies empty settings.
+func (c Config) SandboxJSON() []byte {
+	if len(c.agentSandboxJSON) == 0 || string(c.agentSandboxJSON) == "null" {
+		return []byte("{}")
 	}
-	var cfg sandboxconfig.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
-	}
-	return cfg, nil
+	return append([]byte(nil), c.agentSandboxJSON...)
 }
 
 func Load(path string) (Config, error) {
@@ -93,14 +94,16 @@ func Load(path string) (Config, error) {
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
+		return Config{}, fmt.Errorf("parse factory configuration (%s): %w", path, err)
 	}
 	var raw struct {
 		DisabledStages json.RawMessage `json:"disabledStages"`
+		AgentSandbox   json.RawMessage `json:"agentSandbox"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
+		return Config{}, fmt.Errorf("parse factory configuration (%s): %w", path, err)
 	}
+	cfg.agentSandboxJSON = raw.AgentSandbox
 	cfg.DisabledStages, err = parseDisabledStages(raw.DisabledStages)
 	if err != nil {
 		return Config{}, fmt.Errorf("validate factory configuration: %w", err)

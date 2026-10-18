@@ -16,30 +16,23 @@ Fix the login redirect loop and verify the change with the existing tests.
 Create `software-factory.json`:
 
 ```json
-{"documents": []}
-```
-
-Create `agent-sandbox.json`:
-
-```json
 {
-  "run": {
+  "documents": [],
+  "agentSandbox": {
     "agent": "codex",
     "branch": "fix-login",
-    "filePrompt": "task.txt",
-    "push": false,
-    "pr": false
-  },
-  "resume": {
-    "agent": "codex",
-    "branch": "fix-login",
-    "push": false,
+    "run": {"filePrompt": "task.txt"},
+    "resume": {"push": false},
     "pr": false
   }
 }
 ```
 
-Use the same branch in both sections. Choose a new branch for each new task.
+Breaking change: `agent-sandbox.json` is no longer consumed by Factory. If you
+already have one, manually move its entire object into `agentSandbox`, preserving
+your existing Factory settings and stage assignments.
+
+The shared branch applies to both sections. Choose a new branch for each new task.
 See [configuration](configuration.md) for agent options and supporting documents.
 
 ## Run the task

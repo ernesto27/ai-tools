@@ -33,7 +33,7 @@ Use unnamed return types and explicit values in return statements. Avoid named r
 
 ## Testing Guidelines
 
-No tests or coverage threshold currently exist. Add standard-library `testing` tests beside the relevant source as `*_test.go`, with functions named `TestXxx`. Prefer table-driven cases for configuration validation and document-path handling. Use temporary files and controlled subprocess fixtures when testing filesystem or execution behavior. Run `go test ./...` and `go vet ./...` before submitting code changes.
+Standard-library tests cover configuration and workflow boundaries; there is no coverage threshold. Add standard-library `testing` tests beside the relevant source as `*_test.go`, with functions named `TestXxx`. Prefer table-driven cases for configuration validation and document-path handling. Use temporary files and controlled subprocess fixtures when testing filesystem or execution behavior. Run `go test ./...` and `go vet ./...` before submitting code changes.
 
 ## Commit & Pull Request Guidelines
 
@@ -45,4 +45,6 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 ## Configuration & Reports
 
-Create local `software-factory.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.filePrompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.
+Create only local `software-factory.json`, for example `{"documents":[],"agentSandbox":{"agent":"codex","branch":"task","run":{"filePrompt":"task.txt"}}}`. Document and sandbox paths retain the project-root context. Breaking change: manually move the old `agent-sandbox.json` object into `agentSandbox`; Factory and its sandbox subprocesses no longer consume that file. Preserve existing stage assignments. The local files and `docs/` remain ignored; keep credentials and sensitive task content out of commits.
+
+The embedded field uses upstream `config.Config`. Load it once per workflow and preserve the original JSON for downstream validation; sandbox semantic checks belong to Agent Sandbox. Invocation arguments (including independent stage agent/model overrides) win over section settings, which win over shared settings. All workflows retain the original local task at `agentSandbox.run.filePrompt`. The installed Agent Sandbox CLI must support explicit `--config` input; the Go schema dependency remains pinned because its exported types are unchanged. Release the updated Agent Sandbox CLI before or alongside Factory. Temporary transport files are private and must be removed after every outcome; never replace the legacy file.

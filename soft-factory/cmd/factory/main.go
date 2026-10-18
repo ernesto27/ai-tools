@@ -46,7 +46,7 @@ type workflowOptions struct {
 	Branch     string
 }
 
-func runWorkflow(opts workflowOptions) (runErr error) {
+func runWorkflow(opts workflowOptions) error {
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -54,10 +54,6 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	cfg, err := config.Load(factoryConfigFile)
 	if err != nil {
 		return err
-	}
-
-	shouldRun := func(stage config.Stage) bool {
-		return opts.StartStage == "" || slices.Index(config.Stages, stage) >= slices.Index(config.Stages, opts.StartStage)
 	}
 
 	var loadedSkills sandbox.ProjectSkills
@@ -75,7 +71,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 
 	for _, entry := range entries {
 		// Disabled stages never read their skill files.
-		if entry.name == "" || cfg.StageDisabled(entry.stage) || !shouldRun(entry.stage) {
+		if entry.name == "" || cfg.StageDisabled(entry.stage) || !opts.shouldRun(entry.stage) {
 			continue
 		}
 
@@ -94,13 +90,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
-	branch := opts.Branch
-	if branch == "" {
-		branch, err = workflowBranch(opts)
-		if err != nil {
-			return err
-		}
-	}
+	branch := workflowBranch(opts, cfg)
 	var runLog *executionlog.Run
 	if opts.Implement {
 		command := executionlog.CommandRun
@@ -120,37 +110,44 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 		} else {
 			fmt.Printf("Execution logs: %s\n", runLog.Path())
-			defer func() { runLog.Finish(runErr) }()
 		}
 	}
 
+	err = executeWorkflow(opts, sandbox.TaskContext{
+		Config:       cfg,
+		Branch:       branch,
+		Log:          runLog,
+		CustomSkills: loadedSkills,
+		Continue:     opts.Continue,
+	})
+	if runLog != nil {
+		runLog.Finish(err)
+	}
+	return err
+}
+
+// executeWorkflow shares the loaded configuration with every stage consumer.
+func executeWorkflow(opts workflowOptions, input sandbox.TaskContext) error {
+	cfg, branch, runLog := input.Config, input.Branch, input.Log
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	input.Context = ctx
 
-	var taskOverride string
 	if opts.IssueURL != "" {
-		taskOverride, err = loadJiraTask(ctx, opts.IssueURL)
+		task, err := loadJiraTask(ctx, opts.IssueURL)
 		if err != nil {
 			return err
 		}
+		input.TaskOverride = task
 	}
 
 	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(factoryConfigFile))
 	if err != nil {
 		return err
 	}
-	input := sandbox.TaskContext{
-		TaskOverride: taskOverride,
-		Documents:    documents,
-		CustomSkills: loadedSkills,
-		Context:      ctx,
-		Log:          runLog,
-		Branch:       branch,
-		Continue:     opts.Continue,
-		Config:       cfg,
-	}
+	input.Documents = documents
 
-	if opts.Implement && shouldRun(config.StageImplementation) {
+	if opts.Implement && opts.shouldRun(config.StageImplementation) {
 		if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
 			return sandbox.Run(input)
 		}); err != nil {
@@ -173,8 +170,8 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		if cfg.StageDisabled(review.stage) {
 			disabledReviews = append(disabledReviews, review.stage)
 		}
-		if !shouldRun(review.stage) {
-			if !cfg.StageDisabled(review.stage) && shouldRun(config.StageRiskClassification) && !cfg.StageDisabled(config.StageRiskClassification) {
+		if !opts.shouldRun(review.stage) {
+			if !cfg.StageDisabled(review.stage) && opts.shouldRun(config.StageRiskClassification) && !cfg.StageDisabled(config.StageRiskClassification) {
 				filename := ".soft-factory-stage-changes-" + rand.Text() + "-review.txt"
 				worktree, err := executionlog.WorktreeForBranch(ctx, branch)
 				if err != nil {
@@ -196,7 +193,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		}
 	}
 
-	if shouldRun(config.StageRiskClassification) {
+	if opts.shouldRun(config.StageRiskClassification) {
 		if err := runStage(input, cfg, config.StageRiskClassification, "\nStarting risk classification...", func() error {
 			return sandbox.RiskClassification(input, reports, disabledReviews)
 		}); err != nil {
@@ -207,7 +204,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		// Risk classification normally removes this run's review reports.
 		sandbox.RemoveReviewReports(input, reports)
 	}
-	if !opts.Implement || !shouldRun(config.StageReviewChanges) {
+	if !opts.Implement || !opts.shouldRun(config.StageReviewChanges) {
 		return nil
 	}
 	if err := input.Context.Err(); err != nil {
@@ -229,20 +226,25 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 	return nil
 }
 
+// shouldRun retains the stage boundary selected by recovery.
+func (opts workflowOptions) shouldRun(stage config.Stage) bool {
+	return opts.StartStage == "" || slices.Index(config.Stages, stage) >= slices.Index(config.Stages, opts.StartStage)
+}
+
 // workflowBranch selects one branch for every stage and report in this run.
-func workflowBranch(opts workflowOptions) (string, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "", err
+func workflowBranch(opts workflowOptions, cfg config.Config) string {
+	if opts.Branch != "" {
+		return opts.Branch
 	}
+	settings := cfg.AgentSandbox
 	section := settings.Resume
 	if opts.Implement && !opts.Continue {
 		section = settings.Run
 	}
 	if section != nil && section.Branch != nil {
-		return *section.Branch, nil
+		return *section.Branch
 	}
-	return settings.Branch, nil
+	return settings.Branch
 }
 
 // plannedStages lists enabled stage identifiers in pipeline order.

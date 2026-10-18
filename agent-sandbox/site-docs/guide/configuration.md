@@ -105,3 +105,17 @@ value. Leading and trailing whitespace is trimmed. Omitted, empty, or
 whitespace-only effort resolves to `high`. Values are passed through without
 checking allowed levels. The agent
 reports unsupported values for its selected model.
+
+## Select a configuration file
+
+Use `agent-sandbox run --config /path/to/config.json` or
+`agent-sandbox resume --config /path/to/config.json` to read only that JSON file.
+The same option is available for `run-tui` and `resume-tui`. An explicit file is
+required to exist and uses the same validation and precedence as the default
+`agent-sandbox.json`; no local file is read or merged. Relative paths inside the
+configuration still resolve from the working directory, not the file directory.
+Without `--config`, direct Agent Sandbox use retains its local-file behavior.
+
+Soft Factory uses this input to pass its embedded `software-factory.json`
+`agentSandbox` object. Upgrade Agent Sandbox before or alongside that Factory
+version; the exported Go configuration types are unchanged.

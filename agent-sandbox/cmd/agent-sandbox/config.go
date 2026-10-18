@@ -39,7 +39,20 @@ func configRunArgs(section string, flags *runFlags) cobra.PositionalArgs {
 // here would mark JSON defaults as command-line flags and lose the distinction
 // needed for explicit false, empty strings, and replacement image lists.
 func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
-	config, err := readLocalConfig()
+	path := localConfigFile
+	optional := true
+	if cmd.Flags().Changed(flagConfig) {
+		var err error
+		path, err = cmd.Flags().GetString(flagConfig)
+		if err != nil {
+			return err
+		}
+		if path == "" {
+			return fmt.Errorf("--config requires a nonempty file path")
+		}
+		optional = false
+	}
+	config, err := readConfig(path, optional)
 	if err != nil {
 		return err
 	}
@@ -145,12 +158,18 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 // applied. This catches misspellings when a user first runs either command;
 // worktree management verbs never call this function.
 func readLocalConfig() (config.Config, error) {
-	data, err := os.ReadFile(localConfigFile)
-	if errors.Is(err, os.ErrNotExist) {
+	return readConfig(localConfigFile, true)
+}
+
+// readConfig never consults the project-local file when a caller selects a path.
+// Paths inside the JSON remain relative to the process working directory.
+func readConfig(path string, optional bool) (config.Config, error) {
+	data, err := os.ReadFile(path)
+	if optional && errors.Is(err, os.ErrNotExist) {
 		return config.Config{}, nil
 	}
 	if err != nil {
-		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
+		return config.Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 
 	// Decode raw fields first because encoding/json treats null as an omitted
@@ -158,15 +177,15 @@ func readLocalConfig() (config.Config, error) {
 	// section and field before decoding into the typed configuration below.
 	var root map[string]json.RawMessage
 	if err := json.Unmarshal(data, &root); err != nil {
-		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
+		return config.Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 	if root == nil {
-		return config.Config{}, fmt.Errorf("%s: expected a JSON object", localConfigFile)
+		return config.Config{}, fmt.Errorf("%s: expected a JSON object", path)
 	}
 
 	for name, value := range root {
 		if name == flagFile {
-			if err := validateConfigField("", name, value); err != nil {
+			if err := validateConfigField(path, "", name, value); err != nil {
 				return config.Config{}, err
 			}
 			continue
@@ -174,33 +193,33 @@ func readLocalConfig() (config.Config, error) {
 		if name == flagBranch || name == flagModel || name == flagEffort || name == flagAgent || name == flagBaseImage {
 			var field string
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-				return config.Config{}, fmt.Errorf("%s: %s must be a JSON string", localConfigFile, name)
+				return config.Config{}, fmt.Errorf("%s: %s must be a JSON string", path, name)
 			}
 			continue
 		}
 		if name == flagPush || name == flagPR || name == flagHostNetwork {
 			var field bool
 			if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-				return config.Config{}, fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, name)
+				return config.Config{}, fmt.Errorf("%s: %s must be a JSON boolean", path, name)
 			}
 			continue
 		}
 		if name != "run" && name != "resume" {
-			return config.Config{}, fmt.Errorf("%s: unknown section %q", localConfigFile, name)
+			return config.Config{}, fmt.Errorf("%s: unknown section %q", path, name)
 		}
 		var section map[string]json.RawMessage
 		if err := json.Unmarshal(value, &section); err != nil || section == nil {
-			return config.Config{}, fmt.Errorf("%s: %s must be a JSON object", localConfigFile, name)
+			return config.Config{}, fmt.Errorf("%s: %s must be a JSON object", path, name)
 		}
 		for key, field := range section {
-			if err := validateConfigField(name, key, field); err != nil {
+			if err := validateConfigField(path, name, key, field); err != nil {
 				return config.Config{}, err
 			}
 		}
 	}
 	var cfg config.Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return config.Config{}, fmt.Errorf("%s: %w", localConfigFile, err)
+		return config.Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 	if cfg.Run != nil {
 		cfg.Run.Reviewers = normalizeReviewers(cfg.Run.Reviewers)
@@ -222,7 +241,7 @@ func normalizeReviewers(reviewers []string) []string {
 	return normalized
 }
 
-func validateConfigField(section, key string, value json.RawMessage) error {
+func validateConfigField(path, section, key string, value json.RawMessage) error {
 	fieldName := key
 	if section != "" {
 		fieldName = section + "." + key
@@ -230,44 +249,44 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 	switch key {
 	case configReviewers:
 		if section != "run" {
-			return fmt.Errorf("%s: unknown field %s", localConfigFile, fieldName)
+			return fmt.Errorf("%s: unknown field %s", path, fieldName)
 		}
 		var reviewers []json.RawMessage
 		if string(value) == "null" || json.Unmarshal(value, &reviewers) != nil {
-			return fmt.Errorf("%s: %s must be an array of JSON strings", localConfigFile, fieldName)
+			return fmt.Errorf("%s: %s must be an array of JSON strings", path, fieldName)
 		}
 		for i, value := range reviewers {
 			var reviewer string
 			if string(value) == "null" || json.Unmarshal(value, &reviewer) != nil {
-				return fmt.Errorf("%s: %s[%d] must be a JSON string", localConfigFile, fieldName, i)
+				return fmt.Errorf("%s: %s[%d] must be a JSON string", path, fieldName, i)
 			}
 			if !reviewerUsername.MatchString(strings.TrimSpace(reviewer)) {
-				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", localConfigFile, fieldName, i)
+				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", path, fieldName, i)
 			}
 		}
 	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, configAPIKey:
 		var field string
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-			return fmt.Errorf("%s: %s must be a JSON string", localConfigFile, fieldName)
+			return fmt.Errorf("%s: %s must be a JSON string", path, fieldName)
 		}
 	case flagPush, flagPR, flagHostNetwork:
 		var field bool
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
-			return fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, fieldName)
+			return fmt.Errorf("%s: %s must be a JSON boolean", path, fieldName)
 		}
 	case flagImage, flagFile:
 		var images []json.RawMessage
 		if string(value) == "null" || json.Unmarshal(value, &images) != nil {
-			return fmt.Errorf("%s: %s must be an array of JSON strings", localConfigFile, fieldName)
+			return fmt.Errorf("%s: %s must be an array of JSON strings", path, fieldName)
 		}
 		for i, image := range images {
-			var path string
-			if string(image) == "null" || json.Unmarshal(image, &path) != nil {
-				return fmt.Errorf("%s: %s[%d] must be a JSON string", localConfigFile, fieldName, i)
+			var imagePath string
+			if string(image) == "null" || json.Unmarshal(image, &imagePath) != nil {
+				return fmt.Errorf("%s: %s[%d] must be a JSON string", path, fieldName, i)
 			}
 		}
 	default:
-		return fmt.Errorf("%s: unknown field %s", localConfigFile, fieldName)
+		return fmt.Errorf("%s: unknown field %s", path, fieldName)
 	}
 	return nil
 }

@@ -18,7 +18,10 @@ Run workflow commands from your project directory.
 | `-h`, `--help` | Show command help. |
 
 `--config` and `-c` are not supported. Soft Factory always reads
-`software-factory.json` from the current working directory.
+`software-factory.json` from the project root, including embedded `agentSandbox`
+settings. No sandbox configuration file is generated; supported settings
+travel through flags. Section `apiKey` and `reviewers` are
+temporarily ignored; use existing host authentication.
 
 See [configuration](configuration.md) for JSON properties and
 [reports](reports.md) for output locations and review statuses.

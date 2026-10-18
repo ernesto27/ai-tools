@@ -94,13 +94,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
-	branch := opts.Branch
-	if branch == "" {
-		branch, err = workflowBranch(opts)
-		if err != nil {
-			return err
-		}
-	}
+	branch, branchSet := workflowBranch(cfg, opts)
 	var runLog *executionlog.Run
 	if opts.Implement {
 		command := executionlog.CommandRun
@@ -146,6 +140,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		Context:      ctx,
 		Log:          runLog,
 		Branch:       branch,
+		BranchSet:    branchSet,
 		Continue:     opts.Continue,
 		Config:       cfg,
 	}
@@ -230,19 +225,19 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 }
 
 // workflowBranch selects one branch for every stage and report in this run.
-func workflowBranch(opts workflowOptions) (string, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "", err
+func workflowBranch(cfg config.Config, opts workflowOptions) (string, bool) {
+	if opts.Branch != "" {
+		return opts.Branch, true
 	}
+	settings := cfg.AgentSandbox
 	section := settings.Resume
 	if opts.Implement && !opts.Continue {
 		section = settings.Run
 	}
 	if section != nil && section.Branch != nil {
-		return *section.Branch, nil
+		return *section.Branch, true
 	}
-	return settings.Branch, nil
+	return settings.Branch, settings.Branch != ""
 }
 
 // plannedStages lists enabled stage identifiers in pipeline order.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -17,8 +18,10 @@ import (
 )
 
 type promptCapture struct {
-	Args   []string
-	Prompt string
+	SecretInEnvironment bool
+	Directory           string
+	Args                []string
+	Prompt              string
 }
 
 // A controlled subprocess receives the same -f file as a real sandbox.
@@ -33,9 +36,23 @@ func TestPromptSandboxHelper(t *testing.T) {
 			break
 		}
 	}
-	capture := promptCapture{Args: args}
+	directory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	capture := promptCapture{Args: args, Directory: directory}
+	for _, value := range os.Environ() {
+		if strings.Contains(value, "secret-run") || strings.Contains(value, "secret-resume") || strings.Contains(value, "secret-reviewer") {
+			capture.SecretInEnvironment = true
+		}
+	}
+	var interrupted chan os.Signal
+	if os.Getenv("SOFT_FACTORY_PROMPT_WAIT") == "1" {
+		interrupted = make(chan os.Signal, 1)
+		signal.Notify(interrupted, os.Interrupt)
+	}
 	for i, arg := range args {
-		if arg == "-f" && i+1 < len(args) {
+		if (arg == "-f" || arg == "--filePrompt") && i+1 < len(args) && os.Getenv("SOFT_FACTORY_ARGS_ONLY") != "1" {
 			text, err := os.ReadFile(args[i+1])
 			if err != nil {
 				t.Fatal(err)
@@ -49,6 +66,10 @@ func TestPromptSandboxHelper(t *testing.T) {
 	}
 	if err := os.WriteFile(os.Getenv("SOFT_FACTORY_CAPTURE"), data, 0600); err != nil {
 		t.Fatal(err)
+	}
+	if interrupted != nil {
+		<-interrupted
+		os.Exit(130)
 	}
 	if os.Getenv("SOFT_FACTORY_PROMPT_FAIL") == "1" {
 		os.Exit(17)
@@ -69,6 +90,7 @@ func preparePromptSandbox(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	t.Chdir(root)
+	t.Setenv("TMPDIR", t.TempDir())
 	for _, args := range [][]string{{"init", "-b", "main"}, {"config", "user.name", "Test"}, {"config", "user.email", "test@example.com"}} {
 		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 			t.Fatalf("git: %v\n%s", err, out)
@@ -83,9 +105,6 @@ func preparePromptSandbox(t *testing.T) string {
 		}
 	}
 	if err := os.WriteFile("task.txt", []byte("file task {{literal}} 100%"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile("agent-sandbox.json", []byte(`{"run":{"branch":"main","filePrompt":"task.txt"},"resume":{"branch":"main"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	bin := filepath.Join(root, "bin")
@@ -309,18 +328,15 @@ func TestImplementationPromptModes(t *testing.T) {
 	for _, continuing := range []bool{false, true} {
 		t.Run(fmt.Sprintf("continue=%t", continuing), func(t *testing.T) {
 			path := preparePromptSandbox(t)
-			if err := Run(TaskContext{Branch: "main", Continue: continuing}); err != nil {
+			if err := Run(TaskContext{Branch: "main", Continue: continuing, Config: taskFileConfig(t)}); err != nil {
 				t.Fatal(err)
 			}
 			got := readPromptCapture(t, path)
-			want := ""
-			if continuing {
-				want = "file task {{literal}} 100%"
-			}
+			want := "file task {{literal}} 100%"
 			if got.Prompt != want {
 				t.Fatalf("prompt %q, want %q", got.Prompt, want)
 			}
-			wantArgs := []string{"run", "--branch", "main"}
+			wantArgs := []string{"run", "--branch", "main", "--filePrompt", "task.txt"}
 			if continuing {
 				if len(got.Args) != 5 {
 					t.Fatalf("args %q", got.Args)

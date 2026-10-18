@@ -12,7 +12,7 @@ classification. [Reports](reports.md) document results and verification gaps.
 
 Choose agents and models independently for each stage with
 [`stages` in configuration](configuration.md#stage-agents-and-models).
-Omitted settings inherit the defaults from `agent-sandbox.json`.
+Omitted settings inherit the defaults from `software-factory.json: agentSandbox`.
 
 Each code or security review follows **review → corrections when needed → verification**,
 with up to three rounds. Failures before the final walkthrough stop the

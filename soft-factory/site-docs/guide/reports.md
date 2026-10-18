@@ -83,7 +83,7 @@ The first four stage logs identify the configured agent and model and where
 each value came from. A [stage override](configuration.md#stage-agents-and-models) names its
 Factory setting, for example
 `software-factory.json: stages.codeReview.model`; inherited values name their
-setting in `agent-sandbox.json`. If no model is configured, the log says
+setting in `software-factory.json: agentSandbox`. If no model is configured, the log says
 `unavailable (no configured model)`.
 
 Start with `summary.log` for a quick view of the stages that ran.
@@ -99,7 +99,7 @@ and its agent, model, and change summary may be unavailable.
 `Agent:` and `Model:` appear between `Status:` and `Duration:`, with configured
 names only. Each field is resolved independently: a stage override in
 `software-factory.json`, then the `run` or `resume` section in
-`agent-sandbox.json`, then its shared value. An explicitly empty sandbox section
+`software-factory.json: agentSandbox`, then its shared value. An explicitly empty sandbox section
 value clears the shared value. Unset summary values are left empty; agent
 defaults are not inferred from output. Each sandbox attempt replaces both
 fields, and subprocess output cannot change them. Detailed logs retain

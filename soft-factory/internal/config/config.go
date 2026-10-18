@@ -13,9 +13,10 @@ import (
 )
 
 type Config struct {
-	Documents    []string           `json:"documents"`
-	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
-	CustomSkills CustomSkills       `json:"customSkills"`
+	AgentSandbox sandboxconfig.Config `json:"agentSandbox"`
+	Documents    []string             `json:"documents"`
+	GoogleDrive  *GoogleDriveConfig   `json:"googleDrive,omitempty"`
+	CustomSkills CustomSkills         `json:"customSkills"`
 	// DisabledStages lists stages that must not execute. Load parses it
 	// separately so type errors can name the offending entry.
 	DisabledStages []Stage      `json:"-"`
@@ -72,19 +73,6 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// LoadSandbox decodes the shared types; agent-sandbox owns configuration validation.
-func LoadSandbox() (sandboxconfig.Config, error) {
-	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
-	}
-	var cfg sandboxconfig.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
-	}
-	return cfg, nil
-}
-
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -96,10 +84,14 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 	var raw struct {
+		AgentSandbox   json.RawMessage `json:"agentSandbox"`
 		DisabledStages json.RawMessage `json:"disabledStages"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
+	}
+	if raw.AgentSandbox == nil {
+		return Config{}, fmt.Errorf("validate factory configuration: agentSandbox is required")
 	}
 	cfg.DisabledStages, err = parseDisabledStages(raw.DisabledStages)
 	if err != nil {

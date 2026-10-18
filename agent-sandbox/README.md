@@ -68,7 +68,7 @@ This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [--apiKey <key>] [--reviewers <username>]... [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
 
@@ -76,6 +76,8 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | --- | --- |
 | `-b`, `--branch` | Optional. Branch for the separate worktree; generated if omitted. |
 | `-a`, `--agent` | Required. One of `codex`, `claude`, `opencode`, or `pi`. |
+| `--apiKey <key>` | Optional. Provider API key for Codex or Claude Code on `run`, `resume`, `run-tui`, and `resume-tui`; overrides the section's JSON key. `--apiKey=""` selects host authentication. No shorthand. |
+| `--reviewers <username>` | Optional. Repeat for each GitHub username on `run`, `resume`, `run-tui`, and `resume-tui`. Replaces `run.reviewers`; `--reviewers=""` alone clears it. Validated but has no effect on resume. No shorthand. |
 | `-m`, `--model` | Optional. Overrides the model selected by the agent. |
 | `--effort` | Optional. Agent effort; defaults to `high`. Passed through without checking supported levels. |
 | `-i`, `--baseImage` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |

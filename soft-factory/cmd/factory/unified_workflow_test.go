@@ -67,8 +67,13 @@ func TestWorkflowSandboxHelper(t *testing.T) {
 }
 
 func TestUnifiedWorkflowEntryPoints(t *testing.T) {
-	for _, command := range []string{"default", "continue", "review", "resume"} {
+	for _, command := range []string{"default", "continue", "review", "resume", "disabled"} {
 		t.Run(command, func(t *testing.T) {
+			// "disabled" runs the default workflow with reviewChanges disabled.
+			disabled := command == "disabled"
+			if disabled {
+				command = "default"
+			}
 			root := t.TempDir()
 			t.Chdir(root)
 			bin := filepath.Join(root, "bin")
@@ -93,6 +98,9 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			t.Setenv("FACTORY_WORKFLOW_ROOT", root)
 			t.Setenv("FACTORY_WORKFLOW_HELPER", "1")
 			cfg := `{"documents":["support.txt"],"customSkills":{"codeReview":"legacy-missing","securityReview":"legacy-missing","riskClassification":"legacy-missing","reviewChanges":"legacy-missing"},"stages":{"implementation":{"agent":"stage-agent","customSkill":42},"codeReview":{"model":"stage-model","customSkill":"project-code"},"securityReview":{"customSkill":"project-security"},"riskClassification":{"customSkill":"project-risk"},"reviewChanges":{"customSkill":"project-changes"}},"agentSandbox":{"agent":"shared-agent","model":"shared-model","baseImage":"go image","file":["shared mount"],"push":true,"pr":true,"run":{"agent":"run-agent","model":"run-model","branch":"new-task","filePrompt":"task path.txt","apiKey":"secret-run","reviewers":["secret-reviewer"]},"resume":{"agent":"resume-agent","model":"resume-model","branch":"old-task","filePrompt":"wrong-task.txt","query":"wrong task","push":false,"file":[],"apiKey":"secret-resume","reviewers":["secret-reviewer"]}}}`
+			if disabled {
+				cfg = strings.Replace(cfg, `{"documents"`, `{"disabledStages":["reviewChanges"],"documents"`, 1)
+			}
 			for name, content := range map[string]string{factoryConfigFile: cfg, "task path.txt": "original local task", "support.txt": "supporting context"} {
 				if err := os.WriteFile(name, []byte(content), 0600); err != nil {
 					t.Fatal(err)
@@ -100,6 +108,9 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			}
 			skillNames := []string{"project-code", "project-security", "project-risk", "project-changes"}
 			for _, name := range skillNames {
+				if disabled && name == "project-changes" {
+					continue // a disabled stage must not load its skill file
+				}
 				path := filepath.Join(".agents", "skills", name, "SKILL.md")
 				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 					t.Fatal(err)
@@ -138,6 +149,9 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			count := 5
 			if command == "review" {
 				count = 3
+			}
+			if disabled {
+				count = 4
 			}
 			for i := 0; i < count; i++ {
 				var got workflowCapture

@@ -49,8 +49,8 @@ your configuration enables `push` and you want to leave changes uncommitted.
 ## Supported fields
 
 Multiword JSON keys and long CLI flags use camelCase: `baseImage`,
-`commitMessage`, and `filePrompt`. For example, use `--baseImage` on the CLI.
-The JSON-only API key field is `apiKey`.
+`commitMessage`, `filePrompt`, and `apiKey`. For example, use `--baseImage`
+and `--apiKey` on the CLI.
 Rename the old `base-image`, `commit-message`, `file-prompt`, and `api-key`
 names in existing files and invocations; they are rejected, with no aliases.
 Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
@@ -64,10 +64,25 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
 of strings for `image`, `file`, and `reviewers`. Unknown fields, `null`, and wrong
 types are rejected. Both command sections are validated even when only one
-is being used.
+is being used, including when CLI flags override invalid values.
 
-`apiKey` and `reviewers` are JSON-only fields. See [authentication](authentication.md)
-for keys and [publishing](publishing.md#request-reviewers) for reviewers.
+All four execution commands accept `--apiKey <key>` and repeatable
+`--reviewers <username>`, without shorthands. The API key flag replaces the
+selected section's key; `--apiKey=""` selects host authentication and its required
+mounts. Nonempty keys are supported only for Codex and Claude Code. See
+[authentication](authentication.md).
+
+On `run` and `run-tui`, CLI reviewers replace the JSON list entirely; omitted
+flags use `run.reviewers`. `--reviewers=""` alone clears it. Other empty or
+whitespace-only entries, including a clear value mixed with usernames, are usage
+errors. Values are trimmed and deduplicated case-insensitively, keeping first
+order and spelling. Only plain GitHub usernames are accepted; see
+[publishing](publishing.md#request-reviewers).
+
+On `resume` and `resume-tui`, reviewer flag syntax is validated, then valid
+values are ignored. Existing reviewers are preserved. This does not change the
+JSON schema: root-level `apiKey` and `reviewers`, and `resume.reviewers`, remain
+invalid.
 
 ## Share reference files
 

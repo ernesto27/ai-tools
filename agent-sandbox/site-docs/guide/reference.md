@@ -27,6 +27,8 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | --- | --- |
 | `-b`, `--branch` | Task branch. Generated for new tasks if omitted; required for resumes. |
 | `-a`, `--agent` | `codex`, `claude`, `opencode`, or `pi`; required unless supplied by JSON. |
+| `--apiKey <key>` | Provider API key for Codex or Claude Code; overrides the section's JSON key. `--apiKey=""` selects host authentication. No shorthand. |
+| `--reviewers <username>` | Repeat for each GitHub username. Replaces `run.reviewers`; `--reviewers=""` alone clears it. Validated but ignored on resume. No shorthand. |
 | `-m`, `--model` | Override the model selected for the agent. |
 | `--effort` | Agent effort. Defaults to `high`; the agent checks supported levels. |
 | `-q`, `--query` | Task instructions. |
@@ -40,7 +42,12 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `--hn` | Share the host's network with the container. |
 
 Exactly one prompt source must be supplied through flags or JSON.
-`apiKey` and `reviewers` are [JSON-only settings](configuration.md).
+Flags override [configuration](configuration.md), including explicit empty values.
+Use camelCase `--apiKey`; `--api-key` is unsupported. Keys use the existing
+[authentication modes](authentication.md) and are not added to prompts, worktree
+records, help, or transcripts. Reviewer usernames are trimmed, validated, and
+deduplicated case-insensitively; comma lists and mixed empty entries are usage
+errors. See [reviewer rules](publishing.md#request-reviewers).
 
 ## Help and version
 

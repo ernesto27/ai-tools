@@ -92,9 +92,19 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			t.Setenv("FACTORY_WORKFLOW_EXE", exe)
 			t.Setenv("FACTORY_WORKFLOW_ROOT", root)
 			t.Setenv("FACTORY_WORKFLOW_HELPER", "1")
-			cfg := `{"documents":["support.txt"],"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent"},"codeReview":{"model":"stage-model"}},"agentSandbox":{"agent":"shared-agent","model":"shared-model","baseImage":"go image","file":["shared mount"],"push":true,"pr":true,"run":{"agent":"run-agent","model":"run-model","branch":"new-task","filePrompt":"task path.txt","apiKey":"secret-run","reviewers":["secret-reviewer"]},"resume":{"agent":"resume-agent","model":"resume-model","branch":"old-task","filePrompt":"wrong-task.txt","query":"wrong task","push":false,"file":[],"apiKey":"secret-resume","reviewers":["secret-reviewer"]}}}`
+			cfg := `{"documents":["support.txt"],"customSkills":{"codeReview":"legacy-missing","securityReview":"legacy-missing","riskClassification":"legacy-missing","reviewChanges":"legacy-missing"},"stages":{"implementation":{"agent":"stage-agent","customSkill":42},"codeReview":{"model":"stage-model","customSkill":"project-code"},"securityReview":{"customSkill":"project-security"},"riskClassification":{"customSkill":"project-risk"},"reviewChanges":{"customSkill":"project-changes"}},"agentSandbox":{"agent":"shared-agent","model":"shared-model","baseImage":"go image","file":["shared mount"],"push":true,"pr":true,"run":{"agent":"run-agent","model":"run-model","branch":"new-task","filePrompt":"task path.txt","apiKey":"secret-run","reviewers":["secret-reviewer"]},"resume":{"agent":"resume-agent","model":"resume-model","branch":"old-task","filePrompt":"wrong-task.txt","query":"wrong task","push":false,"file":[],"apiKey":"secret-resume","reviewers":["secret-reviewer"]}}}`
 			for name, content := range map[string]string{factoryConfigFile: cfg, "task path.txt": "original local task", "support.txt": "supporting context"} {
 				if err := os.WriteFile(name, []byte(content), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			skillNames := []string{"project-code", "project-security", "project-risk", "project-changes"}
+			for _, name := range skillNames {
+				path := filepath.Join(".agents", "skills", name, "SKILL.md")
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("Instructions for "+name), 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -125,7 +135,7 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			}
 			defer file.Close()
 			decoder := json.NewDecoder(file)
-			count := 4
+			count := 5
 			if command == "review" {
 				count = 3
 			}
@@ -167,6 +177,11 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 				}
 				if !strings.Contains(got.Prompt, "original local task") || !strings.Contains(got.Prompt, "supporting context") || strings.Contains(got.Prompt, "wrong task") {
 					t.Fatal("task/context mismatch")
+				}
+				for skillStage, name := range skillNames {
+					if got, want := strings.Contains(got.Prompt, "Instructions for "+name), stage == skillStage+1; got != want {
+						t.Fatalf("stage %d: skill %q present = %v; want %v", stage, name, got, want)
+					}
 				}
 				joined := strings.Join(got.Args, "\n")
 				if strings.Contains(joined, "secret-") {

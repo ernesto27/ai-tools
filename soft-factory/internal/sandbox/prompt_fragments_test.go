@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -65,5 +66,38 @@ func writePromptTestFile(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadProjectSkillLookup(t *testing.T) {
+	projectDir := t.TempDir()
+	// Resolve relative to the configuration directory, independently of cwd.
+	t.Chdir(t.TempDir())
+	for _, source := range []string{".claude", ".agents"} {
+		path := filepath.Join(projectDir, source, "skills", "Project-Skill", "SKILL.md")
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(source+" instructions"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		skill, err := LoadProjectSkill(projectDir, "Project-Skill")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if skill.Name != "Project-Skill" || skill.Content != source+" instructions" {
+			t.Fatalf("wrong skill: %+v", skill)
+		}
+	}
+	// An unreadable first match must fail rather than use the second source.
+	path := filepath.Join(projectDir, ".agents", "skills", "Project-Skill", "SKILL.md")
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadProjectSkill(projectDir, "Project-Skill"); err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("expected first-source read error, got %v", err)
 	}
 }

@@ -16,7 +16,6 @@ type Config struct {
 	AgentSandbox sandboxconfig.Config `json:"agentSandbox"`
 	Documents    []string             `json:"documents"`
 	GoogleDrive  *GoogleDriveConfig   `json:"googleDrive,omitempty"`
-	CustomSkills CustomSkills         `json:"customSkills"`
 	// DisabledStages lists stages that must not execute. Load parses it
 	// separately so type errors can name the offending entry.
 	DisabledStages []Stage      `json:"-"`
@@ -28,12 +27,17 @@ type StageConfig struct {
 	Model string `json:"model,omitempty"`
 }
 
+type ReviewStageConfig struct {
+	StageConfig
+	CustomSkill string `json:"customSkill,omitempty"`
+}
+
 type StagesConfig struct {
-	Implementation     StageConfig `json:"implementation"`
-	CodeReview         StageConfig `json:"codeReview"`
-	SecurityReview     StageConfig `json:"securityReview"`
-	RiskClassification StageConfig `json:"riskClassification"`
-	ReviewChanges      StageConfig `json:"reviewChanges"`
+	Implementation     StageConfig       `json:"implementation"`
+	CodeReview         ReviewStageConfig `json:"codeReview"`
+	SecurityReview     ReviewStageConfig `json:"securityReview"`
+	RiskClassification ReviewStageConfig `json:"riskClassification"`
+	ReviewChanges      ReviewStageConfig `json:"reviewChanges"`
 }
 
 // Stage is a public, case-sensitive pipeline stage identifier.
@@ -59,13 +63,6 @@ var Stages = []Stage{
 // StageDisabled reports whether stage is listed in disabledStages.
 func (c Config) StageDisabled(stage Stage) bool {
 	return slices.Contains(c.DisabledStages, stage)
-}
-
-type CustomSkills struct {
-	CodeReview         string `json:"codeReview,omitempty"`
-	SecurityReview     string `json:"securityReview,omitempty"`
-	RiskClassification string `json:"riskClassification,omitempty"`
-	ReviewChanges      string `json:"reviewChanges,omitempty"`
 }
 
 type GoogleDriveConfig struct {
@@ -139,10 +136,10 @@ func (c Config) Validate() error {
 	}
 
 	skillNames := []struct{ stage, name string }{
-		{"codeReview", c.CustomSkills.CodeReview},
-		{"securityReview", c.CustomSkills.SecurityReview},
-		{"riskClassification", c.CustomSkills.RiskClassification},
-		{"reviewChanges", c.CustomSkills.ReviewChanges},
+		{"codeReview", c.Stages.CodeReview.CustomSkill},
+		{"securityReview", c.Stages.SecurityReview.CustomSkill},
+		{"riskClassification", c.Stages.RiskClassification.CustomSkill},
+		{"reviewChanges", c.Stages.ReviewChanges.CustomSkill},
 	}
 
 	for _, skill := range skillNames {
@@ -154,7 +151,7 @@ func (c Config) Validate() error {
 			skill.name == "." ||
 			skill.name == ".." ||
 			strings.ContainsAny(skill.name, `/\`) {
-			return fmt.Errorf("customSkills.%s must be a single nonempty skill name", skill.stage)
+			return fmt.Errorf("stages.%s.customSkill must be a single nonempty skill name", skill.stage)
 		}
 	}
 

@@ -2,16 +2,7 @@
 [] - branch of task name should be set here
 [] - add assert test lib
 [] - in summary risk-classification show status
-[] - get some eveidence
-4. RISK CLASSIFICATION
-   Status:    SUCCEEDED
-   Agent:     codex
-   Model:     gpt-6.1-sol
-   Duration:  53 sec
-   Changes:   No code changes made.
-
-
-[] - posibilty to use a folder as input promt
+[x] - posibil to use a folder as input promt
 
 [] - eponce@HP250G10-06262:~/code/tenaris-telecom-audit-poc$ software-factory
 Execution logs: logs/PTADF-49-update-cantidad-lineas-gasto/run-2026-10-15_19-32-21.003616448

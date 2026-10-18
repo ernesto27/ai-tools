@@ -8,4 +8,4 @@
 [x] - Check if branch in run exists in remote repo 
 [x] - i want to add reviewer in PR githug
 [] - improve error messages in general
-
+[] - Support complete configuration through CLI flags without requiring or generating agent-sandbox.json, so Soft Factory can pass settings from software-factory.json.agentSandbox directly to the executable. Add flags for currently JSON-only settings, including apiKey and reviewers, and an explicit option to skip reading/validating the local JSON file. Preserve existing defaults, explicit false/empty values, authentication modes, and Agent Sandbox-owned validation. Keep secrets out of logs and diagnostics; assess a secure input alternative for API keys rather than exposing them in process arguments. Cover run/resume and their TUI variants with tests and documentation. This is a future task, not an implementation change.

@@ -2,28 +2,42 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agentoutput"
 )
 
-func TestJSONEventWriter(t *testing.T) {
-	for _, tc := range []struct{ name, input, want string }{
-		{"event", `{"type":"system","tools":["Bash","Read"],"model":"sonnet"}` + "\n", "{\n  \"type\": \"system\",\n  \"tools\": [\n    \"Bash\",\n    \"Read\"\n  ],\n  \"model\": \"sonnet\"\n}\n"},
-		{"several events", "{\"type\":\"stream_event\"}\n{\"type\":\"result\"}\n", "{\n  \"type\": \"stream_event\"\n}\n{\n  \"type\": \"result\"\n}\n"},
-		{"diagnostics", "[claude-code:unrecognized_model] {\"model\":\"gpt-6-luna\"}\n\n{broken\n", "[claude-code:unrecognized_model] {\"model\":\"gpt-6-luna\"}\n\n{broken\n"},
-		{"final without newline", "{\"is_error\":true}", "{\n  \"is_error\": true\n}"},
-		{"unfinished final", "{\"type\":", "{\"type\":"},
-		{"empty", "", ""},
+// Normalize wall-clock timestamps so expectations remain stable across runs.
+func auditText(text string) string {
+	return regexp.MustCompile(`(?m)^\d{2}:\d{2}:\d{2}  `).ReplaceAllString(text, "TIME  ")
+}
+
+func TestAgentOutputFormatter(t *testing.T) {
+	const separator = "---------------------------------------------\n"
+	for _, tc := range []struct{ name, agent, input, want string }{
+		{"claude message", agentoutput.AgentClaude, `{"type":"result","result":"done"}` + "\n", "TIME    AGENT\n            done\n\n"},
+		{"codex message", agentoutput.AgentCodex, `{"type":"item.completed","item":{"type":"agent_message","text":"done"}}` + "\n", "TIME    AGENT\n            done\n\n"},
+		{"initialization", agentoutput.AgentClaude, `{"type":"system","subtype":"init","tools":["Bash","Read"],"model":"sonnet"}` + "\n", ""},
+		{"partial events", agentoutput.AgentClaude, "{\"type\":\"stream_event\"}\n{\"type\":\"result\"}\n", ""},
+		{"diagnostic", agentoutput.AgentClaude, "diagnostic\n\n", "TIME  ! OUTPUT\n            Unrecognized claude output: invalid character 'd' looking for beginning of value\n            diagnostic\n\n"},
+		{"final without newline", agentoutput.AgentClaude, `{"type":"result","result":"done"}`, "TIME    AGENT\n            done\n\n"},
+		{"missing type", agentoutput.AgentClaude, `{"is_error":true}`, "TIME  ! OUTPUT\n            Unrecognized claude output: missing message type\n            {\"is_error\":true}\n\n"},
+		{"unfinished final", agentoutput.AgentClaude, `{"type":`, "TIME  ! OUTPUT\n            Unrecognized claude output: unexpected end of JSON input\n            {\"type\":\n\n"},
+		{"empty", agentoutput.AgentClaude, "", ""},
 	} {
-		for _, size := range []int{1, 4096} {
-			t.Run(tc.name+"/"+map[int]string{1: "byte chunks", 4096: "large chunks"}[size], func(t *testing.T) {
+		for _, chunk := range []struct {
+			name string
+			size int
+		}{{"byte chunks", 1}, {"large chunks", 4096}} {
+			t.Run(tc.name+"/"+chunk.name, func(t *testing.T) {
 				var out bytes.Buffer
-				writer := agentOutputFormatter("claude")(&out)
-				for offset := 0; offset < len(tc.input); offset += size {
-					end := min(offset+size, len(tc.input))
+				writer := agentOutputFormatter(tc.agent)(&out, "fix-login")
+				for offset := 0; offset < len(tc.input); offset += chunk.size {
+					end := min(offset+chunk.size, len(tc.input))
 					if n, err := writer.Write([]byte(tc.input[offset:end])); n != end-offset || err != nil {
 						t.Fatalf("Write = %d, %v", n, err)
 					}
@@ -31,48 +45,50 @@ func TestJSONEventWriter(t *testing.T) {
 				if err := writer.Close(); err != nil {
 					t.Fatal(err)
 				}
-				if got := out.String(); got != tc.want {
-					t.Fatalf("formatted output = %q, want %q", got, tc.want)
+				want := tc.agent + " / fix-login\n" + separator + tc.want + separator
+				if got := auditText(out.String()); got != want {
+					t.Fatalf("formatted output = %q, want %q", got, want)
 				}
+				before := out.String()
 				if err := writer.Close(); err != nil {
 					t.Fatal(err)
 				}
-				if out.String() != tc.want {
+				if out.String() != before {
 					t.Fatal("Close repeated output")
+				}
+				if _, err := writer.Write([]byte("more")); !errors.Is(err, io.ErrClosedPipe) {
+					t.Fatalf("Write after Close = %v", err)
 				}
 			})
 		}
 	}
-	for _, name := range []string{"codex", "opencode", "pi"} {
+	for _, name := range []string{"opencode", "pi", "unknown"} {
 		if agentOutputFormatter(name) != nil {
 			t.Fatalf("unexpected formatter for %s", name)
 		}
 	}
 }
 
-func TestJSONEventWriterPreservesContentAndStreams(t *testing.T) {
+func TestAgentOutputFormatterStreamsLargeEvents(t *testing.T) {
 	var out bytes.Buffer
-	writer := &jsonEventWriter{out: &out}
-	input := `{"type":"future_event","n":9007199254740993,"text":"你好\n\t\u001b[31m","payload":"` + strings.Repeat("x", 128*1024) + `"}`
+	writer := agentOutputFormatter(agentoutput.AgentClaude)(&out, "fix-login")
+	header := out.String()
+	message := "你好" + strings.Repeat("x", 128*1024)
+	input := `{"type":"result","result":"` + message + `"}`
 	if _, err := writer.Write([]byte(input)); err != nil {
 		t.Fatal(err)
 	}
-	if out.Len() != 0 {
+	if out.String() != header {
 		t.Fatal("incomplete line emitted early")
 	}
 	if _, err := writer.Write([]byte("\n")); err != nil {
 		t.Fatal(err)
 	}
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, out.Bytes()); err != nil {
-		t.Fatal(err)
+	if got := auditText(out.String()); got != header+"TIME    AGENT\n            "+message+"\n\n" {
+		t.Fatal("large Unicode message was not rendered before EOF")
 	}
-	if compact.String() != input {
-		t.Fatal("JSON fields, order, numbers, or escapes changed")
-	}
-	// The first event must already be visible while later output is pending.
 	before := out.String()
-	if _, err := writer.Write([]byte("{\"type\":")); err != nil {
+	if _, err := writer.Write([]byte(`{"type":`)); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != before {
@@ -81,16 +97,21 @@ func TestJSONEventWriterPreservesContentAndStreams(t *testing.T) {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if out.String() != before+"{\"type\":" {
+	if !strings.Contains(out.String()[len(before):], "! OUTPUT\n            Unrecognized claude output: unexpected end of JSON input\n            {\"type\":\n") {
 		t.Fatal("partial final event lost")
 	}
 }
 
-type shortJSONOutput struct{}
+type shortAuditOutput struct{}
 
-func (shortJSONOutput) Write(p []byte) (int, error) { return len(p) - 1, nil }
+func (shortAuditOutput) Write(p []byte) (int, error) { return len(p) - 1, nil }
 
-func TestJSONEventWriterOutputFailures(t *testing.T) {
+// Allow the header through, then inject a failure during an event or EOF flush.
+type switchAuditOutput struct{ destination io.Writer }
+
+func (w *switchAuditOutput) Write(p []byte) (int, error) { return w.destination.Write(p) }
+
+func TestAgentOutputFormatterOutputFailures(t *testing.T) {
 	failure := errors.New("output unavailable")
 	for _, tc := range []struct {
 		name string
@@ -98,25 +119,32 @@ func TestJSONEventWriterOutputFailures(t *testing.T) {
 		want error
 	}{
 		{"error", failedTranscript{failure}, failure},
-		{"short write", shortJSONOutput{}, io.ErrShortWrite},
+		{"short write", shortAuditOutput{}, io.ErrShortWrite},
 	} {
-		for _, newline := range []bool{true, false} {
-			t.Run(tc.name+"/"+map[bool]string{true: "write", false: "close"}[newline], func(t *testing.T) {
-				writer := &jsonEventWriter{out: tc.out}
-				input := "{\"type\":\"result\"}"
-				if newline {
+		for _, phase := range []string{"header", "write", "close"} {
+			t.Run(tc.name+"/"+phase, func(t *testing.T) {
+				out := &switchAuditOutput{destination: io.Discard}
+				if phase == "header" {
+					out.destination = tc.out
+				}
+				writer := agentOutputFormatter(agentoutput.AgentClaude)(out, "fix-login")
+				out.destination = tc.out
+				input := `{"type":"result","result":"done"}`
+				if phase != "close" {
 					input += "\n"
 				}
 				_, err := writer.Write([]byte(input))
-				if newline {
+				if phase == "close" {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else {
 					if !errors.Is(err, tc.want) {
 						t.Fatalf("Write error = %v", err)
 					}
 					if _, err := writer.Write([]byte("more")); !errors.Is(err, tc.want) {
 						t.Fatalf("subsequent error = %v", err)
 					}
-				} else if err != nil {
-					t.Fatal(err)
 				}
 				if err := writer.Close(); !errors.Is(err, tc.want) {
 					t.Fatalf("Close error = %v", err)
@@ -129,17 +157,20 @@ func TestJSONEventWriterOutputFailures(t *testing.T) {
 func TestFormattedClaudeOutputInLiveBridge(t *testing.T) {
 	var log bytes.Buffer
 	bridge := &liveBridge{log: &log}
-	writer := agentOutputFormatter("claude")(bridge)
-	input := "{\"type\":\"result\",\"result\":\"done\"}\n"
-	if _, err := writer.Write([]byte(input)); err != nil {
+	writer := agentOutputFormatter(agentoutput.AgentClaude)(bridge, "fix-login")
+	if _, err := writer.Write([]byte("{\"type\":\"result\",\"result\":\"done\"}\n")); err != nil {
 		t.Fatal(err)
 	}
 	text, _ := bridge.drain(false)
-	want := "{\n  \"type\": \"result\",\n  \"result\": \"done\"\n}\n"
-	if text != want || log.String() != want {
-		t.Fatal("formatted event did not reach TUI and transcript")
+	want := "claude / fix-login\n---------------------------------------------\nTIME    AGENT\n            done\n\n"
+	if auditText(text) != want || log.String() != text {
+		t.Fatalf("formatted event did not reach TUI and transcript: %q / %q", text, log.String())
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
+	}
+	footer, _ := bridge.drain(false)
+	if footer != "---------------------------------------------\n" || log.String() != text+footer {
+		t.Fatal("footer did not reach TUI and transcript")
 	}
 }

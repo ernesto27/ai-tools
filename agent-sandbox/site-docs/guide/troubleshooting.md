@@ -68,6 +68,23 @@ or scripts, use `run` or `resume`. Check the log path in the error message;
 TUI transcripts normally live under `~/.config/agent-sandbox/logs/`, honoring
 `XDG_CONFIG_HOME`.
 
+## The feed shows `! OUTPUT` or `? EVENT`
+
+Codex and Claude Code use the [compact audit feed](running.md#read-the-compact-audit-feed).
+`! OUTPUT` includes a decoding diagnostic and the original output line.
+`? EVENT` can report an unsupported event type, an API retry, or an MCP server
+notice. Neither label alone determines whether the task succeeded; check the
+final exit status and any accompanying errors.
+
+For a TUI run, inspect its transcript under `~/.config/agent-sandbox/logs/`,
+honoring `XDG_CONFIG_HOME`. The error or nonzero-exit summary prints the log
+path. The transcript contains formatted audit entries, not the original JSON
+stream. For plain runs, capture stdout and stderr if you need a record:
+
+```bash
+agent-sandbox run -a codex -q "inspect the failing tests" > sandbox.log 2>&1
+```
+
 ## Push or PR creation fails
 
 Check the agent's exit status and inspect the worktree first. Publishing

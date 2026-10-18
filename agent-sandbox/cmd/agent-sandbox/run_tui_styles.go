@@ -7,6 +7,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agentoutput"
 )
 
 type livePalette struct {
@@ -33,13 +35,15 @@ func liveOutput(lines []string, width int, palette livePalette) string {
 	for i, line := range lines {
 		style := lipgloss.NewStyle().Foreground(palette.text)
 		switch {
-		case strings.HasPrefix(line, "ERROR:") || strings.Contains(line, " ERROR "):
+		case strings.HasPrefix(line, "ERROR:") || strings.Contains(line, " ERROR ") || strings.Contains(line, "  "+agentoutput.LabelFailed):
 			style = style.Foreground(palette.failure)
-		case strings.HasPrefix(line, "warning:"):
+		case strings.HasPrefix(line, "warning:") || strings.Contains(line, "  "+agentoutput.LabelOutput) || strings.Contains(line, "  "+agentoutput.LabelEvent):
 			style = style.Foreground(palette.warning)
-		case strings.HasPrefix(line, "$ "):
+		case strings.HasPrefix(line, "$ ") || strings.Contains(line, "  "+agentoutput.LabelCommand) || strings.Contains(line, "  "+agentoutput.LabelToolStart):
 			style = style.Foreground(palette.accent).Bold(true)
-		case line == "user", line == "thinking", line == "exec", line == "codex", line == "environment", line == "environment summary":
+		case strings.Contains(line, "  "+agentoutput.LabelResult) || strings.Contains(line, "  "+agentoutput.LabelTool) || strings.Contains(line, "  "+agentoutput.LabelFile):
+			style = style.Foreground(palette.accent)
+		case line == "user", line == "thinking", line == "exec", line == agentoutput.AgentCodex, line == "environment", line == "environment summary":
 			style = style.Foreground(palette.muted).Bold(true)
 		case strings.HasPrefix(line, "OpenAI Codex"):
 			style = style.Foreground(palette.muted)

@@ -15,6 +15,10 @@
 | `worktree-delete -b <branch> [--force]` | Remove a worktree and its local branch. |
 | `worktree-delete-all [--yes]` | Remove all registered tasks for the current repository, including uncommitted work. |
 
+Codex and Claude Code show a [compact audit feed](running.md#read-the-compact-audit-feed)
+in all four execution commands. Plain commands support redirection; TUI commands
+require interactive terminal input and output.
+
 ## Execution flags
 
 These flags apply to `run`, `resume`, and their TUI equivalents:

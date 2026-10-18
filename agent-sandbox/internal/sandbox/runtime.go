@@ -25,7 +25,8 @@ type Runtime struct {
 	Sizes            <-chan docker.TerminalSize
 	Observe          func(Event)
 	ViewOwnsTerminal bool
-	FormatStdout     func(io.Writer) io.WriteCloser
+	// FormatStdout receives the actual branch, including generated run names.
+	FormatStdout func(io.Writer, string) io.WriteCloser
 }
 
 func (r Runtime) withDefaults() Runtime {
@@ -96,7 +97,11 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 	if err != nil {
 		return 0, err
 	}
-	runOpts.FormatStdout = r.FormatStdout
+	if r.FormatStdout != nil {
+		runOpts.FormatStdout = func(out io.Writer) io.WriteCloser {
+			return r.FormatStdout(out, record.Branch)
+		}
+	}
 	r.emit(Event{Phase: "Running agent"})
 	status, err := client.Run(ctx, runOpts)
 	if err != nil {

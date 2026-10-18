@@ -6,7 +6,7 @@ import (
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
 
-// codex runs OpenAI Codex. It needs a TTY, so the container is started with -it.
+// codex uses exec's non-interactive JSONL stream for CLI presentation.
 type codex struct{}
 
 func (codex) Name() string     { return "codex" }
@@ -31,7 +31,6 @@ func (c codex) Container(home string) (docker.RunOptions, error) {
 	}
 
 	return docker.RunOptions{
-		TTY: true,
 		Env: []string{"CODEX_HOME=/codex-home"},
 		Mounts: []docker.Mount{
 			{Host: codexHome, Container: "/codex-home"},
@@ -44,7 +43,6 @@ func (c codex) Container(home string) (docker.RunOptions, error) {
 // login, and writing a login cache would persist the API key after the run.
 func (codex) APIKeyContainer(key string) docker.RunOptions {
 	return docker.RunOptions{
-		TTY: true,
 		Env: []string{
 			"HOME=/codex-home",
 			"CODEX_HOME=/codex-home",
@@ -76,7 +74,7 @@ func codexArgs(model, effort, prompt string, images []string, apiKey bool) []str
 			"--config", `model_providers.agent_sandbox_api={name="OpenAI API",base_url="https://api.openai.com/v1",env_key="OPENAI_API_KEY",wire_api="responses"}`,
 		)
 	}
-	args = append(args, "exec")
+	args = append(args, "exec", "--json")
 	for _, image := range images {
 		args = append(args, "-i", image)
 	}

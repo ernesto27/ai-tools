@@ -179,14 +179,6 @@ func TestUnifiedSandboxSnapshot(t *testing.T) {
 	if cfg.Stages.Implementation.Agent != "codex" || cfg.Stages.CodeReview.Model != "review-model" || cfg.Documents[0] != "support.txt" {
 		t.Fatal("Factory settings lost")
 	}
-	if string(cfg.SandboxJSON()) != embedded {
-		t.Fatal("transport changed original JSON")
-	}
-	copy := cfg.SandboxJSON()
-	copy[0] = 'x'
-	if string(cfg.SandboxJSON()) != embedded {
-		t.Fatal("transport exposes mutable snapshot")
-	}
 }
 
 func TestUnifiedSandboxNoLegacyFallback(t *testing.T) {
@@ -207,7 +199,7 @@ func TestUnifiedSandboxNoLegacyFallback(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if cfg.AgentSandbox.Agent != "" || cfg.AgentSandbox.Run != nil || string(cfg.SandboxJSON()) != "{}" {
+				if cfg.AgentSandbox.Agent != "" || cfg.AgentSandbox.Run != nil {
 					t.Fatal("legacy fallback or defaults added")
 				}
 			})
@@ -241,14 +233,7 @@ func TestUnifiedSnapshotRepeatedObject(t *testing.T) {
 			t.Fatal(err)
 		}
 		if cfg.AgentSandbox.Run != nil || cfg.AgentSandbox.Agent == "discarded" {
-			t.Fatal("Factory and transport disagree on final object")
-		}
-		want := last
-		if last == "null" {
-			want = "{}"
-		}
-		if string(cfg.SandboxJSON()) != want {
-			t.Fatalf("transport = %s", cfg.SandboxJSON())
+			t.Fatal("earlier sandbox settings survived the final object")
 		}
 	}
 }

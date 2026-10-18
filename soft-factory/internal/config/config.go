@@ -13,8 +13,7 @@ import (
 )
 
 type Config struct {
-	AgentSandbox     sandboxconfig.Config `json:"agentSandbox"`
-	agentSandboxJSON json.RawMessage
+	AgentSandbox sandboxconfig.Config `json:"agentSandbox"`
 
 	Documents    []string           `json:"documents"`
 	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
@@ -75,15 +74,6 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// SandboxJSON returns the original embedded object, including unknown fields.
-// Only an omitted or top-level null object becomes empty settings.
-func (c Config) SandboxJSON() []byte {
-	if len(c.agentSandboxJSON) == 0 || string(c.agentSandboxJSON) == "null" {
-		return []byte("{}")
-	}
-	return append([]byte(nil), c.agentSandboxJSON...)
-}
-
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -91,9 +81,8 @@ func Load(path string) (Config, error) {
 	}
 
 	var cfg Config
-	// Decode the embedded object only after retaining its raw representation.
-	// Shadowing the typed field also makes repeated top-level agentSandbox keys
-	// resolve to the same final object for Factory consumers and the subprocess.
+	// Decode the final embedded object once so repeated agentSandbox keys do
+	// not merge settings from an earlier object.
 	raw := struct {
 		*Config
 		DisabledStages json.RawMessage `json:"disabledStages"`
@@ -102,7 +91,6 @@ func Load(path string) (Config, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
-	cfg.agentSandboxJSON = raw.AgentSandbox
 	if len(raw.AgentSandbox) != 0 {
 		if err := json.Unmarshal(raw.AgentSandbox, &cfg.AgentSandbox); err != nil {
 			return Config{}, fmt.Errorf("parse factory configuration %s: agentSandbox: %w", path, err)

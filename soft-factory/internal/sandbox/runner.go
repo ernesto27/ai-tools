@@ -402,6 +402,7 @@ func execute(options ExecuteOptions) (string, error) {
 		args := append([]string(nil), options.Args...)
 		options.Args = append(args, "--branch", options.Branch)
 	}
+	options.Args = sandboxArgs(options.Settings, options.Args)
 	cmd := exec.CommandContext(ctx, "agent-sandbox", options.Args...)
 	// Let the sandbox stop its container on interruption before forcing exit.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }

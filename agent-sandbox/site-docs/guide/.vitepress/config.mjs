@@ -11,8 +11,7 @@ export default defineConfig({
     logo: { src: '/mark.svg', alt: '' },
     nav: [
       { text: 'User guide', link: '/first-run' },
-      { text: 'Reference', link: '/reference' },
-      { text: 'Soft Factory', link: 'https://ernesto27.github.io/ai-tools/soft-factory/' }
+      { text: 'Reference', link: '/reference' }
     ],
     sidebar: [
       { text: 'Overview', link: '/' },

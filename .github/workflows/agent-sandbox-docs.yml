@@ -1,10 +1,9 @@
-name: AI Tools Documentation
+name: Agent Sandbox Documentation
 
 on:
   push:
     tags:
       - 'agent-sandbox-v*'
-      - 'software-factory-v*'
   workflow_dispatch:
 
 permissions:
@@ -30,42 +29,33 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
-        run: '[[ "$RELEASE_TAG" =~ ^(agent-sandbox|software-factory)-v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+        run: '[[ "$RELEASE_TAG" =~ ^agent-sandbox-v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            agent-sandbox/site-docs/package-lock.json
-            soft-factory/site-docs/package-lock.json
+          cache-dependency-path: agent-sandbox/site-docs/package-lock.json
       - name: Install documentation dependencies
         run: npm ci
       - name: Build and check documentation
         run: npm run docs:build
-      - name: Install Soft Factory documentation dependencies
-        working-directory: soft-factory/site-docs
-        run: npm ci
-      - name: Build and check Soft Factory documentation
-        working-directory: soft-factory/site-docs
-        run: npm run docs:build
-      - name: Assemble both documentation sites
+      - name: Assemble documentation site
         working-directory: .
         run: |
-          mkdir -p _site/soft-factory
+          mkdir -p _site
           cp -a agent-sandbox/site-docs/guide/.vitepress/dist/. _site/
-          cp -a soft-factory/site-docs/guide/.vitepress/dist/. _site/soft-factory/
       - name: Configure GitHub Pages
-        if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/agent-sandbox-v') || startsWith(github.ref, 'refs/tags/software-factory-v'))) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
         uses: actions/configure-pages@v6
       - name: Upload website
-        if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/agent-sandbox-v') || startsWith(github.ref, 'refs/tags/software-factory-v'))) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
   deploy:
-    if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/agent-sandbox-v') || startsWith(github.ref, 'refs/tags/software-factory-v'))) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/agent-sandbox-v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
     needs: build
     runs-on: ubuntu-latest
     permissions:

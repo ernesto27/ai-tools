@@ -59,16 +59,7 @@ func runWorkflow(opts workflowOptions) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runtime, err := sandbox.PrepareRuntime(cfg.SandboxJSON())
-	if err != nil {
-		return err
-	}
-	var cleanupErr error
-	runErr := func() error {
-		defer func() { cleanupErr = runtime.Close() }()
-		return runConfiguredWorkflow(ctx, opts, cfg)
-	}()
-	return errors.Join(runErr, cleanupErr)
+	return runConfiguredWorkflow(ctx, opts, cfg)
 }
 
 func runConfiguredWorkflow(ctx context.Context, opts workflowOptions, cfg config.Config) error {

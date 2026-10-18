@@ -55,12 +55,10 @@ Check for an existing Pages site before enabling or replacing a deployment.
    and select **GitHub Actions** as the source.
 3. In **Settings → Environments → github-pages → Deployment branches and tags**,
    select **Selected branches and tags**. Keep a **Branch** rule for `master`
-   and add separate **Tag** rules for `agent-sandbox-v*` and
-   `software-factory-v*`. Branch rules do not allow
+   and add a **Tag** rule for `agent-sandbox-v*`. Branch rules do not allow
    tags with the same name pattern; the tag rule must be added separately.
-4. Push a stable `agent-sandbox-vMAJOR.MINOR.PATCH` or
-   `software-factory-vMAJOR.MINOR.PATCH` tag, or open
-   **Actions → AI Tools Documentation → Run workflow** and select `master`
+4. Push a stable `agent-sandbox-vMAJOR.MINOR.PATCH` tag, or open
+   **Actions → Agent Sandbox Documentation → Run workflow** and select `master`
    for a manual deployment.
 5. Wait for `build` and `deploy` to succeed. The `github-pages` deployment
    environment reports the published URL.
@@ -69,13 +67,12 @@ This uses GitHub's [custom Pages workflow](https://docs.github.com/en/pages/gett
 No personal server or separate hosting account is needed. If environment
 protection rules require approval, approve the deployment in GitHub.
 
-The shared workflow checks for dead Markdown links and builds both guides on
-release tag pushes and manual runs. Stable release tags for either tool deploy
-both sites from the tagged commit; manual deployment is allowed only from
+The workflow checks for dead Markdown links and builds the guide on release
+tag pushes and manual runs. Stable Agent Sandbox release tags deploy the site
+from the tagged commit; manual deployment is allowed only from
 `master`. Branch pushes and pull requests do not trigger the workflow.
-Agent Sandbox stays at `/ai-tools/`, and Soft Factory is included at
-`/ai-tools/soft-factory/`. The uploaded artifact contains only the generated
-websites, not repository files or local configuration.
+Agent Sandbox is published at `/ai-tools/`. The uploaded artifact contains only
+the generated website, not repository files or local configuration.
 
 If the repository moves or uses a custom domain, update `base` and the sitemap
 hostname in `guide/.vitepress/config.mjs`. If the default branch changes, update the

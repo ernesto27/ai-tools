@@ -15,7 +15,7 @@ import (
 
 type workflowCapture struct {
 	Args      []string
-	Settings  json.RawMessage
+	Legacy    string
 	Prompt    string
 	Directory string
 	Mode      uint32
@@ -27,18 +27,21 @@ func TestUnifiedWorkflowHelper(t *testing.T) {
 	}
 	args := os.Args[slices.Index(os.Args, "--")+1:]
 	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	info, err := os.Stat("agent-sandbox.json")
-	if err != nil {
-		t.Fatal(err)
+	var mode uint32
+	if info, err := os.Stat("agent-sandbox.json"); err == nil {
+		mode = uint32(info.Mode().Perm())
+	}
+	if _, err := os.Stat(".soft-factory-sandbox-runtime"); !os.IsNotExist(err) {
+		t.Fatal("Factory created a runtime configuration directory")
 	}
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	capture := workflowCapture{Args: args, Settings: data, Directory: dir, Mode: uint32(info.Mode().Perm())}
+	capture := workflowCapture{Args: args, Legacy: string(data), Directory: dir, Mode: mode}
 	for i, arg := range args {
 		if arg == "-f" {
 			prompt, err := os.ReadFile(args[i+1])
@@ -62,20 +65,12 @@ func TestUnifiedWorkflowHelper(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if os.Getenv("FACTORY_WORKFLOW_REPLACE") == "1" {
-		if err := os.WriteFile("replacement.json", []byte("unexpected replacement"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Rename("replacement.json", "agent-sandbox.json"); err != nil {
-			t.Fatal(err)
-		}
-	}
 	if os.Getenv("FACTORY_WORKFLOW_FAIL") == "1" {
 		fmt.Fprintln(os.Stderr, "upstream sandbox validation failed")
 		os.Exit(17)
 	}
 	// Mutating the maintained config during the first child must not affect the
-	// branch, task path, stage overrides, logs, or transport used by later stages.
+	// branch, task path, stage overrides, logs, or arguments used by later stages.
 	if err := os.WriteFile(factoryConfigFile, []byte(`{"agentSandbox":{"agent":"mutated","run":{"filePrompt":"missing.txt"}}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +131,7 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 	for _, command := range []string{"run", "continue", "review", "resume"} {
 		t.Run(command, func(t *testing.T) {
 			root := prepareUnifiedWorkflow(t)
-			// Malformed input is moved without parsing and restored verbatim.
+			// Existing legacy input stays untouched, including while children run.
 			original := "{malformed conflicting legacy\n"
 			if err := os.WriteFile("agent-sandbox.json", []byte(original), 0640); err != nil {
 				t.Fatal(err)
@@ -181,10 +176,10 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 				if err := json.Unmarshal([]byte(line), &capture); err != nil {
 					t.Fatal(err)
 				}
-				if string(capture.Settings) != embedded {
-					t.Fatalf("child %d settings changed: %s", i, capture.Settings)
+				if capture.Legacy != original || capture.Mode != 0640 {
+					t.Fatalf("child %d saw modified legacy configuration: %+v", i, capture)
 				}
-				if capture.Directory != root || capture.Mode != 0600 {
+				if capture.Directory != root {
 					t.Fatalf("child context = %q, %o", capture.Directory, capture.Mode)
 				}
 				mode := "resume"
@@ -209,7 +204,7 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 					t.Fatalf("child task context = %q", capture.Prompt)
 				}
 				if i == 0 && command != "review" {
-					if at := slices.Index(capture.Args, "-a"); at < 0 || capture.Args[at+1] != "claude" || slices.Contains(capture.Args, "-m") {
+					if at := slices.Index(capture.Args, "-a"); at < 0 || capture.Args[at+1] != "claude" || !slices.Contains(capture.Args, "--model") {
 						t.Fatalf("independent agent override lost: %q", capture.Args)
 					}
 				}
@@ -218,7 +213,7 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 					codeIndex = 0
 				}
 				if i == codeIndex {
-					if at := slices.Index(capture.Args, "-m"); at < 0 || capture.Args[at+1] != "stage-model" || slices.Contains(capture.Args, "-a") {
+					if at := slices.Index(capture.Args, "-m"); at < 0 || capture.Args[at+1] != "stage-model" || !slices.Contains(capture.Args, "--agent") {
 						t.Fatalf("independent model override lost: %q", capture.Args)
 					}
 				}
@@ -303,29 +298,7 @@ func TestUnifiedWorkflowFailureCleanup(t *testing.T) {
 	}
 }
 
-func TestUnifiedWorkflowReportsExecutionAndCleanupFailure(t *testing.T) {
-	prepareUnifiedWorkflow(t)
-	t.Setenv("FACTORY_WORKFLOW_FAIL", "1")
-	t.Setenv("FACTORY_WORKFLOW_REPLACE", "1")
-	if err := os.WriteFile(factoryConfigFile, []byte(`{"agentSandbox":{"run":{"filePrompt":"task.txt"},"resume":{"branch":"resume-branch"}}}`), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile("agent-sandbox.json", []byte("original"), 0640); err != nil {
-		t.Fatal(err)
-	}
-	err := runWorkflow(workflowOptions{})
-	if err == nil || !strings.Contains(err.Error(), "execute agent-sandbox") || !strings.Contains(err.Error(), "clean up sandbox configuration") {
-		t.Fatalf("combined failure = %v", err)
-	}
-	for path, want := range map[string]string{"agent-sandbox.json": "unexpected replacement", ".soft-factory-sandbox-runtime/original.json": "original"} {
-		data, err := os.ReadFile(path)
-		if err != nil || string(data) != want {
-			t.Fatalf("preserved %s = %q, %v", path, data, err)
-		}
-	}
-}
-
-func TestUnifiedWorkflowEmptySandboxTransport(t *testing.T) {
+func TestUnifiedWorkflowEmptySandboxFlags(t *testing.T) {
 	for _, sandboxProperty := range []string{"", `,"agentSandbox":null`} {
 		t.Run(sandboxProperty, func(t *testing.T) {
 			prepareUnifiedWorkflow(t)
@@ -334,7 +307,7 @@ func TestUnifiedWorkflowEmptySandboxTransport(t *testing.T) {
 				t.Fatal(err)
 			}
 			// No configured branch means execution logging is unavailable. Factory must
-			// still send empty settings downstream and leave command requirements there.
+			// still send empty settings as flags downstream and leave command requirements there.
 			if err := runWorkflow(workflowOptions{Implement: true}); err != nil {
 				t.Fatal(err)
 			}
@@ -346,8 +319,8 @@ func TestUnifiedWorkflowEmptySandboxTransport(t *testing.T) {
 			if err := json.Unmarshal(dataBytes, &capture); err != nil {
 				t.Fatal(err)
 			}
-			if string(capture.Settings) != "{}" {
-				t.Fatalf("empty transport = %s", capture.Settings)
+			if capture.Legacy != "" || capture.Mode != 0 {
+				t.Fatal("Factory generated a sandbox configuration file")
 			}
 			at := slices.Index(capture.Args, "--branch")
 			if at < 0 || capture.Args[at+1] != "" {

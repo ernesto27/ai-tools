@@ -35,7 +35,7 @@ func TestPromptSandboxHelper(t *testing.T) {
 	}
 	capture := promptCapture{Args: args}
 	for i, arg := range args {
-		if arg == "-f" && i+1 < len(args) {
+		if (arg == "-f" || arg == "--filePrompt") && i+1 < len(args) && args[i+1] != "" {
 			text, err := os.ReadFile(args[i+1])
 			if err != nil {
 				t.Fatal(err)
@@ -273,6 +273,7 @@ func TestStagePromptIntegration(t *testing.T) {
 						}
 					}
 					wantArgs = append(wantArgs, "-f", promptPath, "--branch", "main")
+					wantArgs = sandboxArgs(input.Config.AgentSandbox, wantArgs)
 					if strings.Join(capture.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 						t.Fatalf("args %q, want %q", capture.Args, wantArgs)
 					}
@@ -317,20 +318,24 @@ func TestImplementationPromptModes(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := readPromptCapture(t, path)
-			want := ""
-			if continuing {
-				want = "file task {{literal}} 100%"
-			}
+			want := "file task {{literal}} 100%"
 			if got.Prompt != want {
 				t.Fatalf("prompt %q, want %q", got.Prompt, want)
 			}
 			wantArgs := []string{"run", "--branch", "main"}
 			if continuing {
-				if len(got.Args) != 5 {
-					t.Fatalf("args %q", got.Args)
+				promptIndex := -1
+				for i, arg := range got.Args {
+					if arg == "-f" {
+						promptIndex = i
+					}
 				}
-				wantArgs = []string{"resume", "-f", got.Args[2], "--branch", "main"}
+				if promptIndex < 0 {
+					t.Fatalf("missing prompt: %q", got.Args)
+				}
+				wantArgs = []string{"resume", "-f", got.Args[promptIndex+1], "--branch", "main"}
 			}
+			wantArgs = sandboxArgs(cfg.AgentSandbox, wantArgs)
 			if strings.Join(got.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 				t.Fatalf("args %q, want %q", got.Args, wantArgs)
 			}

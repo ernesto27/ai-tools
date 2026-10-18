@@ -1,7 +1,5 @@
 # Soft Factory
 
-[Read the documentation](https://ernesto27.github.io/ai-tools/soft-factory/).
-
 Soft Factory is a command-line tool that uses `agent-sandbox` to implement a task, review the changes, apply corrections, assess the final risk, and explain the final changes.
 
 You can provide a task from a local file or a Jira issue, and include supporting documents from local files or Google Drive.
@@ -16,24 +14,14 @@ object into the top-level `agentSandbox` property, keeping `documents`,
 `customSkills`, `disabledStages`, and `stages` unchanged. The old file is never
 read as input: there is no fallback, merge, or automatic migration.
 
-Factory loads this configuration once per workflow. It writes the original
-embedded JSON to a temporary `./agent-sandbox.json` with mode `0600` in the
-project directory, runs the existing Agent Sandbox binary there, then removes
-the generated file. Any pre-existing regular file is backed up without parsing
-and restored with its original contents and permissions, even after failures
-or normal cancellation. Symlinks and non-regular paths are refused.
+Factory loads this configuration once per workflow and passes sandbox settings
+as CLI flags. Section settings override shared fields, and stage/workflow
+arguments override both. API keys and reviewers are ignored because Agent
+Sandbox has no CLI flags for them. Factory does not create or replace
+`agent-sandbox.json` or a runtime configuration directory.
 
-Keep `software-factory.json`, `agent-sandbox.json`, and
-`.soft-factory-sandbox-runtime/` in your project's `.gitignore`; configuration
-can contain secrets. The private runtime directory holds the workflow lock,
-backup, and recovery information. A competing or interrupted run stops with
-recovery instructions. After forced termination, first stop Factory and all
-its sandbox children, inspect the runtime directory's `owner` file and the
-generated path, preserve `original.json`, and manually restore that backup
-before removing the runtime directory. If there was no original file, remove
-the generated file after confirming ownership. Never remove recovery artifacts
-while a workflow is active. Do not run a separate manual `agent-sandbox`
-workflow in the same directory while Factory owns its runtime configuration.
+Keep `software-factory.json` in your project's `.gitignore`; configuration
+can contain secrets.
 
 ### `software-factory.json`: workflow and sandbox settings
 
@@ -175,16 +163,16 @@ The `run` section controls implementation. The `resume` section controls code re
 Soft Factory decodes `agentSandbox` using Agent Sandbox's exported Go configuration
 type. Factory reports JSON/type errors and filesystem failures; Agent Sandbox
 validates sandbox settings and command requirements when each stage starts.
-Omitting `agentSandbox` or setting it to `null` delivers `{}` to Agent Sandbox.
+Omitting `agentSandbox` or setting it to `null` uses empty sandbox settings.
 Factory adds no required-sandbox check, though reading a local task without a
 usable `agentSandbox.run.filePrompt` can report a contextual filesystem error.
 Explicit Factory flags (including stage agent/model overrides and workflow
 controls) take priority, followed by the applicable section, then shared fields.
 Agent Sandbox supplies defaults. Explicit `false` and empty section values
 retain their upstream meaning. Relative task and sandbox paths resolve from
-the project root; the temporary transport does not rebase paths.
+the project root.
 Use camelCase keys such as `filePrompt`,
-`baseImage`, `apiKey`, and `commitMessage`; old hyphenated keys are unsupported.
+`baseImage` and `commitMessage`; old hyphenated keys are unsupported.
 Keep explicit branch names for Factory's worktree reports and execution logs.
 
 Example for a local task:

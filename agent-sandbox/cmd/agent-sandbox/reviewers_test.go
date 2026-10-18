@@ -61,6 +61,12 @@ func TestReviewerConfigCommandIsolation(t *testing.T) {
 		{command: "resume", wantPR: true},
 		{command: "resume-tui", wantPR: true},
 		{command: "run", args: []string{"--pr=false"}, want: []string{"Alice", "bob-2"}},
+		{command: "run", args: []string{"--reviewers", "CLI-user"}, want: []string{"CLI-user"}, wantPR: true},
+		{command: "run-tui", args: []string{"--reviewers", "CLI-user"}, want: []string{"CLI-user"}, wantPR: true},
+		{command: "resume", args: []string{"--reviewers", "CLI-user"}, wantPR: true},
+		{command: "resume-tui", args: []string{"--reviewers", "CLI-user"}, wantPR: true},
+		{command: "resume", args: []string{"--reviewers="}, wantPR: true},
+		{command: "resume-tui", args: []string{"--reviewers="}, wantPR: true},
 	} {
 		t.Run(tc.command+strings.Join(tc.args, ""), func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -93,9 +99,6 @@ func TestReviewerConfigCommandIsolation(t *testing.T) {
 			}
 			if !reflect.DeepEqual(flags.Reviewers, tc.want) || flags.PR != tc.wantPR {
 				t.Fatalf("reviewers = %v, PR = %t; want %v, %t", flags.Reviewers, flags.PR, tc.want, tc.wantPR)
-			}
-			if probe.Flags().Lookup("reviewers") != nil {
-				t.Fatal("reviewers must remain JSON-only")
 			}
 		})
 	}

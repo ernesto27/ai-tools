@@ -74,7 +74,24 @@ not saved or replayed on the next resume. See [publication recovery](troubleshoo
 
 ## Request reviewers
 
-Add plain GitHub usernames, without `@`, to the `run` section:
+Pass one plain GitHub username per repeatable flag, without a shorthand:
+
+```bash
+agent-sandbox run -a claude --pr --reviewers alice --reviewers bob -q "fix the login redirect"
+```
+
+On `run` and `run-tui`, explicit CLI values replace `run.reviewers` entirely;
+lists are not combined. Omit the flag to use the JSON list. Pass
+`--reviewers=""` alone to clear configured reviewers. Empty or whitespace-only
+entries in any other list, including a clear value mixed with named reviewers,
+are usage errors before sandbox execution.
+
+Surrounding whitespace is trimmed. Usernames may contain letters, digits, and
+hyphens, starting with a letter or digit. Mentions (`@alice`), emails, teams,
+comma-separated lists, and option-like strings are rejected. Duplicate names
+are removed case-insensitively, retaining first occurrence order and spelling.
+
+For saved defaults, add usernames to the `run` section:
 
 ```json
 {
@@ -87,6 +104,16 @@ Add plain GitHub usernames, without `@`, to the `run` section:
 ```
 
 Then supply your prompt with `agent-sandbox run -q "your task"`.
-Reviewer requests apply only when creating a new PR through `run` or `run-tui`.
-They do not modify existing PRs and are not supported in `resume`.
+Reviewer requests apply only when creating a new PR with `--pr` through `run`
+or `run-tui`. Existing PRs are preserved. Push-only runs, absent `--pr`, no
+reviewable changes, agent failures, and cancellation do not request reviewers.
+If PR creation reports an error but recovery finds the PR, the host checks its
+outstanding review requests without re-requesting them; missing requests remain
+an error.
+
+`resume` and `resume-tui` accept and validate the same flags, then ignore valid
+reviewer values, including `--reviewers=""`. They do not add, remove, or
+re-request reviewers. With `--pr`, they still require an existing open PR and
+preserve its reviewers. The JSON schema is unchanged: reviewers are accepted
+only in `run`; `resume.reviewers` and root-level `reviewers` are invalid.
 

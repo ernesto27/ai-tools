@@ -15,8 +15,6 @@ import (
 )
 
 const localConfigFile = "agent-sandbox.json"
-const configAPIKey = "apiKey"
-const configReviewers = "reviewers"
 
 var reviewerUsername = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*$`)
 
@@ -45,11 +43,28 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 	}
 
 	section := config.Run
-	flags.Reviewers = nil
+	if cmd.Flags().Changed(flagReviewers) {
+		// Only a single explicit empty value clears the configured list.
+		// Resume validates the same input before discarding reviewer options.
+		if len(flags.Reviewers) == 1 && flags.Reviewers[0] == "" {
+			flags.Reviewers = nil
+		} else {
+			for i, reviewer := range flags.Reviewers {
+				if !reviewerUsername.MatchString(strings.TrimSpace(reviewer)) {
+					return fmt.Errorf("--reviewers[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", i)
+				}
+			}
+			flags.Reviewers = normalizeReviewers(flags.Reviewers)
+		}
+	} else {
+		flags.Reviewers = nil
+		if section != nil {
+			flags.Reviewers = section.Reviewers
+		}
+	}
 	if name == "resume" {
 		section = config.Resume
-	} else if section != nil {
-		flags.Reviewers = section.Reviewers
+		flags.Reviewers = nil
 	}
 
 	// Explicit flags win; section values override shared JSON defaults.
@@ -111,11 +126,14 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 		}
 	}
 
-	if section != nil {
-		if section.APIKey != nil {
+	if !cmd.Flags().Changed(flagAPIKey) {
+		flags.APIKey = ""
+		if section != nil && section.APIKey != nil {
 			flags.APIKey = *section.APIKey
 		}
+	}
 
+	if section != nil {
 		if section.Query != nil && !cmd.Flags().Changed(flagQuery) {
 			flags.Prompt = *section.Query
 		}
@@ -228,7 +246,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 		fieldName = section + "." + key
 	}
 	switch key {
-	case configReviewers:
+	case flagReviewers:
 		if section != "run" {
 			return fmt.Errorf("%s: unknown field %s", localConfigFile, fieldName)
 		}
@@ -245,7 +263,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", localConfigFile, fieldName, i)
 			}
 		}
-	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, configAPIKey:
+	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, flagAPIKey:
 		var field string
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 			return fmt.Errorf("%s: %s must be a JSON string", localConfigFile, fieldName)

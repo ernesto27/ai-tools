@@ -17,7 +17,11 @@ cmd/agent-sandbox -> config
 - [cmd/agent-sandbox](../cmd/agent-sandbox/root.go) uses Cobra for dispatch,
   flags, and usage errors. [config.go](../cmd/agent-sandbox/config.go) loads
   `./agent-sandbox.json` from the invocation directory. Explicit CLI flags
-  override command-section values, which override shared root values.
+  override command-section values, which override shared root values. Shared
+  execution bindings register `--apiKey <key>` and repeatable
+  `--reviewers <username>` on all four commands, without shorthands. The loader
+  validates the complete JSON file before applying CLI overrides; the schema
+  still accepts `apiKey` only in sections and `reviewers` only in `run`.
   [run_tui.go](../cmd/agent-sandbox/run_tui.go) adds `run-tui` and `resume-tui`
   using the same execution and configuration as `run` and `resume`.
   [update.go](../cmd/agent-sandbox/update.go) runs the embedded
@@ -78,10 +82,13 @@ of two credential modes:
   [Codex](../internal/agent/codex.go) mounts `.codex`; [Claude](../internal/agent/claude.go)
   mounts `.claude` and `.claude.json`; [opencode](../internal/agent/opencode.go)
   mounts configuration, data, and state; [pi](../internal/agent/pi.go) mounts `.pi/agent`.
-- JSON `apiKey` authentication requires `APIKeyAgent`, implemented by Codex
-  and Claude. The key is supplied as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in
+- `--apiKey` or section JSON `apiKey` authentication requires `APIKeyAgent`,
+  implemented by Codex and Claude. The key is supplied as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in
   the container environment. These runs use a tmpfs home and do not mount host
-  agent credentials. There is no CLI `apiKey` flag.
+  agent credentials. An explicit flag overrides the selected section, including
+  `--apiKey=""`, which selects host authentication and its required mounts.
+  Nonempty keys for other agents remain usage errors. Keys are not added to
+  prompts, worktree records, help, or transcripts. The `--api-key` alias is rejected.
 
 The container runs as the invoking UID/GID with the worktree at `/workspace`.
 It also mounts the repository's common Git directory at its original absolute
@@ -122,11 +129,21 @@ differences against the snapshot, pushes, and reuses an open PR for the same
 head and base or creates a PR ready for review. Combining `--push` and `--pr`
 uses this single PR publication flow.
 
-`run.reviewers` is a JSON-only list of GitHub usernames, normalized by the CLI
-configuration loader and passed through `Options` to host publication. `run-tui`
-uses the same configuration. Reviewer arguments are supplied only for new PR
-creation; existing PRs are not modified. `Resume` clears reviewer options at
-its entry point, and reviewers are not stored in worktree records or prompts.
+Repeatable CLI `--reviewers` values replace `run.reviewers` entirely; omitted
+flags use the JSON list. A single `--reviewers=""` clears it. All other empty or
+whitespace-only entries are usage errors. Both input paths trim usernames,
+validate letters, digits, and hyphens with an initial letter or digit, and
+deduplicate case-insensitively, preserving first occurrence order and spelling.
+Mentions, emails, teams, comma lists, and option-like strings are rejected.
+`run-tui` uses the same configuration. `resume` and `resume-tui` validate CLI
+reviewer syntax, then discard valid values before execution; they add no effective
+reviewer configuration and still reject `resume.reviewers` in JSON.
+Reviewer options pass through `Options` to host publication only for new PR
+creation with `--pr`; existing PRs are not modified. Push-only runs, absent
+`--pr`, no reviewable changes, agent failures, and cancellation do not request
+reviews. `Resume` also clears reviewer options at its entry point, and reviewers
+are not stored in worktree records or prompts. Resume with `--pr` continues to
+require an existing open PR and preserves its reviewers.
 After a failed create call with reviewers, recovery also checks outstanding
 review requests before reporting success; missing requests remain an error.
 

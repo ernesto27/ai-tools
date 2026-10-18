@@ -27,7 +27,30 @@ opencode and pi support only this mode.
 
 ## Use an API key
 
-Create `agent-sandbox.json` in the directory where you will invoke the command.
+Pass `--apiKey <key>` on `run`, `resume`, `run-tui`, or `resume-tui`:
+
+```bash
+agent-sandbox run -a codex --apiKey "$OPENAI_API_KEY" -q "inspect this repository"
+agent-sandbox resume -b fix-login -a codex --apiKey "$OPENAI_API_KEY" --pr -q "add a regression test"
+```
+
+The flag has no shorthand and overrides the selected section's JSON `apiKey`.
+Omit it to use that section's value and existing defaults. Use `--apiKey=""`
+to clear a configured key and select host authentication with the required
+configuration mounts above. Use the exact camelCase name; `--api-key` is rejected.
+Nonempty keys for opencode or pi produce a usage error.
+
+A key passed on the command line is part of the `agent-sandbox` process
+arguments for the whole run, so other local users and processes can read it
+from the process list (for example `ps` or `/proc/<pid>/cmdline`). A key typed
+literally may also be saved in shell history; referencing an environment
+variable such as `"$OPENAI_API_KEY"` avoids that, but the expanded value is
+still visible in the process list. On shared hosts, prefer the JSON `apiKey`
+below, and keep `agent-sandbox.json` readable only by you (for example,
+`chmod 600 agent-sandbox.json`) and out of Git (for example, listed in
+`.gitignore`).
+
+Alternatively, create `agent-sandbox.json` in the invocation directory.
 For Codex:
 
 ```json
@@ -47,11 +70,12 @@ agent-sandbox run
 ```
 
 For Claude Code, use `"agent": "claude"` and your Anthropic API key instead.
-`apiKey` is supported only in the `run` and `resume` JSON sections.
+In JSON, `apiKey` is supported only in the `run` and `resume` sections.
 
 In this mode, the key is supplied to the container as the provider's environment
 variable. The container uses a temporary home and does not mount host agent
-credentials.
+credentials. Keys are not added to prompts, worktree records, help, or
+transcript output.
 
 ::: warning Keep your key out of Git
 Replace the placeholder locally and add `agent-sandbox.json` to your

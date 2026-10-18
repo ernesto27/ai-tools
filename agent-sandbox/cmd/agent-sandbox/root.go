@@ -18,6 +18,8 @@ type commandState struct {
 
 const (
 	flagAgent         = "agent"
+	flagAPIKey        = "apiKey"
+	flagReviewers     = "reviewers"
 	flagModel         = "model"
 	flagEffort        = "effort"
 	flagBaseImage     = "baseImage"
@@ -44,7 +46,7 @@ func newRootCmd() (*cobra.Command, *commandState) {
 			"for the terminal view, or run and resume for plain output. Run\n" +
 			"creates a worktree; resume continues one already recorded.\n\n" +
 			"Authentication comes from the agent's configuration directory on the host,\n" +
-			"or from apiKey in agent-sandbox.json for Codex or Claude.",
+			"or from --apiKey or apiKey in agent-sandbox.json for Codex or Claude.",
 		Example: "  agent-sandbox run -a codex -q \"fix the login redirect loop\"\n" +
 			"  agent-sandbox resume -b fix-login -a codex -q \"add a regression test\"",
 
@@ -122,6 +124,8 @@ type runFlags struct {
 // publish behavior.
 func (f *runFlags) bind(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.AgentName, flagAgent, "a", "", "agent to run ("+strings.Join(sandbox.AgentNames(), "|")+")")
+	cmd.Flags().StringVar(&f.APIKey, flagAPIKey, "", "provider API `key` for Codex or Claude (overrides JSON; empty uses host authentication)")
+	cmd.Flags().StringArrayVar(&f.Reviewers, flagReviewers, nil, "GitHub `username` to request on a new PR (repeatable; replaces JSON; empty alone clears; no effect on resume)")
 	cmd.Flags().StringVarP(&f.Model, flagModel, "m", "", "model to use (default: the agent's own)")
 	cmd.Flags().StringVar(&f.Effort, flagEffort, "", "agent effort (default: "+sandbox.DefaultEffort+"; supported values depend on the agent and model)")
 	cmd.Flags().StringVarP(&f.BaseImage, flagBaseImage, "i", "", "Alpine base image for the agent sandbox (for example golang:1.26-alpine)")

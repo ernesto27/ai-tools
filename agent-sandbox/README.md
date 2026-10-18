@@ -36,8 +36,8 @@ go build -o agent-sandbox ./cmd/agent-sandbox
 - Git and a Git repository: run the command from any directory inside the
   repository.
 - An authenticated session for the selected agent on the host or, for Codex
-  and Claude Code, an API key in `./agent-sandbox.json`. opencode and pi require
-  the host session.
+  and Claude Code, an API key through `--apiKey` or `./agent-sandbox.json`.
+  opencode and pi require the host session.
 
 | Agent | Host configuration when not using `apiKey` |
 | --- | --- |
@@ -68,7 +68,7 @@ This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [--apiKey <key>] [--reviewers <username>]... [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
 ```
 
@@ -76,6 +76,8 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | --- | --- |
 | `-b`, `--branch` | Optional. Branch for the separate worktree; generated if omitted. |
 | `-a`, `--agent` | Required. One of `codex`, `claude`, `opencode`, or `pi`. |
+| `--apiKey <key>` | Optional. Provider API key for Codex or Claude Code on `run`, `resume`, `run-tui`, and `resume-tui`; overrides the section's JSON key. `--apiKey=""` selects host authentication. No shorthand. |
+| `--reviewers <username>` | Optional. Repeat for each GitHub username on `run`, `resume`, `run-tui`, and `resume-tui`. Replaces `run.reviewers`; `--reviewers=""` alone clears it. Validated but has no effect on resume. No shorthand. |
 | `-m`, `--model` | Optional. Overrides the model selected by the agent. |
 | `--effort` | Optional. Agent effort; defaults to `high`. Passed through without checking supported levels. |
 | `-i`, `--baseImage` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
@@ -104,13 +106,19 @@ where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `effor
 `push`, `pr`, `hn`, and `file` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`, `effort`,
 `baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
-`image` and `file` (arrays of paths), plus the `apiKey` field. For `file`, CLI values replace the section array, which replaces the root array; arrays are not combined, and a section’s empty array clears the root files. Explicit CLI image lists replace their section JSON lists. `apiKey` is available only in JSON: there is
-no equivalent command-line option. For each field, an explicit command-line
-option takes precedence, followed by the section value, then the root value.
+`image` and `file` (arrays of paths), plus the `apiKey` field. Only `run`
+accepts a JSON `reviewers` array. For `file`, CLI values replace the section
+array, which replaces the root array; arrays are not combined, and a section's
+empty array clears the root files. Explicit CLI image lists replace their
+section JSON lists. For each supported field, an explicit command-line option
+takes precedence, followed by the section value, then the root value.
 A section's `false` or empty string also overrides the shared value.
+The complete JSON file is validated even when CLI flags override its values.
+Neither `apiKey` nor `reviewers` is accepted at the JSON root; `resume.reviewers`
+is also invalid, even though resume accepts and ignores the CLI flag.
 
 Multiword JSON keys and long CLI flags use camelCase: `baseImage`,
-`commitMessage`, and `filePrompt`, plus the JSON-only `apiKey`.
+`commitMessage`, `filePrompt`, and `apiKey`.
 The previous names `base-image`, `commit-message`, `file-prompt`, and `api-key`
 are rejected. Rename them in existing configuration files and invocations.
 Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
@@ -203,10 +211,55 @@ This mode shares the host network and reduces container isolation: the agent
 can access local host services without a port allowlist. Use it when the task
 needs that access.
 
+### Request PR reviewers
+
+All four execution commands accept repeatable `--reviewers <username>`, without
+a shorthand. On `run` and `run-tui`, an explicit list replaces `run.reviewers`
+entirely. Omit the flag to use the JSON list. Use `--reviewers=""` alone to clear
+configured reviewers; empty or whitespace-only entries in any other list are
+usage errors, including an empty value combined with a username.
+
+```bash
+agent-sandbox run -a claude --pr --reviewers alice --reviewers bob -q "fix the login redirect"
+agent-sandbox run -a codex --apiKey="" --reviewers="" -q "inspect this repository"
+```
+
+Usernames are trimmed and deduplicated case-insensitively, preserving the first
+occurrence's order and spelling. Use letters, digits, and hyphens, starting with
+a letter or digit. Mentions, email addresses, teams, comma-separated lists, and
+option-like strings are rejected before sandbox execution.
+
+Reviewers are requested only when a run creates a new PR with `--pr`. Reused PRs,
+push-only runs, runs without `--pr`, no reviewable changes, failed agents, and
+cancellation do not request reviewers. Create recovery checks existing requests
+without re-requesting them. `resume` and `resume-tui` validate reviewer flag syntax,
+then ignore valid values, including clearing: they preserve existing reviewers.
+With `--pr`, resume still requires an existing open PR.
+
 ### API keys for Codex and Claude Code
 
-To use an API key instead of the host session, add `apiKey` to the `run` or
-`resume` section you will execute. For example, for Codex:
+All four execution commands accept `--apiKey <key>`, without a shorthand.
+It overrides the selected section's JSON `apiKey`. Omit the flag to use that
+section's key and existing defaults. Pass `--apiKey=""` to clear a configured
+key and use host authentication, including its required configuration mounts.
+Nonempty keys are supported only for Codex and Claude Code; other agents report
+a usage error. Keys enter the container environment with a disposable home;
+they are not added to prompts, worktree records, help, or transcript output.
+A `--apiKey` value is part of the host process arguments for the whole run, so
+other local users and processes can read it from the process list (for example
+`ps`), and a literal value may be saved in shell history. Referencing an
+environment variable avoids the history entry but not the process list; on
+shared hosts, prefer the JSON `apiKey` shown below, and keep `agent-sandbox.json`
+readable only by you (for example, `chmod 600 agent-sandbox.json`) and out of
+Git (for example, listed in `.gitignore`).
+
+```bash
+agent-sandbox run -a codex --apiKey "$OPENAI_API_KEY" -q "inspect this repository"
+agent-sandbox resume -b fix-login -a codex --apiKey "$OPENAI_API_KEY" --pr -q "add a regression test"
+```
+
+Alternatively, add `apiKey` to the `run` or `resume` JSON section you will execute.
+For example, for Codex:
 
 ```json
 {

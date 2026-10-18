@@ -10,6 +10,8 @@ import (
 // sandboxArgs transports typed settings as flags. Command-specific values
 // override shared settings; explicit workflow and stage arguments win over both.
 // API keys and reviewers have no CLI flags and are deliberately omitted.
+// --effort is omitted when empty: agent-sandbox applies its default effort to
+// an empty value, and binaries older than v0.0.15 reject the flag entirely.
 func sandboxArgs(settings sandboxconfig.Config, args []string) []string {
 	section := settings.Run
 	if args[0] == "resume" {
@@ -27,7 +29,9 @@ func sandboxArgs(settings sandboxconfig.Config, args []string) []string {
 	addString("branch", "b", settingValue(settings.Branch, section.Branch))
 	addString("agent", "a", settingValue(settings.Agent, section.Agent))
 	addString("model", "m", settingValue(settings.Model, section.Model))
-	addString("effort", "", settingValue(settings.Effort, section.Effort))
+	if effort := settingValue(settings.Effort, section.Effort); effort != "" {
+		addString("effort", "", effort)
+	}
 	addString("baseImage", "i", settingValue(settings.BaseImage, section.BaseImage))
 	addString("commitMessage", "c", settingValue("", section.CommitMessage))
 	// A generated stage prompt replaces both configured prompt sources.

@@ -92,3 +92,22 @@ func TestSandboxArgsPrecedence(t *testing.T) {
 		})
 	}
 }
+
+func TestSandboxArgsOmitsUnsetEffort(t *testing.T) {
+	empty := ""
+	for _, settings := range []sandboxconfig.Config{
+		{},
+		{Effort: "high", Run: &sandboxconfig.Section{Effort: &empty}},
+	} {
+		args := sandboxArgs(settings, []string{"run"})
+		for _, arg := range args {
+			if arg == "--effort" {
+				t.Fatalf("unset effort passed: %q", args)
+			}
+		}
+	}
+	args := sandboxArgs(sandboxconfig.Config{Effort: "low"}, []string{"run"})
+	if !strings.Contains(strings.Join(args, " "), "--effort low") {
+		t.Fatalf("configured effort missing: %q", args)
+	}
+}

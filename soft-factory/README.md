@@ -11,14 +11,24 @@ Create `software-factory.json` in the project root before running Soft Factory.
 **Breaking change:** `software-factory.json` is now the only maintained workflow
 configuration. To migrate manually, move the entire old `agent-sandbox.json`
 object into the top-level `agentSandbox` property, keeping `documents`,
-`customSkills`, `disabledStages`, and `stages` unchanged. The old file is never
-read as input: there is no fallback, merge, or automatic migration.
+`customSkills`, `disabledStages`, and `stages` unchanged. Factory itself never
+reads the old file: there is no fallback, merge, or automatic migration.
 
 Factory loads this configuration once per workflow and passes sandbox settings
 as CLI flags. Section settings override shared fields, and stage/workflow
-arguments override both. API keys and reviewers are ignored because Agent
-Sandbox has no CLI flags for them. Factory does not create or replace
-`agent-sandbox.json` or a runtime configuration directory.
+arguments override both. `agentSandbox.run.apiKey` and
+`agentSandbox.run.reviewers` are ignored because Agent Sandbox has no CLI flags
+for them. An unset `effort` is not passed, so Agent Sandbox uses its default.
+Factory does not create, move, or replace `agent-sandbox.json` or a runtime
+configuration directory.
+
+**Remove any leftover `agent-sandbox.json` from the project root.** Factory runs
+`agent-sandbox` from the project root, and `agent-sandbox` always reads
+`./agent-sandbox.json` there. Flags from `software-factory.json` override the
+file's matching values, but anything Factory does not pass as a flag still
+applies (including `run.apiKey`, `run.reviewers`, and `effort` when Factory's
+is unset), and a malformed file makes every stage fail. Factory prints a
+warning before each stage while that file exists.
 
 Keep `software-factory.json` in your project's `.gitignore`; configuration
 can contain secrets.

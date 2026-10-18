@@ -404,6 +404,9 @@ func execute(options ExecuteOptions) (string, error) {
 	}
 	options.Args = sandboxArgs(options.Settings, options.Args)
 	cmd := exec.CommandContext(ctx, "agent-sandbox", options.Args...)
+	if warning := localSandboxConfigWarning(cmd.Dir); warning != "" {
+		fmt.Fprint(os.Stderr, warning)
+	}
 	// Let the sandbox stop its container on interruption before forcing exit.
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
 	cmd.WaitDelay = 20 * time.Second
@@ -468,6 +471,23 @@ func execute(options ExecuteOptions) (string, error) {
 	}
 
 	return reportPath, errors.Join(runErr, reportErr)
+}
+
+// sandboxLocalConfigFile is the file agent-sandbox reads from its working
+// directory before applying command-line flags.
+const sandboxLocalConfigFile = "agent-sandbox.json"
+
+// localSandboxConfigWarning reports an agent-sandbox.json in the child's
+// working directory. Agent Sandbox always reads that file and has no flag to
+// skip it, so values Factory does not pass as flags (such as run.apiKey and
+// run.reviewers) still apply, and a malformed file fails every stage. Factory
+// only warns; it never creates, moves, or hides the file.
+func localSandboxConfigWarning(dir string) string {
+	path := filepath.Join(dir, sandboxLocalConfigFile)
+	if _, err := os.Lstat(path); err != nil {
+		return ""
+	}
+	return fmt.Sprintf("Warning: %s exists in the agent-sandbox working directory; agent-sandbox reads it on every stage, so settings Factory does not pass as flags (including run.apiKey and run.reviewers) still apply, and a malformed file makes the stage fail. Remove it or move its settings into software-factory.json.\n", sandboxLocalConfigFile)
 }
 
 // selectionDetails reads only supported selection fields. Provider means the

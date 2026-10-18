@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,5 +48,28 @@ func TestExecuteCancellationWaitsForChild(t *testing.T) {
 	}
 	if _, err := os.Stat("agent-sandbox.json"); !os.IsNotExist(err) {
 		t.Fatalf("runtime remains: %v", err)
+	}
+}
+
+func TestLocalSandboxConfigWarning(t *testing.T) {
+	dir := t.TempDir()
+	if warning := localSandboxConfigWarning(dir); warning != "" {
+		t.Fatalf("warning without file: %q", warning)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent-sandbox.json"), []byte(`{"run":{"apiKey":"secret"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	warning := localSandboxConfigWarning(dir)
+	for _, want := range []string{"agent-sandbox.json", "apiKey", "reviewers", "malformed"} {
+		if !strings.Contains(warning, want) {
+			t.Errorf("warning %q lacks %q", warning, want)
+		}
+	}
+	if strings.Contains(warning, "secret") {
+		t.Fatalf("warning exposes file contents: %q", warning)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "agent-sandbox.json"))
+	if err != nil || string(data) != `{"run":{"apiKey":"secret"}}` {
+		t.Fatalf("file changed: %q, %v", data, err)
 	}
 }

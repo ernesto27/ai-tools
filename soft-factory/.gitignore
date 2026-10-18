@@ -19,5 +19,3 @@ task.txt
 .agents/skills/test-review-changes/
 .claude/skills/claude-review/
 *.pdf
-
-.soft-factory-sandbox-runtime/

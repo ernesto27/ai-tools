@@ -87,17 +87,27 @@ func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
 	}
 }
 
-func TestChangeEvidenceExcludesRuntimeArtifacts(t *testing.T) {
+func TestChangeEvidenceReportsConfigChangesWithoutContents(t *testing.T) {
 	preparePromptSandbox(t)
+	for _, args := range [][]string{{"add", "software-factory.json"}, {"commit", "-m", "track config"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git: %v\n%s", err, out)
+		}
+	}
+	writePromptTestFile(t, "software-factory.json", `{"agentSandbox":{"run":{"apiKey":"maintained-secret","network":"host"}}}`)
 	writePromptTestFile(t, "agent-sandbox.json", `{"apiKey":"runtime-secret"}`)
-	writePromptTestFile(t, "software-factory.json", `{"agentSandbox":{"run":{"apiKey":"maintained-secret"}}}`)
 	snapshot, err := changeEvidence(context.Background(), "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"agent-sandbox.json", "software-factory.json", ".soft-factory-sandbox-runtime", "secret"} {
+	for _, want := range []string{" M software-factory.json", "?? agent-sandbox.json", `"agent-sandbox.json"`, "M\tsoftware-factory.json"} {
+		if !strings.Contains(snapshot.Text, want) {
+			t.Errorf("evidence missing %q:\n%s", want, snapshot.Text)
+		}
+	}
+	for _, forbidden := range []string{"secret", "apiKey", `"network"`} {
 		if strings.Contains(snapshot.Text, forbidden) {
-			t.Fatalf("evidence contains %q", forbidden)
+			t.Errorf("evidence contains %q:\n%s", forbidden, snapshot.Text)
 		}
 	}
 }

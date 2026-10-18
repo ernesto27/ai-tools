@@ -18,21 +18,38 @@ type changeSnapshot struct {
 	Worktree string
 }
 
+// redactedConfigPatterns name configuration files that may hold credentials.
+// Changes to them stay visible in status, summaries and file lists; only their
+// patch bodies are withheld from the evidence.
+var redactedConfigPatterns = []string{"**/agent-sandbox.json", "**/software-factory.json"}
+
 func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) {
 	worktree, err := executionlog.WorktreeForBranch(ctx, branch)
 	if err != nil {
 		return changeSnapshot{}, err
 	}
 	base, baseNote := comparisonBase(ctx, worktree, branch)
-	status, err := gitOutput(ctx, worktree, "status", "--short", "--untracked-files=all", "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
+	status, err := gitOutput(ctx, worktree, "status", "--short", "--untracked-files=all")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	patch, err := gitOutput(ctx, worktree, "diff", "--no-ext-diff", "--no-renames", base, "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
+	patchArgs := []string{"diff", "--no-ext-diff", "--no-renames", base, "--", "."}
+	for _, pattern := range redactedConfigPatterns {
+		patchArgs = append(patchArgs, ":(glob,exclude)"+pattern)
+	}
+	patch, err := gitOutput(ctx, worktree, patchArgs...)
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	summary, err := gitOutput(ctx, worktree, "diff", "--summary", "--find-renames", base, "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
+	redactedArgs := []string{"diff", "--name-status", "--no-renames", base, "--"}
+	for _, pattern := range redactedConfigPatterns {
+		redactedArgs = append(redactedArgs, ":(glob)"+pattern)
+	}
+	redacted, err := gitOutput(ctx, worktree, redactedArgs...)
+	if err != nil {
+		return changeSnapshot{}, err
+	}
+	summary, err := gitOutput(ctx, worktree, "diff", "--summary", "--find-renames", base, "--")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
@@ -40,7 +57,7 @@ func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) 
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	untracked, err := gitOutput(ctx, worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
+	untracked, err := gitOutput(ctx, worktree, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
@@ -60,7 +77,8 @@ func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) 
 			}
 		}
 	}
-	fmt.Fprintf(&evidence, "Tracked file patch against base:\n%s\n", emptyLabel(patch))
+	fmt.Fprintf(&evidence, "Tracked configuration files changed against base (patch withheld to keep credentials out of evidence; report every entry as a configuration change):\n%s\n", emptyLabel(redacted))
+	fmt.Fprintf(&evidence, "Tracked file patch against base (configuration files above excluded):\n%s\n", emptyLabel(patch))
 	snapshot.Text = evidence.String()
 	return snapshot, nil
 }

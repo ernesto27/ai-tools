@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -46,7 +47,7 @@ type workflowOptions struct {
 	Branch     string
 }
 
-func runWorkflow(opts workflowOptions) (runErr error) {
+func runWorkflow(opts workflowOptions) error {
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -56,9 +57,25 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	runtime, err := sandbox.PrepareRuntime(cfg.SandboxJSON())
+	if err != nil {
+		return err
+	}
+	var cleanupErr error
+	runErr := func() error {
+		defer func() { cleanupErr = runtime.Close() }()
+		return runConfiguredWorkflow(ctx, opts, cfg)
+	}()
+	return errors.Join(runErr, cleanupErr)
+}
+
+func runConfiguredWorkflow(ctx context.Context, opts workflowOptions, cfg config.Config) error {
 	shouldRun := func(stage config.Stage) bool {
 		return opts.StartStage == "" || slices.Index(config.Stages, stage) >= slices.Index(config.Stages, opts.StartStage)
 	}
+	var err error
 
 	var loadedSkills sandbox.ProjectSkills
 
@@ -90,13 +107,13 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		*entry.target = skill
 	}
 
-	if err := installAgentSandbox(context.Background()); err != nil {
+	if err := installAgentSandbox(ctx); err != nil {
 		return err
 	}
 
 	branch := opts.Branch
 	if branch == "" {
-		branch, err = workflowBranch(opts)
+		branch, err = workflowBranch(opts, cfg)
 		if err != nil {
 			return err
 		}
@@ -120,12 +137,18 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 		} else {
 			fmt.Printf("Execution logs: %s\n", runLog.Path())
-			defer func() { runLog.Finish(runErr) }()
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
+	runErr := runPreparedWorkflow(ctx, opts, cfg, loadedSkills, branch, runLog)
+	if runLog != nil {
+		runLog.Finish(runErr)
+	}
+	return runErr
+}
+
+func runPreparedWorkflow(ctx context.Context, opts workflowOptions, cfg config.Config, loadedSkills sandbox.ProjectSkills, branch string, runLog *executionlog.Run) error {
+	var err error
 
 	var taskOverride string
 	if opts.IssueURL != "" {
@@ -140,15 +163,24 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		return err
 	}
 	input := sandbox.TaskContext{
-		TaskOverride: taskOverride,
-		Documents:    documents,
-		CustomSkills: loadedSkills,
-		Context:      ctx,
-		Log:          runLog,
-		Branch:       branch,
-		Continue:     opts.Continue,
-		Config:       cfg,
+		TaskOverride:   taskOverride,
+		Documents:      documents,
+		CustomSkills:   loadedSkills,
+		Context:        ctx,
+		Log:            runLog,
+		Branch:         branch,
+		BranchSelected: true,
+		Continue:       opts.Continue,
+		Config:         cfg,
 	}
+
+	return runPipeline(opts, cfg, input, func(stage config.Stage) bool {
+		return opts.StartStage == "" || slices.Index(config.Stages, stage) >= slices.Index(config.Stages, opts.StartStage)
+	})
+}
+
+func runPipeline(opts workflowOptions, cfg config.Config, input sandbox.TaskContext, shouldRun func(config.Stage) bool) error {
+	ctx, branch, runLog := input.Context, input.Branch, input.Log
 
 	if opts.Implement && shouldRun(config.StageImplementation) {
 		if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
@@ -230,10 +262,10 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 }
 
 // workflowBranch selects one branch for every stage and report in this run.
-func workflowBranch(opts workflowOptions) (string, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "", err
+func workflowBranch(opts workflowOptions, cfg config.Config) (string, error) {
+	settings := cfg.AgentSandbox
+	if opts.Branch != "" {
+		return opts.Branch, nil
 	}
 	section := settings.Resume
 	if opts.Implement && !opts.Continue {

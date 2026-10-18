@@ -13,6 +13,9 @@ import (
 )
 
 type Config struct {
+	AgentSandbox     sandboxconfig.Config `json:"agentSandbox"`
+	agentSandboxJSON json.RawMessage
+
 	Documents    []string           `json:"documents"`
 	GoogleDrive  *GoogleDriveConfig `json:"googleDrive,omitempty"`
 	CustomSkills CustomSkills       `json:"customSkills"`
@@ -72,17 +75,13 @@ type GoogleDriveConfig struct {
 	Files   []string `json:"files"`
 }
 
-// LoadSandbox decodes the shared types; agent-sandbox owns configuration validation.
-func LoadSandbox() (sandboxconfig.Config, error) {
-	data, err := os.ReadFile("agent-sandbox.json")
-	if err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("read agent-sandbox configuration: %w", err)
+// SandboxJSON returns the original embedded object, including unknown fields.
+// Only an omitted or top-level null object becomes empty settings.
+func (c Config) SandboxJSON() []byte {
+	if len(c.agentSandboxJSON) == 0 || string(c.agentSandboxJSON) == "null" {
+		return []byte("{}")
 	}
-	var cfg sandboxconfig.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return sandboxconfig.Config{}, fmt.Errorf("parse agent-sandbox configuration: %w", err)
-	}
-	return cfg, nil
+	return append([]byte(nil), c.agentSandboxJSON...)
 }
 
 func Load(path string) (Config, error) {
@@ -92,14 +91,22 @@ func Load(path string) (Config, error) {
 	}
 
 	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
-	}
-	var raw struct {
+	// Decode the embedded object only after retaining its raw representation.
+	// Shadowing the typed field also makes repeated top-level agentSandbox keys
+	// resolve to the same final object for Factory consumers and the subprocess.
+	raw := struct {
+		*Config
 		DisabledStages json.RawMessage `json:"disabledStages"`
-	}
+		AgentSandbox   json.RawMessage `json:"agentSandbox"`
+	}{Config: &cfg}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
+	}
+	cfg.agentSandboxJSON = raw.AgentSandbox
+	if len(raw.AgentSandbox) != 0 {
+		if err := json.Unmarshal(raw.AgentSandbox, &cfg.AgentSandbox); err != nil {
+			return Config{}, fmt.Errorf("parse factory configuration %s: agentSandbox: %w", path, err)
+		}
 	}
 	cfg.DisabledStages, err = parseDisabledStages(raw.DisabledStages)
 	if err != nil {

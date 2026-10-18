@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"testing"
+
+	"soft-factory/internal/config"
 )
 
 func TestWorkflowBranch(t *testing.T) {
@@ -13,6 +15,9 @@ func TestWorkflowBranch(t *testing.T) {
 		want     string
 		wantErr  bool
 	}{
+		{"shared branch", workflowOptions{Implement: true}, `{"branch":"shared"}`, "shared", false},
+		{"empty overrides shared", workflowOptions{Implement: true}, `{"branch":"shared","run":{"branch":""},"resume":{"branch":"other"}}`, "", false},
+		{"explicit Factory branch", workflowOptions{Implement: true, Branch: "explicit"}, `{"run":{"branch":"configured"}}`, "explicit", false},
 		{"implementation", workflowOptions{Implement: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "new-task", false},
 		{"review only", workflowOptions{}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
 		{"continuation", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
@@ -25,10 +30,14 @@ func TestWorkflowBranch(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("agent-sandbox.json", []byte(tt.settings), 0600); err != nil {
+			if err := os.WriteFile(factoryConfigFile, []byte(`{"agentSandbox":`+tt.settings+`}`), 0600); err != nil {
 				t.Fatal(err)
 			}
-			got, err := workflowBranch(tt.opts)
+			cfg, err := config.Load(factoryConfigFile)
+			var got string
+			if err == nil {
+				got, err = workflowBranch(tt.opts, cfg)
+			}
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -23,9 +23,12 @@ import (
 )
 
 type ExecuteOptions struct {
-	Stage             config.Stage
-	StageConfig       config.StageConfig
-	Branch            string
+	Settings    sandboxconfig.Config
+	Stage       config.Stage
+	StageConfig config.StageConfig
+	Branch      string
+	// BranchSelected preserves an explicitly selected empty branch.
+	BranchSelected    bool
 	Args              []string
 	ReportName        string
 	Prompt            string
@@ -51,14 +54,15 @@ type ProjectSkills struct {
 // TaskContext carries a task override and supporting documents through all stages.
 // An empty override retains the configured filePrompt behavior.
 type TaskContext struct {
-	TaskOverride string
-	Documents    string
-	CustomSkills ProjectSkills
-	Context      context.Context
-	Log          *executionlog.Run
-	Branch       string
-	Continue     bool
-	Config       config.Config
+	TaskOverride   string
+	Documents      string
+	CustomSkills   ProjectSkills
+	Context        context.Context
+	Log            *executionlog.Run
+	Branch         string
+	BranchSelected bool
+	Continue       bool
+	Config         config.Config
 }
 
 func Run(input TaskContext) error {
@@ -77,7 +81,7 @@ func Run(input TaskContext) error {
 		} else {
 			// Snapshot the source before launch so later edits cannot change the
 			// executed prompt independently of the saved log.
-			prompt, err = readTaskFile()
+			prompt, err = readTaskFile(input.Config.AgentSandbox)
 		}
 		if err != nil {
 			return err
@@ -98,6 +102,8 @@ func Run(input TaskContext) error {
 
 	args = appendStageArgs(args, input.Config.Stages.Implementation)
 	_, err := execute(ExecuteOptions{
+		Settings:          input.Config.AgentSandbox,
+		BranchSelected:    input.BranchSelected,
 		Stage:             config.StageImplementation,
 		StageConfig:       input.Config.Stages.Implementation,
 		Args:              args,
@@ -190,18 +196,20 @@ func ReviewChanges(input TaskContext) error {
 	args = appendStageArgs(args, input.Config.Stages.ReviewChanges)
 	// The walkthrough keeps subprocess output live-only, so record its
 	// configured selection before executing without a stream logger.
-	selection, agent, model, provider := selectionDetails(args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges)
+	selection, agent, model, provider := selectionDetails(input.Config.AgentSandbox, args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges)
 	input.Log.Selection(selection.Agent, selection.Model)
 	input.Log.Details(agent, model, provider)
 
 	_, err = execute(ExecuteOptions{
-		Stage:       config.StageReviewChanges,
-		StageConfig: input.Config.Stages.ReviewChanges,
-		Args:        args,
-		Branch:      input.Branch,
-		Prompt:      prompt,
-		Context:     input.Context,
-		Log:         nil,
+		Settings:       input.Config.AgentSandbox,
+		BranchSelected: input.BranchSelected,
+		Stage:          config.StageReviewChanges,
+		StageConfig:    input.Config.Stages.ReviewChanges,
+		Args:           args,
+		Branch:         input.Branch,
+		Prompt:         prompt,
+		Context:        input.Context,
+		Log:            nil,
 	})
 	resolvedSource, locateErr := executionlog.StageReportPath(input.Context, input.Branch, filepath.Base(source))
 	if locateErr != nil {
@@ -292,6 +300,8 @@ func review(input TaskContext, stage config.Stage, skillPath, additionalSkill st
 	args = appendStageArgs(args, settings)
 
 	options := ExecuteOptions{
+		Settings:          input.Config.AgentSandbox,
+		BranchSelected:    input.BranchSelected,
 		Stage:             stage,
 		StageConfig:       settings,
 		Args:              args,
@@ -318,7 +328,7 @@ func buildTaskPrompt(input TaskContext) (string, error) {
 	task := input.TaskOverride
 	if task == "" {
 		var err error
-		task, err = readTaskFile()
+		task, err = readTaskFile(input.Config.AgentSandbox)
 		if err != nil {
 			return "", err
 		}
@@ -337,12 +347,7 @@ func buildTaskPrompt(input TaskContext) (string, error) {
 	return prompt, nil
 }
 
-func readTaskFile() (string, error) {
-	settings, err := config.LoadSandbox()
-	if err != nil {
-		return "", err
-	}
-
+func readTaskFile(settings sandboxconfig.Config) (string, error) {
 	var taskPath string
 	if settings.Run != nil && settings.Run.FilePrompt != nil {
 		taskPath = *settings.Run.FilePrompt
@@ -350,7 +355,7 @@ func readTaskFile() (string, error) {
 
 	task, err := os.ReadFile(taskPath)
 	if err != nil {
-		return "", fmt.Errorf("read task file %q: %w", taskPath, err)
+		return "", fmt.Errorf("read task file software-factory.json: agentSandbox.run.filePrompt %q: %w", taskPath, err)
 	}
 
 	return string(task), nil
@@ -393,7 +398,7 @@ func execute(options ExecuteOptions) (string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if options.Branch != "" {
+	if options.Branch != "" || options.BranchSelected {
 		args := append([]string(nil), options.Args...)
 		options.Args = append(args, "--branch", options.Branch)
 	}
@@ -404,7 +409,7 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.Stdin = os.Stdin
 
 	if options.Log != nil {
-		selection, agent, model, provider := selectionDetails(options.Args[0], options.Stage, options.StageConfig)
+		selection, agent, model, provider := selectionDetails(options.Settings, options.Args[0], options.Stage, options.StageConfig)
 		options.Log.Selection(selection.Agent, selection.Model)
 		options.Log.Details(agent, model, provider)
 		options.Log.Command(cmd.Path, options.Args)
@@ -451,7 +456,7 @@ func execute(options ExecuteOptions) (string, error) {
 		if options.ReportName != "" {
 			fmt.Fprintf(&output, "\nCommand error: %v\n", runErr)
 		}
-		runErr = fmt.Errorf("execute agent-sandbox: %w", runErr)
+		runErr = fmt.Errorf("execute agent-sandbox (software-factory.json: agentSandbox): %w", runErr)
 	}
 	if options.ReportName == "" {
 		return "", runErr
@@ -468,25 +473,23 @@ func execute(options ExecuteOptions) (string, error) {
 // selected sandbox agent, not its underlying API backend. Do not copy the
 // configuration into logs: it may also contain API keys. Selection contains
 // plain names: stage overrides, then run/resume, then shared fields and defaults.
-func selectionDetails(section string, stage config.Stage, override config.StageConfig) (config.StageConfig, string, string, string) {
+func selectionDetails(settings sandboxconfig.Config, section string, stage config.Stage, override config.StageConfig) (config.StageConfig, string, string, string) {
 	agent := "unavailable (no configured selection)"
 	model := "unavailable (no configured model)"
 	provider := "unavailable (no configured agent)"
 	var agentValue, modelValue string
-	agentSource, modelSource := "agent-sandbox.json: agent", "agent-sandbox.json: model"
-	if settings, err := config.LoadSandbox(); err == nil {
-		agentValue, modelValue = settings.Agent, settings.Model
-		selected := settings.Run
-		if section == "resume" {
-			selected = settings.Resume
+	agentSource, modelSource := "software-factory.json: agentSandbox.agent", "software-factory.json: agentSandbox.model"
+	agentValue, modelValue = settings.Agent, settings.Model
+	selected := settings.Run
+	if section == "resume" {
+		selected = settings.Resume
+	}
+	if selected != nil {
+		if selected.Agent != nil {
+			agentValue, agentSource = *selected.Agent, "software-factory.json: agentSandbox."+section+".agent"
 		}
-		if selected != nil {
-			if selected.Agent != nil {
-				agentValue, agentSource = *selected.Agent, "agent-sandbox.json: "+section+".agent"
-			}
-			if selected.Model != nil {
-				modelValue, modelSource = *selected.Model, "agent-sandbox.json: "+section+".model"
-			}
+		if selected.Model != nil {
+			modelValue, modelSource = *selected.Model, "software-factory.json: agentSandbox."+section+".model"
 		}
 	}
 	stageSource := "software-factory.json: stages." + string(stage)
@@ -660,6 +663,8 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 	args = appendStageArgs(args, input.Config.Stages.RiskClassification)
 
 	options := ExecuteOptions{
+		Settings:       input.Config.AgentSandbox,
+		BranchSelected: input.BranchSelected,
 		Stage:          config.StageRiskClassification,
 		StageConfig:    input.Config.Stages.RiskClassification,
 		Args:           args,

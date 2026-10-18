@@ -33,7 +33,7 @@ Use unnamed return types and explicit values in return statements. Avoid named r
 
 ## Testing Guidelines
 
-No tests or coverage threshold currently exist. Add standard-library `testing` tests beside the relevant source as `*_test.go`, with functions named `TestXxx`. Prefer table-driven cases for configuration validation and document-path handling. Use temporary files and controlled subprocess fixtures when testing filesystem or execution behavior. Run `go test ./...` and `go vet ./...` before submitting code changes.
+Use the existing tests; there is no numeric coverage threshold. Add standard-library `testing` tests beside the relevant source as `*_test.go`, with functions named `TestXxx`. Prefer table-driven cases for configuration validation and document-path handling. Use temporary files and controlled subprocess fixtures when testing filesystem or execution behavior. Run `go test ./...` and `go vet ./...` before submitting code changes.
 
 ## Commit & Pull Request Guidelines
 
@@ -45,4 +45,6 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 ## Configuration & Reports
 
-Create local `software-factory.json`, for example `{"documents":["task.txt"]}`. Document paths resolve relative to that configuration file. Set `run.filePrompt` in local `agent-sandbox.json` to the task file. Both configuration files and `docs/` are ignored; keep credentials and sensitive task content out of commits.
+Maintain only project-root `software-factory.json`. Embed the full upstream sandbox object under `agentSandbox` (for example `{"documents":[],"agentSandbox":{"agent":"codex","branch":"task","run":{"filePrompt":"task.txt"}}}`). Reuse the imported Agent Sandbox `config.Config` and retain the original JSON for transport; Factory validates only its own fields. Keep stage overrides under `stages`.
+
+This is a breaking change: manually move the old `agent-sandbox.json` object into `agentSandbox`; never read, merge, or migrate the legacy file automatically. Factory generates a private runtime `agent-sandbox.json` while holding `.soft-factory-sandbox-runtime/`, then cleans up and restores any original regular file unchanged. Preserve recovery artifacts on interruption or unsafe cleanup. Do not run a manual sandbox workflow in that directory during a Factory workflow. Ignore both configuration filenames, the runtime directory, and reports; keep configuration and credentials out of commits, logs, and change evidence. All relative task/sandbox paths use the project root. The task remains `agentSandbox.run.filePrompt` even for resume-based workflows.

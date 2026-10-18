@@ -24,15 +24,15 @@ func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) 
 		return changeSnapshot{}, err
 	}
 	base, baseNote := comparisonBase(ctx, worktree, branch)
-	status, err := gitOutput(ctx, worktree, "status", "--short", "--untracked-files=all")
+	status, err := gitOutput(ctx, worktree, "status", "--short", "--untracked-files=all", "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	patch, err := gitOutput(ctx, worktree, "diff", "--no-ext-diff", "--no-renames", base, "--")
+	patch, err := gitOutput(ctx, worktree, "diff", "--no-ext-diff", "--no-renames", base, "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	summary, err := gitOutput(ctx, worktree, "diff", "--summary", "--find-renames", base, "--")
+	summary, err := gitOutput(ctx, worktree, "diff", "--summary", "--find-renames", base, "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
 	if err != nil {
 		return changeSnapshot{}, err
 	}
@@ -40,7 +40,7 @@ func changeEvidence(ctx context.Context, branch string) (changeSnapshot, error) 
 	if err != nil {
 		return changeSnapshot{}, err
 	}
-	untracked, err := gitOutput(ctx, worktree, "ls-files", "--others", "--exclude-standard", "-z")
+	untracked, err := gitOutput(ctx, worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", ".", ":(glob,exclude)**/agent-sandbox.json", ":(glob,exclude)**/software-factory.json", ":(glob,exclude)**/.soft-factory-sandbox-runtime/**")
 	if err != nil {
 		return changeSnapshot{}, err
 	}

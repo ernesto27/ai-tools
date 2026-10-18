@@ -86,3 +86,27 @@ func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
 		}
 	}
 }
+
+func TestChangeEvidenceExcludesRuntimeArtifacts(t *testing.T) {
+	preparePromptSandbox(t)
+	writePromptTestFile(t, "agent-sandbox.json", `{"apiKey":"runtime-secret"}`)
+	writePromptTestFile(t, "software-factory.json", `{"agentSandbox":{"run":{"apiKey":"maintained-secret"}}}`)
+	runtime, err := PrepareRuntime([]byte(`{"apiKey":"generated-secret"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	snapshot, err := changeEvidence(context.Background(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"agent-sandbox.json", "software-factory.json", runtimeDirectory, "secret"} {
+		if strings.Contains(snapshot.Text, forbidden) {
+			t.Fatalf("evidence contains %q", forbidden)
+		}
+	}
+}

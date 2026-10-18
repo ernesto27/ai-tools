@@ -9,8 +9,9 @@ use `docker info` to verify Docker daemon access.
 
 ## Configuration cannot be loaded
 
-Run from the project folder containing `software-factory.json` and
-`agent-sandbox.json`. Rename older `config.json` files and use the
+Run from the project folder containing `software-factory.json`. Sandbox
+settings must be under `agentSandbox`; the old `agent-sandbox.json` is ignored
+as input. Move its object manually into the unified configuration. Rename older `config.json` files and use the
 [documented camelCase properties](configuration.md).
 
 ## The sandbox branch cannot be found
@@ -67,3 +68,15 @@ the result of earlier stages. During `resume`, a walkthrough failure returns
 an error so recovery can be retried. Check whether `reviewChanges` is disabled,
 then check terminal warnings and [reports](reports.md). If execution logging
 is unavailable, the workflow can proceed but cannot save the final walkthrough.
+
+## A runtime configuration lock or recovery directory exists
+
+Another Factory workflow may still own `agent-sandbox.json`, or forced termination
+may have interrupted cleanup. Stop Factory and its sandbox children before any
+manual recovery. Inspect `.soft-factory-sandbox-runtime/owner`, preserve the
+`original.json` backup, inspect the generated path, and restore the original
+before removing the runtime directory. If no backup exists, verify that the
+runtime file belongs to the interrupted workflow before removing it. See
+[configuration](configuration.md) for the full lifecycle. A symlink or non-regular
+`agent-sandbox.json` is refused without modification. Cleanup failures are
+reported alongside execution failures and retain recovery artifacts.

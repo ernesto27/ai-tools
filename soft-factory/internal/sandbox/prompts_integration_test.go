@@ -85,7 +85,7 @@ func preparePromptSandbox(t *testing.T) string {
 	if err := os.WriteFile("task.txt", []byte("file task {{literal}} 100%"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("agent-sandbox.json", []byte(`{"run":{"branch":"main","filePrompt":"task.txt"},"resume":{"branch":"main"}}`), 0600); err != nil {
+	if err := os.WriteFile("software-factory.json", []byte(`{"agentSandbox":{"run":{"branch":"main","filePrompt":"task.txt"},"resume":{"branch":"main"}}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	bin := filepath.Join(root, "bin")
@@ -309,7 +309,11 @@ func TestImplementationPromptModes(t *testing.T) {
 	for _, continuing := range []bool{false, true} {
 		t.Run(fmt.Sprintf("continue=%t", continuing), func(t *testing.T) {
 			path := preparePromptSandbox(t)
-			if err := Run(TaskContext{Branch: "main", Continue: continuing}); err != nil {
+			cfg, err := config.Load("software-factory.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := Run(TaskContext{Branch: "main", Continue: continuing, Config: cfg}); err != nil {
 				t.Fatal(err)
 			}
 			got := readPromptCapture(t, path)

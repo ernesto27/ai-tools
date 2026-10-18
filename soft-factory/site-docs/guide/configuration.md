@@ -1,8 +1,33 @@
 # Configuration
 
-Create these two files in the project folder before running Soft Factory.
+Create `software-factory.json` in the project root before running Soft Factory.
 
-### `software-factory.json`: documents, skills, and stage settings
+**Breaking change:** `software-factory.json` is now the only maintained workflow
+configuration. To migrate manually, move the entire old `agent-sandbox.json`
+object into the top-level `agentSandbox` property, keeping `documents`,
+`customSkills`, `disabledStages`, and `stages` unchanged. The old file is never
+read as input: there is no fallback, merge, or automatic migration.
+
+Factory loads this configuration once per workflow. It writes the original
+embedded JSON to a temporary `./agent-sandbox.json` with mode `0600` in the
+project directory, runs the existing Agent Sandbox binary there, then removes
+the generated file. Any pre-existing regular file is backed up without parsing
+and restored with its original contents and permissions, even after failures
+or normal cancellation. Symlinks and non-regular paths are refused.
+
+Keep `software-factory.json`, `agent-sandbox.json`, and
+`.soft-factory-sandbox-runtime/` in your project's `.gitignore`; configuration
+can contain secrets. The private runtime directory holds the workflow lock,
+backup, and recovery information. A competing or interrupted run stops with
+recovery instructions. After forced termination, first stop Factory and all
+its sandbox children, inspect the runtime directory's `owner` file and the
+generated path, preserve `original.json`, and manually restore that backup
+before removing the runtime directory. If there was no original file, remove
+the generated file after confirming ownership. Never remove recovery artifacts
+while a workflow is active. Do not run a separate manual `agent-sandbox`
+workflow in the same directory while Factory owns its runtime configuration.
+
+### `software-factory.json`: workflow and sandbox settings
 
 The CLI always reads `software-factory.json` from the current working directory.
 Rename an existing `config.json` to `software-factory.json`; there is no fallback
@@ -12,6 +37,7 @@ All property names use lower camelCase, including nested properties. These are a
 
 | Option | Purpose |
 | --- | --- |
+| `agentSandbox` | Embedded Agent Sandbox configuration, using its shared fields and `run`/`resume` sections. Agent Sandbox owns validation and defaults. |
 | `documents` | Optional list of local document paths. Paths resolve relative to this configuration file. Use `[]` or omit it when no local documents are needed. Blank paths are rejected. |
 | `googleDrive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
 | `googleDrive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
@@ -26,11 +52,18 @@ All property names use lower camelCase, including nested properties. These are a
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
 | `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
-Minimal example:
+Minimal local-task example:
 
 ```json
 {
-  "documents": []
+  "documents": [],
+  "agentSandbox": {
+    "agent": "codex",
+    "branch": "factory-task",
+    "run": {"filePrompt": "task.txt"},
+    "resume": {"push": false},
+    "pr": false
+  }
 }
 ```
 
@@ -160,7 +193,7 @@ stage. Each stage and each field is optional. For example:
 }
 ```
 
-This example assumes Codex is the default agent in `agent-sandbox.json` for
+This example assumes Codex is the default agent in `agentSandbox` for
 risk classification. Authenticate both Codex and Claude before using the
 mixed-agent example. Choose model IDs available to your account and supported
 by the selected agent.
@@ -177,7 +210,7 @@ Use these exact camelCase keys. Overrides apply only when the stage runs;
 `disabledStages` still skips a stage even when it has settings here.
 
 Each nonempty `agent` or `model` overrides its corresponding value from
-`agent-sandbox.json` for that invocation. Omitted or empty fields retain
+`agentSandbox` for that invocation. Omitted or empty fields retain
 Agent Sandbox's configuration defaults independently: setting only `model`
 keeps the configured agent, and setting only `agent` keeps the configured
 model. When changing agents, ensure any inherited model is compatible with
@@ -185,25 +218,35 @@ the new agent, or set both fields.
 
 The default workflow inherits `run` settings for implementation and `resume`
 settings for later stages. `continue`, `review`, and `resume <path>` inherit `resume` settings.
-Soft Factory passes overrides as command-line arguments and leaves
-`agent-sandbox.json` unchanged. Branch, task, authentication, and other sandbox
-settings still come from the existing configuration.
+Soft Factory passes overrides as command-line arguments. Branch, task,
+authentication, and other sandbox settings come from the same loaded
+`agentSandbox` snapshot. The generated runtime file transports all fields,
+including JSON-only fields; `-f` / `--filePrompt` still selects a task prompt.
 
-### `agent-sandbox.json`: defaults and task
+### `agentSandbox`: defaults and task
 
 The default workflow uses `run` settings for implementation and `resume`
 settings for later stages. `continue`, `review`, and `resume <path>` use
 `resume` settings.
 The [stage overrides](#stage-agents-and-models) take priority over agent and
-model defaults from this file.
+model defaults from this embedded object.
 Soft Factory selects one branch for every stage: `run.branch` for the default
 workflow, or `resume.branch` for `review`, `continue`, and `resume <path>`.
 It overrides the branch in each Agent Sandbox invocation. Set both branches to the same value when
 you want to review or continue the task you just implemented.
 
-Soft Factory reads this file using agent-sandbox's shared configuration types.
-It reports file-read and JSON decoding errors; agent-sandbox validates its
-configuration when each stage starts. Use camelCase keys such as `filePrompt`,
+Soft Factory decodes `agentSandbox` using Agent Sandbox's exported Go configuration
+type. Factory reports JSON/type errors and filesystem failures; Agent Sandbox
+validates sandbox settings and command requirements when each stage starts.
+Omitting `agentSandbox` or setting it to `null` delivers `{}` to Agent Sandbox.
+Factory adds no required-sandbox check, though reading a local task without a
+usable `agentSandbox.run.filePrompt` can report a contextual filesystem error.
+Explicit Factory flags (including stage agent/model overrides and workflow
+controls) take priority, followed by the applicable section, then shared fields.
+Agent Sandbox supplies defaults. Explicit `false` and empty section values
+retain their upstream meaning. Relative task and sandbox paths resolve from
+the project root; the temporary transport does not rebase paths.
+Use camelCase keys such as `filePrompt`,
 `baseImage`, `apiKey`, and `commitMessage`; old hyphenated keys are unsupported.
 Keep explicit branch names for Factory's worktree reports and execution logs.
 
@@ -211,18 +254,21 @@ Example for a local task:
 
 ```json
 {
-  "run": {
-    "agent": "codex",
-    "branch": "factory-task",
-    "filePrompt": "task.txt",
-    "push": false,
-    "pr": false
-  },
-  "resume": {
-    "agent": "codex",
-    "branch": "factory-task",
-    "push": false,
-    "pr": false
+  "documents": [],
+  "agentSandbox": {
+    "run": {
+      "agent": "codex",
+      "branch": "factory-task",
+      "filePrompt": "task.txt",
+      "push": false,
+      "pr": false
+    },
+    "resume": {
+      "agent": "codex",
+      "branch": "factory-task",
+      "push": false,
+      "pr": false
+    }
   }
 }
 ```
@@ -236,17 +282,20 @@ Example for a Jira task, where `--jira` supplies the task instead of a local fil
 
 ```json
 {
-  "run": {
-    "agent": "codex",
-    "branch": "eng-123",
-    "push": false,
-    "pr": false
-  },
-  "resume": {
-    "agent": "codex",
-    "branch": "eng-123",
-    "push": false,
-    "pr": false
+  "documents": [],
+  "agentSandbox": {
+    "run": {
+      "agent": "codex",
+      "branch": "eng-123",
+      "push": false,
+      "pr": false
+    },
+    "resume": {
+      "agent": "codex",
+      "branch": "eng-123",
+      "push": false,
+      "pr": false
+    }
   }
 }
 ```
@@ -268,4 +317,4 @@ Common settings in either section:
 | `image` | Optional list of image paths to attach for agents that support them. |
 | `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
 
-Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.
+Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. The original local task always comes from `agentSandbox.run.filePrompt`, including `continue`, `review`, and recovery `resume`. Jira overrides the task while supporting documents still apply. Do not set a separate review prompt in `resume`.

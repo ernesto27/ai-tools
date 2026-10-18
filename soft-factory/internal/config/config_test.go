@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"reflect"
 	"slices"
@@ -152,5 +153,102 @@ func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
 	}
 	if _, err := Load("software-factory.json"); err == nil || !strings.Contains(err.Error(), "customSkills.codeReview must be") {
 		t.Fatalf("expected custom skill validation error for disabled stage, got %v", err)
+	}
+}
+
+func TestUnifiedSandboxSnapshot(t *testing.T) {
+	t.Chdir(t.TempDir())
+	const embedded = `{"agent":"not-an-agent","model":"not-a-model","baseImage":"image","branch":"shared","push":true,"run":{"branch":"","filePrompt":"task.txt","apiKey":"secret","image":[],"model":null},"resume":{"push":false,"agent":"","model":""},"future":{"value":null}}`
+	data := `{"documents":["support.txt"],"stages":{"implementation":{"agent":"codex"},"codeReview":{"model":"review-model"}},"agentSandbox":` + embedded + `}`
+	if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load("software-factory.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AgentSandbox.Agent != "not-an-agent" || cfg.AgentSandbox.Model != "not-a-model" {
+		t.Fatal("semantic settings were changed")
+	}
+	if cfg.AgentSandbox.Run.Branch == nil || *cfg.AgentSandbox.Run.Branch != "" || cfg.AgentSandbox.Run.Model != nil || cfg.AgentSandbox.Run.Image == nil || len(*cfg.AgentSandbox.Run.Image) != 0 {
+		t.Fatal("run pointer semantics lost")
+	}
+	if cfg.AgentSandbox.Resume.Push == nil || *cfg.AgentSandbox.Resume.Push || cfg.AgentSandbox.Resume.Agent == nil || *cfg.AgentSandbox.Resume.Agent != "" {
+		t.Fatal("resume pointer semantics lost")
+	}
+	if cfg.Stages.Implementation.Agent != "codex" || cfg.Stages.CodeReview.Model != "review-model" || cfg.Documents[0] != "support.txt" {
+		t.Fatal("Factory settings lost")
+	}
+	if string(cfg.SandboxJSON()) != embedded {
+		t.Fatal("transport changed original JSON")
+	}
+	copy := cfg.SandboxJSON()
+	copy[0] = 'x'
+	if string(cfg.SandboxJSON()) != embedded {
+		t.Fatal("transport exposes mutable snapshot")
+	}
+}
+
+func TestUnifiedSandboxNoLegacyFallback(t *testing.T) {
+	for _, legacy := range []string{`{"agent":"claude","run":{"filePrompt":"legacy.txt"}}`, `{malformed`} {
+		for _, data := range []string{`{}`, `{"agentSandbox":null}`} {
+			t.Run(legacy+data, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				if err := os.WriteFile("agent-sandbox.json", []byte(legacy), 0640); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := Load("software-factory.json"); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("legacy satisfied Factory input: %v", err)
+				}
+				if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+					t.Fatal(err)
+				}
+				cfg, err := Load("software-factory.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if cfg.AgentSandbox.Agent != "" || cfg.AgentSandbox.Run != nil || string(cfg.SandboxJSON()) != "{}" {
+					t.Fatal("legacy fallback or defaults added")
+				}
+			})
+		}
+	}
+}
+
+func TestUnifiedSandboxDecodeErrors(t *testing.T) {
+	for _, data := range []string{`{"agentSandbox":`, `{"agentSandbox":[]}`, `{"agentSandbox":{"run":{"push":"false"}}}`, `{"agentSandbox":{"agent":123}}`} {
+		t.Run(data, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load("software-factory.json"); err == nil || !strings.Contains(err.Error(), "parse factory configuration") {
+				t.Fatalf("decode error = %v", err)
+			}
+		})
+	}
+}
+
+func TestUnifiedSnapshotRepeatedObject(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, last := range []string{`null`, `{}`, `{"agent":"final"}`} {
+		data := `{"agentSandbox":{"agent":"discarded","run":{"filePrompt":"discarded.txt"}},"agentSandbox":` + last + `}`
+		if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load("software-factory.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.AgentSandbox.Run != nil || cfg.AgentSandbox.Agent == "discarded" {
+			t.Fatal("Factory and transport disagree on final object")
+		}
+		want := last
+		if last == "null" {
+			want = "{}"
+		}
+		if string(cfg.SandboxJSON()) != want {
+			t.Fatalf("transport = %s", cfg.SandboxJSON())
+		}
 	}
 }

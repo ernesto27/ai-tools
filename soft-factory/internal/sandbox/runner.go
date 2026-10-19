@@ -142,6 +142,9 @@ func Review(input TaskContext) (string, error) {
 }
 
 func SecurityReview(input TaskContext) (string, error) {
+	if input.Config.Stages.SecurityReview.SaveFindings {
+		return securityFindings(input)
+	}
 	additionalSkill, err := customSkillPrompt(input.CustomSkills.SecurityReview, true)
 	if err != nil {
 		return "", err
@@ -250,7 +253,7 @@ func review(input TaskContext, stage config.Stage, skillPath, additionalSkill st
 	case config.StageCodeReview:
 		settings = input.Config.Stages.CodeReview
 	case config.StageSecurityReview:
-		settings = input.Config.Stages.SecurityReview
+		settings = input.Config.Stages.SecurityReview.StageConfig
 	}
 
 	skill, err := skills.ReadFile(skillPath)
@@ -593,6 +596,9 @@ func RemoveReviewReports(input TaskContext, reportFiles []string) {
 		if filename == "" {
 			continue
 		}
+		if input.Log.RetainReviewReport(filename) {
+			continue
+		}
 		reportPath, err := executionlog.StageReportPath(input.Context, input.Branch, filename)
 		if err == nil {
 			err = os.Remove(reportPath)
@@ -613,6 +619,9 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 			return fmt.Errorf("locate review report: %w", err)
 		}
 		defer func(path string) {
+			if input.Log.RetainReviewReport(filepath.Base(path)) {
+				return
+			}
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "Warning: remove review report: %v\n", err)
 			}
@@ -636,6 +645,9 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 	reviewEvidence, err := riskReviewEvidence(reportFiles, disabledReviews)
 	if err != nil {
 		return err
+	}
+	if input.Config.Stages.SecurityReview.SaveFindings && !input.Config.StageDisabled(config.StageSecurityReview) {
+		reviewEvidence += "\nSecurity review uses saveFindings: findings and suggested fixes were intentionally left unapplied. Do not describe them as fixed.\n"
 	}
 	prompt, err := prompts.Render("risk-classification.txt", map[string]any{
 		"ReportDirectory": executionlog.ContainerReportPath(""),

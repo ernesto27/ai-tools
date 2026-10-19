@@ -25,6 +25,7 @@ All property names use lower camelCase, including nested properties. These are a
 | `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
 | `stages` | Optional agent and model overrides for individual stages. See [Stage agents and models](#stage-agents-and-models). |
 | `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
+| `stages.securityReview.saveFindings` | Optional boolean; `true` saves security findings and suggested fixes without applying corrections or committing. Defaults to `false`. |
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
 | `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
@@ -123,8 +124,8 @@ Error: validate factory configuration: disabledStages[0]: unknown stage "securit
 
 Duplicates are allowed. Listing a stage that the selected command never runs,
 such as `implementation` with `review`, has no effect. Each skipped stage
-prints `Skipping disabled stage: <name>` and, in the default workflow and
-`continue`, adds that line to `summary.log`. Skipped stages start no agent,
+prints `Skipping disabled stage: <name>` and, when execution logging is enabled,
+adds that line to `summary.log`. Skipped stages start no agent,
 create no stage log or report, and do not load their configured custom skill,
 so a missing skill file does not block a disabled stage. Skill names are still
 validated.
@@ -201,6 +202,45 @@ Factory-generated prompts replace both section `query` and `filePrompt`; workflo
 controls such as the risk stage's `push=false` and `pr=false` take priority too.
 Explicit section false values, empty strings, and empty lists override shared
 values. Lists are resolved before repeatable `--file` and `--image` flags are expanded.
+
+### Save security findings without corrections
+
+Merge this into your existing local `software-factory.json`:
+
+```json
+{
+  "stages": {
+    "securityReview": {
+      "saveFindings": true
+    }
+  }
+}
+```
+
+`saveFindings` is a Factory-owned option for security review only. It accepts
+JSON `true` or `false`; explicit null, strings, numbers, arrays, and objects
+are rejected with an error naming `stages.securityReview.saveFindings`.
+Omitting it or setting it to `false` preserves automatic security corrections.
+Existing stage `agent` and `model` assignments keep their usual precedence.
+
+When enabled, security review performs one pass using the bundled security
+criteria, configured custom skill, task changes, and supporting documents.
+It reports findings and suggested fixes without editing task files, staging,
+committing, pushing, or opening a PR. These restrictions also apply to delegated
+reviewers and take precedence over requests in custom skills. Factory overrides
+both sandbox `push` and `pr` to `false` for this stage, selecting the sandbox's
+no-commit instructions. Other stages retain their configured behavior.
+
+The current invocation's `summary.log` includes the findings, recommendations,
+review verdict, checks, and verification gaps. Findings alone do not fail a
+successful execution or stop later enabled stages. Execution failures and
+interruptions retain normal recovery behavior. See [Reports](reports.md).
+
+With this option enabled, standalone `review` creates and prints an invocation
+log directory under `logs/<sanitized-branch>/review-<UTC-timestamp>/`. It still
+runs only reviews and risk classification, without implementation or the final
+walkthrough. If security review is explicitly disabled, it remains skipped and
+standalone review keeps its existing logging behavior.
 
 ### Sandbox settings transport
 

@@ -96,16 +96,24 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 
 	branch, branchSet := workflowBranch(cfg, opts)
 	var runLog *executionlog.Run
-	if opts.Implement {
+	logReview := !opts.Implement && cfg.Stages.SecurityReview.SaveFindings && !cfg.StageDisabled(config.StageSecurityReview)
+	if opts.Implement || logReview || opts.ResumePath != "" {
 		command := executionlog.CommandRun
 		if opts.Continue {
 			command = executionlog.CommandContinue
 		}
+		planned := plannedStages(cfg)
+		if !opts.Implement {
+			command = executionlog.CommandReview
+			planned = slices.DeleteFunc(planned, func(stage config.Stage) bool {
+				return stage == config.StageImplementation || stage == config.StageReviewChanges
+			})
+		}
 		var err error
 		if opts.ResumePath != "" {
-			runLog, err = executionlog.OpenRun(opts.ResumePath, branch, plannedStages(cfg))
+			runLog, err = executionlog.OpenRun(opts.ResumePath, branch, planned)
 		} else {
-			runLog, err = executionlog.NewRun(branch, command, plannedStages(cfg))
+			runLog, err = executionlog.NewRun(branch, command, planned)
 		}
 		if err != nil {
 			if opts.ResumePath != "" {
@@ -165,6 +173,9 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		{config.StageSecurityReview, "\nStarting security review and corrections...", sandbox.SecurityReview},
 	}
 	for _, review := range reviews {
+		if review.stage == config.StageSecurityReview && cfg.Stages.SecurityReview.SaveFindings {
+			review.message = "\nStarting security review (save findings; no corrections)..."
+		}
 		if cfg.StageDisabled(review.stage) {
 			disabledReviews = append(disabledReviews, review.stage)
 		}

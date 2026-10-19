@@ -53,6 +53,9 @@ func TestWorkflowSandboxHelper(t *testing.T) {
 	}
 	for _, path := range regexp.MustCompile(`/workspace/\.soft-factory-[A-Za-z0-9._-]+`).FindAllString(capture.Prompt, -1) {
 		content := "Test stage changes.\n"
+		if strings.HasSuffix(path, "-review.txt") && strings.Contains(capture.Prompt, "This stage has saveFindings enabled.") {
+			content = workflowSecurityReport
+		}
 		if strings.HasSuffix(path, ".json") {
 			content = `{"classification":"LOW"}`
 		}
@@ -61,8 +64,10 @@ func TestWorkflowSandboxHelper(t *testing.T) {
 		}
 	}
 	// Later stages must keep using the original loaded configuration.
-	if err := os.WriteFile(factoryConfigFile, []byte(`{invalid after launch`), 0600); err != nil {
-		t.Fatal(err)
+	if os.Getenv("FACTORY_KEEP_TEST_CONFIG") != "1" {
+		if err := os.WriteFile(factoryConfigFile, []byte(`{invalid after launch`), 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

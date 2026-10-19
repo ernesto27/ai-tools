@@ -9,6 +9,7 @@ import (
 
 func TestRenderMatchesOriginalPromptText(t *testing.T) {
 	cases := map[string]map[string]any{
+		"security-findings.txt":   {"ReportPath": "VALUE_ReportPath {{literal}} 100%", "Skill": "VALUE_Skill {{literal}} 100%", "AdditionalSkill": "VALUE_AdditionalSkill {{literal}} 100%", "Task": "VALUE_Task {{literal}} 100%", "HostEvidence": "VALUE_HostEvidence {{literal}} 100%"},
 		"review-changes.txt":      {"ReportPath": "VALUE_ReportPath {{literal}} 100%", "Skill": "VALUE_Skill {{literal}} 100%", "AdditionalSkill": "VALUE_AdditionalSkill {{literal}} 100%", "Task": "VALUE_Task {{literal}} 100%", "HostEvidence": "VALUE_HostEvidence {{literal}} 100%"},
 		"review.txt":              {"Skill": "VALUE_Skill {{literal}} 100%", "AdditionalSkill": "VALUE_AdditionalSkill {{literal}} 100%", "Task": "VALUE_Task {{literal}} 100%"},
 		"review-report.txt":       {"ReportPath": "VALUE_ReportPath {{literal}} 100%"},

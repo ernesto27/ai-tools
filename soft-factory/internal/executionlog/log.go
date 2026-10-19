@@ -26,6 +26,8 @@ const (
 	CommandRun = "run"
 	// CommandContinue identifies a continued workflow invocation.
 	CommandContinue = "continue"
+	// CommandReview identifies a standalone review with execution logs.
+	CommandReview = "review"
 
 	statusInterrupted = "INTERRUPTED"
 	statusFailed      = "FAILED"
@@ -46,36 +48,40 @@ func ContainerReportPath(filename string) string {
 // Run owns one directory of log files. Writes are serialized and best effort: after creation,
 // logging failures warn once and never become workflow errors.
 type Run struct {
-	mu                sync.Mutex
-	file              *os.File
-	summary           *os.File
-	summaryEntries    int
-	changeSummaryPath string
-	riskResultPath    string
-	stageAgent        string
-	stageModel        string
-	path              string
-	header            string
-	err               error
-	attempts          map[config.Stage]int
-	active            config.Stage
-	stream            string
-	newline           bool
-	closed            bool
-	ready             bool
-	stageStatus       *StageStatus
-	resuming          bool
+	mu                   sync.Mutex
+	file                 *os.File
+	summary              *os.File
+	summaryEntries       int
+	changeSummaryPath    string
+	riskResultPath       string
+	securityReporting    bool
+	securityFindingsPath string
+	securityReportName   string
+	retainSecurityReport bool
+	stageAgent           string
+	stageModel           string
+	path                 string
+	header               string
+	err                  error
+	attempts             map[config.Stage]int
+	active               config.Stage
+	stream               string
+	newline              bool
+	closed               bool
+	ready                bool
+	stageStatus          *StageStatus
+	resuming             bool
 }
 
 // NewRun initializes a private invocation directory under the branch's log folder.
-// command identifies the invocation as "run" or "continue".
+// command identifies the invocation as "run", "continue", or "review".
 // planned lists, in order, the stage labels this run will execute; stages
 // disabled for the run are omitted from the header.
 func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
 	}
-	if command != CommandRun && command != CommandContinue {
+	if command != CommandRun && command != CommandContinue && command != CommandReview {
 		return nil, fmt.Errorf("unsupported execution log command %q", command)
 	}
 	workingDirectory, err := os.Getwd()
@@ -114,6 +120,13 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 		file.Close()
 		stageStatus.Close()
 		return nil, fmt.Errorf("write summary header: %w", writeErr)
+	}
+	if command == CommandReview {
+		if err := os.WriteFile(filepath.Join(path, "command.txt"), []byte(CommandReview+"\n"), 0600); err != nil {
+			file.Close()
+			stageStatus.Close()
+			return nil, fmt.Errorf("save review invocation command: %w", err)
+		}
 	}
 
 	return &Run{
@@ -222,6 +235,8 @@ func (r *Run) StartStage(stage config.Stage) {
 	r.attempts[stage]++
 	r.changeSummaryPath = ""
 	r.riskResultPath = ""
+	r.securityReporting = false
+	r.securityFindingsPath = ""
 	r.stageAgent, r.stageModel = "", ""
 	filename := fmt.Sprintf("%02d-%s.log", index, stage)
 	if r.attempts[stage] > 1 && !r.resuming {
@@ -553,7 +568,11 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 	case config.StageReviewChanges:
 		// The walkthrough has no additional summary field.
 	default:
-		line, cleanup = r.changeSummaryLocked()
+		if stage == config.StageSecurityReview && r.securityReporting {
+			line = "   Changes:   No code changes made (saveFindings enabled).\n" + r.securitySummaryLocked()
+		} else {
+			line, cleanup = r.changeSummaryLocked()
+		}
 	}
 	entry += line
 	if stageErr != nil {
@@ -564,6 +583,9 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		return fmt.Errorf("write stage summary: %w", err)
 	}
 	r.summaryEntries++
+	if stage == config.StageSecurityReview && r.securityReporting {
+		r.retainSecurityReport = false
+	}
 	r.stageAgent, r.stageModel = "", ""
 	if cleanup != nil {
 		cleanup()

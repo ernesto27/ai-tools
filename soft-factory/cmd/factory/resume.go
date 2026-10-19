@@ -25,6 +25,13 @@ func newResumeCmd(run func(workflowOptions) error) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			reviewOnly, err := executionlog.IsReviewRun(path)
+			if err != nil {
+				return err
+			}
+			if reviewOnly {
+				opts.Implement = false
+			}
 			saved, err := executionlog.NewStageStatus(path, false)
 			if err != nil {
 				return err

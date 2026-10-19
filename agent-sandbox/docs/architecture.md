@@ -7,6 +7,7 @@ describes the CLI contract; consult the linked source when changing behavior.
 
 ```text
 cmd/agent-sandbox -> config
+                 -> openrouter
                  -> sandbox -> agent -> docker
                             -> docker
                             -> git
@@ -27,9 +28,17 @@ cmd/agent-sandbox -> config
   [update.go](../cmd/agent-sandbox/update.go) runs the embedded
   [install.sh](../install.sh) with Bash to install the latest release, independently
   of sandbox execution and configuration.
+  [models.go](../cmd/agent-sandbox/models.go) owns the model browser's terminal
+  layout, provider selection, and asynchronous OpenRouter requests. Request
+  identifiers prevent older responses from replacing a newer selection.
 - [config](../config/config.go) exposes the public `Config` and `Section` JSON
   types and a `DefaultModel` accessor backed by `internal/agent`. The CLI owns
   file loading, validation, reviewer normalization, and flag merging.
+- [internal/openrouter](../internal/openrouter/openrouter.go) fetches the public
+  model catalog without authentication, filtering by model creator with
+  `model_authors` and sorting by `newest`. It decodes model metadata and formats
+  input/output prices in USD per million tokens. The CLI formats context limits
+  and the `created` timestamp, which records when the model was added to OpenRouter.
 - [internal/sandbox](../internal/sandbox/sandbox.go) orchestrates image preparation,
   worktree creation or reuse, container execution, and publication.
   [Runtime](../internal/sandbox/runtime.go) routes output and execution events

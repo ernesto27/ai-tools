@@ -67,6 +67,8 @@ agent-sandbox doctor
 This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
+Browse the public OpenRouter model catalog with `agent-sandbox models`.
+
 ```text
 agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [--apiKey <key>] [--reviewers <username>]... [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
 agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)

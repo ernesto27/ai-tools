@@ -73,7 +73,17 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		return sandbox.NewUsageError(err)
 	})
 
-	cmd.AddCommand(newRunCmd(state), newResumeCmd(state), newRunTUICmd(state), newResumeTUICmd(state), newWorktreeListCmd(), newWorktreeDeleteCmd(), newWorktreeDeleteAllCmd(), newWorktreeEditorOpenCmd())
+	cmd.AddCommand(
+		newRunCmd(state),
+		newResumeCmd(state),
+		newRunTUICmd(state),
+		newResumeTUICmd(state),
+		newWorktreeListCmd(),
+		newWorktreeDeleteCmd(),
+		newWorktreeDeleteAllCmd(),
+		newWorktreeEditorOpenCmd(),
+		newModelCmd(),
+	)
 	cmd.AddCommand(newDoctorCmd(), newUpdateCmd())
 	return cmd, state
 }

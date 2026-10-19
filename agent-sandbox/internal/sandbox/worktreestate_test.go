@@ -3,29 +3,25 @@ package sandbox
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigPathsDoesNotCreateDirectories(t *testing.T) {
 	configDir := setupWorktreeState(t)
 
 	config, err := configPaths()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	wantStateFile := filepath.Join(configDir, "agent-sandbox", "worktrees.jsonl")
-	if config.StateFile != wantStateFile {
-		t.Fatalf("Config.StateFile = %q, want %q", config.StateFile, wantStateFile)
-	}
+	require.Equal(t, wantStateFile, config.StateFile)
 	wantWorktreesDir := filepath.Join(configDir, "agent-sandbox", "worktrees")
-	if config.WorktreesDir != wantWorktreesDir {
-		t.Fatalf("Config.WorktreesDir = %q, want %q", config.WorktreesDir, wantWorktreesDir)
-	}
-	if _, err := os.Stat(filepath.Dir(config.WorktreesDir)); !os.IsNotExist(err) {
-		t.Fatalf("configuration directory exists before a write: %v", err)
+	require.Equal(t, wantWorktreesDir, config.WorktreesDir)
+	{
+		_, err := os.Stat(filepath.Dir(config.WorktreesDir))
+		require.True(t, os.IsNotExist(err), "configuration directory exists before a write: %v", err)
 	}
 }
 
@@ -33,43 +29,29 @@ func TestRepoSlugScopesSameNamedRepositoriesAndResolvesSymlinks(t *testing.T) {
 	root := t.TempDir()
 	first := filepath.Join(root, "one", "api")
 	second := filepath.Join(root, "two", "api")
-	if err := os.MkdirAll(first, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(second, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(first, 0o755))
+	require.NoError(t, os.MkdirAll(second, 0o755))
 
 	firstSlug := repoSlug(first)
 	secondSlug := repoSlug(second)
-	if firstSlug == secondSlug {
-		t.Fatalf("repoSlug(%q) = repoSlug(%q) = %q, want distinct slugs", first, second, firstSlug)
-	}
-	if !strings.HasPrefix(firstSlug, "api-") || !strings.HasPrefix(secondSlug, "api-") {
-		t.Fatalf("repo slugs = %q, %q, want names prefixed with api-", firstSlug, secondSlug)
-	}
+	require.NotEqual(t, secondSlug, firstSlug)
+	require.True(t, strings.HasPrefix(firstSlug, "api-"), "repo slugs = %q, %q, want names prefixed with api-", firstSlug, secondSlug)
+	require.True(t, strings.HasPrefix(secondSlug, "api-"), "repo slugs = %q, %q, want names prefixed with api-", firstSlug, secondSlug)
 
 	link := filepath.Join(root, "link")
-	if err := os.Symlink(first, link); err != nil {
-		t.Fatal(err)
-	}
-	if got := repoSlug(link); got != firstSlug {
-		t.Fatalf("repoSlug(%q) = %q, want %q", link, got, firstSlug)
-	}
+	require.NoError(t, os.Symlink(first, link))
+	require.Equal(t, firstSlug, repoSlug(link))
 }
 
 func TestRecordWorktreeAndReadRecords(t *testing.T) {
 	configDir := setupWorktreeState(t)
 
 	empty, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if empty != nil {
-		t.Fatalf("readRecords() before writing = %#v, want nil", empty)
-	}
-	if _, err := os.Stat(filepath.Join(configDir, "agent-sandbox")); !os.IsNotExist(err) {
-		t.Fatalf("state directory exists after a read: %v", err)
+	require.NoError(t, err)
+	require.Nil(t, empty)
+	{
+		_, err := os.Stat(filepath.Join(configDir, "agent-sandbox"))
+		require.True(t, os.IsNotExist(err), "state directory exists after a read: %v", err)
 	}
 
 	records := []worktreeRecord{
@@ -77,90 +59,64 @@ func TestRecordWorktreeAndReadRecords(t *testing.T) {
 		{Repo: "/repos/two", Path: "/worktrees/two", Branch: "two", Created: time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)},
 	}
 	for _, record := range records {
-		if err := recordWorktree(record); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, recordWorktree(record))
 	}
 
 	got, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, records) {
-		t.Fatalf("readRecords() = %#v, want %#v", got, records)
-	}
+	require.NoError(t, err)
+	require.Equal(t, records, got)
 }
 
 func TestWriteRecordsCreatesStateDirectory(t *testing.T) {
 	configDir := setupWorktreeState(t)
 
-	if err := writeRecords(nil); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, writeRecords(nil))
 	path := filepath.Join(configDir, "agent-sandbox", "worktrees.jsonl")
-	if info, err := os.Stat(path); err != nil || info.IsDir() {
-		t.Fatalf("state file = (%v, %v), want an existing file", info, err)
+	{
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.False(t, info.IsDir(), "state file = (%v, %v), want an existing file", info, err)
 	}
 }
 
 func TestReadRecordsSkipsMalformedLines(t *testing.T) {
 	setupWorktreeState(t)
 	record := worktreeRecord{Repo: "/repo", Path: "/worktree", Branch: "feature"}
-	if err := recordWorktree(record); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, recordWorktree(record))
 
 	config, err := configPaths()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	path := config.StateFile
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if _, err := file.WriteString("not json\n"); err != nil {
 		file.Close()
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if err := file.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, file.Close())
 
 	got, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, []worktreeRecord{record}) {
-		t.Fatalf("readRecords() = %#v, want only %#v", got, record)
-	}
+	require.NoError(t, err)
+	require.Equal(t, []worktreeRecord{record}, got)
 }
 
 func TestRecordedWorktreesFiltersByResolvedRepository(t *testing.T) {
 	setupWorktreeState(t)
 	repoDir := t.TempDir()
 	repoLink := filepath.Join(t.TempDir(), "repo")
-	if err := os.Symlink(repoDir, repoLink); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Symlink(repoDir, repoLink))
 
 	mine := []worktreeRecord{
 		{Repo: repoDir, Path: "/worktrees/one", Branch: "one"},
 		{Repo: repoLink, Path: "/worktrees/two", Branch: "two"},
 	}
 	for _, record := range append(mine, worktreeRecord{Repo: t.TempDir(), Path: "/worktrees/other", Branch: "other"}) {
-		if err := recordWorktree(record); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, recordWorktree(record))
 	}
 
 	got, err := recordedWorktrees(repoDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, mine) {
-		t.Fatalf("recordedWorktrees() = %#v, want %#v", got, mine)
-	}
+	require.NoError(t, err)
+	require.Equal(t, mine, got)
 }
 
 func TestRecordedWorktreePathFindsOnlyTheCurrentRepositoryBranch(t *testing.T) {
@@ -172,26 +128,16 @@ func TestRecordedWorktreePathFindsOnlyTheCurrentRepositoryBranch(t *testing.T) {
 		{Repo: otherRepo, Path: "/worktrees/other-feature", Branch: "feature"},
 	}
 	for _, record := range records {
-		if err := recordWorktree(record); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, recordWorktree(record))
 	}
 
 	path, err := recordedWorktreePath(repoDir, "feature")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if path != records[0].Path {
-		t.Fatalf("recordedWorktreePath() = %q, want %q", path, records[0].Path)
-	}
+	require.NoError(t, err)
+	require.Equal(t, records[0].Path, path)
 
 	path, err = recordedWorktreePath(repoDir, "missing")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if path != "" {
-		t.Fatalf("recordedWorktreePath() = %q, want empty path", path)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "", path)
 }
 
 func TestForgetWorktreesRemovesOnlyMatchingRepositoryAndPath(t *testing.T) {
@@ -205,72 +151,42 @@ func TestForgetWorktreesRemovesOnlyMatchingRepositoryAndPath(t *testing.T) {
 		{Repo: t.TempDir(), Path: pathToRemove, Branch: "other-repo"},
 	}
 	for _, record := range records {
-		if err := recordWorktree(record); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, recordWorktree(record))
 	}
 
-	if err := forgetWorktrees(repoDir, []string{pathToRemove}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, forgetWorktrees(repoDir, []string{pathToRemove}))
 
 	got, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	want := []worktreeRecord{records[1], records[2]}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("readRecords() after forget = %#v, want %#v", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestForgetWorktreesDoesNothingWithoutPaths(t *testing.T) {
 	setupWorktreeState(t)
 	record := worktreeRecord{Repo: "/repo", Path: "/worktree", Branch: "feature"}
-	if err := recordWorktree(record); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, recordWorktree(record))
 
-	if err := forgetWorktrees(record.Repo, nil); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, forgetWorktrees(record.Repo, nil))
 	got, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, []worktreeRecord{record}) {
-		t.Fatalf("readRecords() = %#v, want %#v", got, record)
-	}
+	require.NoError(t, err)
+	require.Equal(t, []worktreeRecord{record}, got)
 }
 
 func TestWriteRecordsReplacesState(t *testing.T) {
 	setupWorktreeState(t)
-	if err := recordWorktree(worktreeRecord{Repo: "/repo", Path: "/worktree/old", Branch: "old"}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, recordWorktree(worktreeRecord{Repo: "/repo", Path: "/worktree/old", Branch: "old"}))
 
 	want := []worktreeRecord{{Repo: "/repo", Path: "/worktree/new", Branch: "new"}}
-	if err := writeRecords(want); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, writeRecords(want))
 	got, err := readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("readRecords() after replacement = %#v, want %#v", got, want)
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got)
 
-	if err := writeRecords(nil); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, writeRecords(nil))
 	got, err = readRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != nil {
-		t.Fatalf("readRecords() after clearing = %#v, want nil", got)
-	}
+	require.NoError(t, err)
+	require.Nil(t, got)
 }
 
 func setupWorktreeState(t *testing.T) string {

@@ -3,13 +3,14 @@ package sandbox
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
@@ -27,16 +28,13 @@ func TestRequireCommittedPRWorktree(t *testing.T) {
 			repoDir := setupDeleteTestRepo(t)
 			worktree := addDeleteTestWorktree(t, repoDir, "feature")
 			if tc.dirty {
-				if err := os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("pending\n"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("pending\n"), 0o600))
 			}
 			err := requireCommittedWorktree(&git.Repo{Dir: worktree.Path})
-			if tc.dirty && (err == nil || !strings.Contains(err.Error(), "uncommitted changes")) {
-				t.Fatalf("expected uncommitted changes error, got %v", err)
-			}
-			if !tc.dirty && err != nil {
-				t.Fatal(err)
+			if tc.dirty {
+				require.ErrorContains(t, err, "uncommitted changes")
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -84,9 +82,7 @@ func TestPublishAgentPRContent(t *testing.T) {
 			repoDir := setupDeleteTestRepo(t)
 			repo := &git.Repo{Dir: repoDir}
 			baseBranch, err := repo.CurrentBranch(context.Background())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			remote := t.TempDir()
 			runGit(t, remote, "init", "--bare", "--quiet")
 			runGit(t, repoDir, "remote", "add", "origin", remote)
@@ -95,13 +91,9 @@ func TestPublishAgentPRContent(t *testing.T) {
 			record.BaseBranch = baseBranch
 			worktree := repo.At(record.Path)
 			base, err := worktree.FetchBase(context.Background(), baseBranch)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if !tc.unchanged {
-				if err := os.WriteFile(filepath.Join(record.Path, "change.txt"), []byte("change"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(record.Path, "change.txt"), []byte("change"), 0o600))
 				runGit(t, record.Path, "add", "change.txt")
 				runGit(t, record.Path, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "change")
 			}
@@ -111,9 +103,7 @@ func TestPublishAgentPRContent(t *testing.T) {
 				runGit(t, record.Path, "push", "origin", "HEAD:"+baseBranch)
 			}
 			if tc.dirty {
-				if err := os.WriteFile(filepath.Join(record.Path, "pending.txt"), []byte("pending"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(record.Path, "pending.txt"), []byte("pending"), 0o600))
 			}
 			artifact := filepath.Join(record.Path, prContentFile)
 			data := `{"title":"Fix login","body":"Changes\n\nTests passed"}`
@@ -121,9 +111,7 @@ func TestPublishAgentPRContent(t *testing.T) {
 				data = `{`
 			}
 			if !tc.prDisabled {
-				if err := os.WriteFile(artifact, []byte(data), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(artifact, []byte(data), 0o600))
 			}
 			fakeDir := t.TempDir()
 			logPath := filepath.Join(fakeDir, "calls")
@@ -149,9 +137,7 @@ else
   printf 'https://github.com/owner/repo/pull/1\n'
 fi
 `
-			if err := os.WriteFile(filepath.Join(fakeDir, "gh"), []byte(script), 0o700); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(fakeDir, "gh"), []byte(script), 0o700))
 			t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 			t.Setenv("PR_TEST_LOG", logPath)
 			t.Setenv("PR_TEST_BODY", bodyPath)
@@ -180,9 +166,7 @@ fi
 				t.Setenv("PR_TEST_FAILURE", "1")
 			}
 			client, err := github.New(repoDir, "https://github.com/owner/repo.git")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if tc.cancelInspection {
@@ -209,57 +193,46 @@ fi
 			}
 			var out bytes.Buffer
 			err = publishResult(ctx, Options{PR: !tc.prDisabled, Push: tc.push, Branch: "feature", prBase: base, Reviewers: tc.reviewers}, record, repo, client, tc.status, &out)
-			if tc.cancelInspection && (!errors.Is(err, context.Canceled) || out.Len() != 0) {
-				t.Fatalf("cancelled recovery error = %v, output = %q", err, out.String())
+			if tc.cancelInspection {
+				require.ErrorIs(t, err, context.Canceled)
+				require.Empty(t, out.String())
 			}
 			if tc.wantError != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-					t.Fatalf("error = %v, want %q", err, tc.wantError)
-				}
-			} else if err != nil {
-				t.Fatal(err)
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
 			}
-			if tc.wantOutput != "" && !strings.Contains(out.String(), tc.wantOutput) {
-				t.Fatalf("output = %q, want %q", out.String(), tc.wantOutput)
+			if tc.wantOutput != "" {
+				require.Contains(t, out.String(), tc.wantOutput)
 			}
 			_, statErr := os.Lstat(artifact)
-			if !tc.prDisabled && os.IsNotExist(statErr) != tc.wantConsumed {
-				t.Fatalf("artifact removal = %v, want %t", statErr, tc.wantConsumed)
+			if !tc.prDisabled {
+				require.Equal(t, tc.wantConsumed, os.IsNotExist(statErr), "artifact removal: %v", statErr)
 			}
 			refs, err := exec.Command("git", "-C", remote, "show-ref", "--verify", "refs/heads/feature").CombinedOutput()
-			if (err == nil) != tc.wantPushed {
-				t.Fatalf("remote feature ref = %s, %v; want pushed %t", refs, err, tc.wantPushed)
-			}
+			require.Equal(t, tc.wantPushed, err == nil, "remote feature ref: %s; error: %v", refs, err)
 			if tc.wantPushed {
 				paths, err := exec.Command("git", "-C", remote, "ls-tree", "--name-only", "feature").Output()
-				if err != nil || strings.Contains(string(paths), prContentFile) {
-					t.Fatalf("PR artifact entered remote commit: %s, %v", paths, err)
-				}
+				require.NoError(t, err)
+				require.NotContains(t, string(paths), prContentFile)
 			}
 			calls, _ := os.ReadFile(logPath)
-			if tc.prDisabled && len(calls) != 0 {
-				t.Fatalf("unexpected GitHub calls without PR mode: %s", calls)
+			if tc.prDisabled {
+				require.Empty(t, calls, "unexpected GitHub calls without PR mode")
 			}
-			if strings.Contains(string(calls), "create\n") != tc.wantCreated {
-				t.Fatalf("gh calls = %s, want create %t", calls, tc.wantCreated)
-			}
+			require.Equal(t, tc.wantCreated, strings.Contains(string(calls), "create\n"))
 			wantInspection := tc.recovered && len(tc.reviewers) > 0
-			if strings.Contains(string(calls), "view\n") != wantInspection {
-				t.Fatalf("gh calls = %s, want reviewer inspection %t", calls, wantInspection)
-			}
-			if strings.Contains(string(calls), "edit\n") || strings.Contains(string(calls), "api\n") {
-				t.Fatalf("unexpected reviewer mutation: %s", calls)
-			}
+			require.Equal(t, wantInspection, strings.Contains(string(calls), "view\n"))
+			require.NotContains(t, string(calls), "edit\n")
+			require.NotContains(t, string(calls), "api\n")
 			for _, reviewer := range tc.reviewers {
-				if strings.Contains(string(calls), "--reviewer\n"+reviewer+"\n") != tc.wantCreated {
-					t.Fatalf("gh calls = %s, want reviewer %s passed %t", calls, reviewer, tc.wantCreated)
-				}
+				require.Equal(t, tc.wantCreated, strings.Contains(string(calls), "--reviewer\n"+reviewer+"\n"))
 			}
 			if tc.wantCreated {
 				body, err := os.ReadFile(bodyPath)
-				if err != nil || string(body) != "Changes\n\nTests passed" || !strings.Contains(string(calls), "Fix login\n") {
-					t.Fatalf("gh content = %q, calls = %s, error = %v", body, calls, err)
-				}
+				require.NoError(t, err)
+				require.Equal(t, "Changes\n\nTests passed", string(body))
+				require.Contains(t, string(calls), "Fix login\n")
 			}
 		})
 	}

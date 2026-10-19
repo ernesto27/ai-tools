@@ -1,8 +1,9 @@
 package agent
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCodexArgsWithoutImages(t *testing.T) {
@@ -13,9 +14,7 @@ func TestCodexArgsWithoutImages(t *testing.T) {
 		"--config", `model_reasoning_effort="high"`,
 		"exec", "--json", "inspect this",
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Args() = %q, want %q", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestCodexArgsAttachImagesBeforePrompt(t *testing.T) {
@@ -28,7 +27,5 @@ func TestCodexArgsAttachImagesBeforePrompt(t *testing.T) {
 		"-i", "/agent-sandbox-images/2.png",
 		"--", "compare them",
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Args() = %q, want %q", got, want)
-	}
+	require.Equal(t, want, got)
 }

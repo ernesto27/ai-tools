@@ -1,8 +1,9 @@
 package sandbox
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agent"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
@@ -31,18 +32,12 @@ func TestAddImageMountsUsesAgentImageCapability(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			selected, err := agent.Lookup(tt.name)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			runOpts := docker.RunOptions{}
 			paths := addImageMounts(&runOpts, Options{Agent: selected, Images: images})
-			if !reflect.DeepEqual(paths, tt.wantPaths) {
-				t.Fatalf("paths = %q, want %q", paths, tt.wantPaths)
-			}
-			if !reflect.DeepEqual(runOpts.Mounts, tt.wantMounts) {
-				t.Fatalf("mounts = %#v, want %#v", runOpts.Mounts, tt.wantMounts)
-			}
+			require.Equal(t, tt.wantPaths, paths)
+			require.Equal(t, tt.wantMounts, runOpts.Mounts)
 		})
 	}
 }

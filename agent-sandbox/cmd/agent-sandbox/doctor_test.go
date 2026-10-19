@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDoctorInstallationReport(t *testing.T) {
@@ -28,30 +29,20 @@ func TestDoctorInstallationReport(t *testing.T) {
 			t.Chdir(dir)
 			t.Setenv("PATH", dir)
 			t.Setenv("NO_COLOR", "1")
-			if err := os.WriteFile("agent-sandbox.json", []byte("invalid json"), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile("agent-sandbox.json", []byte("invalid json"), 0o600))
 			for _, name := range tt.installed {
 				// A marker would reveal accidental execution instead of PATH lookup.
-				if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nprintf invoked > invoked\n"), 0o755); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nprintf invoked > invoked\n"), 0o755))
 			}
 			if tt.nonexec != "" {
-				if err := os.WriteFile(filepath.Join(dir, tt.nonexec), nil, 0o644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(dir, tt.nonexec), nil, 0o644))
 			}
 			cmd, state := newRootCmd()
 			var output bytes.Buffer
 			cmd.SetOut(&output)
 			cmd.SetArgs([]string{"doctor"})
-			if err := cmd.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			if state.status != 0 {
-				t.Fatalf("status = %d, want 0", state.status)
-			}
+			require.NoError(t, cmd.Execute())
+			require.Equal(t, 0, state.status)
 			var want strings.Builder
 			want.WriteString("Dependency checks:\n\nDependency  Status         Usage\n----------  -------------  -----\n")
 			for i, name := range []string{"git", "docker", "gh", "code"} {
@@ -64,11 +55,10 @@ func TestDoctorInstallationReport(t *testing.T) {
 				usage := []string{"Required", "Required", "Optional: PRs", "Optional: worktree-editor"}[i]
 				fmt.Fprintf(&want, "%-10s  %s%s  %s\n", name, status, padding, usage)
 			}
-			if output.String() != want.String() {
-				t.Fatalf("output = %q, want %q", output.String(), want.String())
-			}
-			if _, err := os.Stat("invoked"); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("tool invocation marker: %v", err)
+			require.Equal(t, want.String(), output.String())
+			{
+				_, err := os.Stat("invoked")
+				require.ErrorIs(t, err, os.ErrNotExist)
 			}
 		})
 	}
@@ -90,12 +80,8 @@ func TestDoctorAppearsInHelp(t *testing.T) {
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 	cmd.SetArgs([]string{"--help"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output.String(), "doctor") {
-		t.Fatalf("doctor missing from help: %s", output.String())
-	}
+	require.NoError(t, cmd.Execute())
+	require.Contains(t, output.String(), "doctor")
 }
 
 type doctorFailingWriter struct{}
@@ -106,7 +92,5 @@ func TestDoctorOutputFailure(t *testing.T) {
 	cmd, _ := newRootCmd()
 	cmd.SetOut(doctorFailingWriter{})
 	cmd.SetArgs([]string{"doctor"})
-	if err := cmd.Execute(); !errors.Is(err, io.ErrClosedPipe) {
-		t.Fatalf("error = %v, want output failure", err)
-	}
+	require.ErrorIs(t, cmd.Execute(), io.ErrClosedPipe)
 }

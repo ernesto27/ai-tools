@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLiveBridgePreservesStreamJSON(t *testing.T) {
@@ -21,26 +23,20 @@ func TestLiveBridgePreservesStreamJSON(t *testing.T) {
 				bridge := &liveBridge{log: &transcript}
 				for offset := 0; offset < len(tc.text); offset += size {
 					end := min(offset+size, len(tc.text))
-					if n, err := bridge.Write([]byte(tc.text[offset:end])); err != nil || n != end-offset {
-						t.Fatalf("Write = %d, %v", n, err)
+					{
+						n, err := bridge.Write([]byte(tc.text[offset:end]))
+						require.NoError(t, err)
+						require.Equal(t, end-offset, n)
 					}
 					text, events := bridge.drain(false)
 					drained.WriteString(text)
-					if len(events) != 0 {
-						t.Fatal("agent JSON generated execution events")
-					}
+					require.Empty(t, events)
 				}
 				text, _ := bridge.drain(true)
 				drained.WriteString(text)
-				if drained.String() != tc.text {
-					t.Fatal("TUI changed or filtered JSON text")
-				}
-				if transcript.String() != tc.text {
-					t.Fatal("transcript changed or filtered JSON text")
-				}
-				if err := bridge.logError(); err != nil {
-					t.Fatal(err)
-				}
+				require.Equal(t, tc.text, drained.String())
+				require.Equal(t, tc.text, transcript.String())
+				require.NoError(t, bridge.logError())
 			})
 		}
 	}
@@ -55,15 +51,13 @@ func TestLiveBridgeContinuesAfterTranscriptFailure(t *testing.T) {
 	bridge := &liveBridge{log: failedTranscript{failure}}
 	events := []string{"{\"type\":\"stream_event\"}\n", "{\"type\":\"result\"}\n"}
 	for _, event := range events {
-		if n, err := bridge.Write([]byte(event)); err != nil || n != len(event) {
-			t.Fatalf("Write = %d, %v", n, err)
+		{
+			n, err := bridge.Write([]byte(event))
+			require.NoError(t, err)
+			require.Equal(t, len(event), n)
 		}
 	}
 	text, _ := bridge.drain(true)
-	if text != strings.Join(events, "") {
-		t.Fatal("output lost after transcript failure")
-	}
-	if !errors.Is(bridge.logError(), failure) {
-		t.Fatalf("log error = %v", bridge.logError())
-	}
+	require.Equal(t, strings.Join(events, ""), text)
+	require.ErrorIs(t, bridge.logError(), failure)
 }

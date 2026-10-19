@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agentoutput"
 )
 
@@ -38,34 +40,27 @@ func TestAgentOutputFormatter(t *testing.T) {
 				writer := agentOutputFormatter(tc.agent)(&out, "fix-login")
 				for offset := 0; offset < len(tc.input); offset += chunk.size {
 					end := min(offset+chunk.size, len(tc.input))
-					if n, err := writer.Write([]byte(tc.input[offset:end])); n != end-offset || err != nil {
-						t.Fatalf("Write = %d, %v", n, err)
+					{
+						n, err := writer.Write([]byte(tc.input[offset:end]))
+						require.Equal(t, end-offset, n)
+						require.NoError(t, err)
 					}
 				}
-				if err := writer.Close(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, writer.Close())
 				want := tc.agent + " / fix-login\n" + separator + tc.want + separator
-				if got := auditText(out.String()); got != want {
-					t.Fatalf("formatted output = %q, want %q", got, want)
-				}
+				require.Equal(t, want, auditText(out.String()))
 				before := out.String()
-				if err := writer.Close(); err != nil {
-					t.Fatal(err)
-				}
-				if out.String() != before {
-					t.Fatal("Close repeated output")
-				}
-				if _, err := writer.Write([]byte("more")); !errors.Is(err, io.ErrClosedPipe) {
-					t.Fatalf("Write after Close = %v", err)
+				require.NoError(t, writer.Close())
+				require.Equal(t, before, out.String())
+				{
+					_, err := writer.Write([]byte("more"))
+					require.ErrorIs(t, err, io.ErrClosedPipe)
 				}
 			})
 		}
 	}
 	for _, name := range []string{"opencode", "pi", "unknown"} {
-		if agentOutputFormatter(name) != nil {
-			t.Fatalf("unexpected formatter for %s", name)
-		}
+		require.Nil(t, agentOutputFormatter(name))
 	}
 }
 
@@ -75,31 +70,24 @@ func TestAgentOutputFormatterStreamsLargeEvents(t *testing.T) {
 	header := out.String()
 	message := "你好" + strings.Repeat("x", 128*1024)
 	input := `{"type":"result","result":"` + message + `"}`
-	if _, err := writer.Write([]byte(input)); err != nil {
-		t.Fatal(err)
+	{
+		_, err := writer.Write([]byte(input))
+		require.NoError(t, err)
 	}
-	if out.String() != header {
-		t.Fatal("incomplete line emitted early")
+	require.Equal(t, header, out.String())
+	{
+		_, err := writer.Write([]byte("\n"))
+		require.NoError(t, err)
 	}
-	if _, err := writer.Write([]byte("\n")); err != nil {
-		t.Fatal(err)
-	}
-	if got := auditText(out.String()); got != header+"TIME    AGENT\n            "+message+"\n\n" {
-		t.Fatal("large Unicode message was not rendered before EOF")
-	}
+	require.Equal(t, header+"TIME    AGENT\n            "+message+"\n\n", auditText(out.String()))
 	before := out.String()
-	if _, err := writer.Write([]byte(`{"type":`)); err != nil {
-		t.Fatal(err)
+	{
+		_, err := writer.Write([]byte(`{"type":`))
+		require.NoError(t, err)
 	}
-	if out.String() != before {
-		t.Fatal("incomplete next event affected completed event")
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String()[len(before):], "! OUTPUT\n            Unrecognized claude output: unexpected end of JSON input\n            {\"type\":\n") {
-		t.Fatal("partial final event lost")
-	}
+	require.Equal(t, before, out.String())
+	require.NoError(t, writer.Close())
+	require.Contains(t, out.String()[len(before):], "! OUTPUT\n            Unrecognized claude output: unexpected end of JSON input\n            {\"type\":\n")
 }
 
 type shortAuditOutput struct{}
@@ -135,20 +123,15 @@ func TestAgentOutputFormatterOutputFailures(t *testing.T) {
 				}
 				_, err := writer.Write([]byte(input))
 				if phase == "close" {
-					if err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, err)
 				} else {
-					if !errors.Is(err, tc.want) {
-						t.Fatalf("Write error = %v", err)
-					}
-					if _, err := writer.Write([]byte("more")); !errors.Is(err, tc.want) {
-						t.Fatalf("subsequent error = %v", err)
+					require.ErrorIs(t, err, tc.want)
+					{
+						_, err := writer.Write([]byte("more"))
+						require.ErrorIs(t, err, tc.want)
 					}
 				}
-				if err := writer.Close(); !errors.Is(err, tc.want) {
-					t.Fatalf("Close error = %v", err)
-				}
+				require.ErrorIs(t, writer.Close(), tc.want)
 			})
 		}
 	}
@@ -158,19 +141,16 @@ func TestFormattedClaudeOutputInLiveBridge(t *testing.T) {
 	var log bytes.Buffer
 	bridge := &liveBridge{log: &log}
 	writer := agentOutputFormatter(agentoutput.AgentClaude)(bridge, "fix-login")
-	if _, err := writer.Write([]byte("{\"type\":\"result\",\"result\":\"done\"}\n")); err != nil {
-		t.Fatal(err)
+	{
+		_, err := writer.Write([]byte("{\"type\":\"result\",\"result\":\"done\"}\n"))
+		require.NoError(t, err)
 	}
 	text, _ := bridge.drain(false)
 	want := "claude / fix-login\n---------------------------------------------\nTIME    AGENT\n            done\n\n"
-	if auditText(text) != want || log.String() != text {
-		t.Fatalf("formatted event did not reach TUI and transcript: %q / %q", text, log.String())
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.Equal(t, want, auditText(text))
+	require.Equal(t, text, log.String())
+	require.NoError(t, writer.Close())
 	footer, _ := bridge.drain(false)
-	if footer != "---------------------------------------------\n" || log.String() != text+footer {
-		t.Fatal("footer did not reach TUI and transcript")
-	}
+	require.Equal(t, "---------------------------------------------\n", footer)
+	require.Equal(t, text+footer, log.String())
 }

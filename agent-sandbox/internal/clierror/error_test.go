@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDiagnosticPreservesCause(t *testing.T) {
@@ -20,11 +23,10 @@ func TestDiagnosticPreservesCause(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wrapped := fmt.Errorf("operation: %w", tt.err)
 			var diagnostic *Error
-			if !errors.As(wrapped, &diagnostic) || tt.err.Error() != tt.want {
-				t.Fatalf("diagnostic not preserved: %v", wrapped)
-			}
-			if diagnostic.Cause != nil && !errors.Is(wrapped, cause) {
-				t.Fatal("original cause lost through wrapping")
+			require.ErrorAs(t, wrapped, &diagnostic)
+			assert.Equal(t, tt.want, tt.err.Error())
+			if diagnostic.Cause != nil {
+				assert.ErrorIs(t, wrapped, cause)
 			}
 		})
 	}

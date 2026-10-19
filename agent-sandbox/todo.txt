@@ -1,4 +1,5 @@
-[] - improve error messages in general
+[x] - improve error messages in general
+[] - Extend error categories and actionable recovery hints to Docker/image builds, authentication, agent failures, network requests, Git push/PR publication, and update failures.
 [x] - container sandbox should commit changes
 [x] - command to get list of providers, models , pricing
 [x] - should docker have .git folder always

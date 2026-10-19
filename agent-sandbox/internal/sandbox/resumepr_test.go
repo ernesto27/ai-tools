@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
 )
@@ -28,9 +30,7 @@ func TestAppendPRChecklist(t *testing.T) {
 		{name: "whitespace preserved", existing: " Original  \n\n\n", want: " Original  \n\n\n" + checklist},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := appendPRChecklist(tc.existing, checklist); got != tc.want {
-				t.Fatalf("description = %q, want %q", got, tc.want)
-			}
+			require.Equal(t, tc.want, appendPRChecklist(tc.existing, checklist))
 		})
 	}
 }
@@ -57,9 +57,7 @@ func TestPublishResumedPR(t *testing.T) {
 			repoDir := setupDeleteTestRepo(t)
 			repo := &git.Repo{Dir: repoDir}
 			base, err := repo.CurrentBranch(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			remote := t.TempDir()
 			runGit(t, remote, "init", "--bare", "--quiet")
 			runGit(t, repoDir, "remote", "add", "origin", remote)
@@ -68,19 +66,13 @@ func TestPublishResumedPR(t *testing.T) {
 			// Keeping HEAD at the base proves resume trusts the agent's decision
 			// rather than requiring new commits or a reviewable branch comparison.
 			if tc.dirty {
-				if err := os.WriteFile(filepath.Join(record.Path, "pending.txt"), []byte("pending"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(record.Path, "pending.txt"), []byte("pending"), 0o600))
 			}
 			if tc.failure == "push" {
-				if err := os.WriteFile(filepath.Join(remote, "hooks", "pre-receive"), []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(remote, "hooks", "pre-receive"), []byte("#!/bin/sh\nexit 1\n"), 0o700))
 			}
 			artifactPath := filepath.Join(record.Path, prContentFile)
-			if err := os.WriteFile(artifactPath, []byte(tc.artifact), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(artifactPath, []byte(tc.artifact), 0o600))
 
 			const prURL = "https://github.com/owner/repo/pull/1"
 			const original = "Original description with `quotes` and $(literal text)."
@@ -90,9 +82,7 @@ func TestPublishResumedPR(t *testing.T) {
 				"headRepositoryOwner": map[string]string{"login": "owner"},
 				"headRepository":      map[string]string{"name": "repo"},
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			fakeDir := t.TempDir()
 			callsPath := filepath.Join(fakeDir, "calls")
 			bodyPath := filepath.Join(fakeDir, "body")
@@ -114,9 +104,7 @@ case "$2" in
   *) exit 1 ;;
 esac
 `
-			if err := os.WriteFile(filepath.Join(fakeDir, "gh"), []byte(script), 0o700); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(fakeDir, "gh"), []byte(script), 0o700))
 			t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 			t.Setenv("RESUME_TEST_CALLS", callsPath)
 			t.Setenv("RESUME_TEST_BODY", bodyPath)
@@ -125,46 +113,38 @@ esac
 			t.Setenv("RESUME_TEST_VIEW", string(view))
 			t.Setenv("RESUME_TEST_FAILURE", tc.failure)
 			client, err := github.New(repoDir, "https://github.com/owner/repo.git")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			var out bytes.Buffer
 			err = publishResult(ctx, Options{PR: true, Branch: "feature", prResume: true, prURL: prURL}, record, repo, client, 0, &out)
 			if tc.wantError != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-					t.Fatalf("error = %v, want %q", err, tc.wantError)
-				}
-			} else if err != nil {
-				t.Fatal(err)
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
 			}
-			if tc.wantOutput != "" && !strings.Contains(out.String(), tc.wantOutput) {
-				t.Fatalf("output = %q, want %q", out.String(), tc.wantOutput)
+			if tc.wantOutput != "" {
+				require.Contains(t, out.String(), tc.wantOutput)
 			}
-			if tc.wantError != "" && out.Len() != 0 {
-				t.Fatalf("failure printed success output: %q", out.String())
+			if tc.wantError != "" {
+				require.Empty(t, out.String(), "failure printed success output")
 			}
-			if _, err := os.Stat(artifactPath); !os.IsNotExist(err) {
-				t.Fatalf("consumed artifact still exists: %v", err)
+			{
+				_, err := os.Stat(artifactPath)
+				require.True(t, os.IsNotExist(err), "consumed artifact still exists: %v", err)
 			}
 			pushErr := exec.CommandContext(ctx, "git", "--git-dir", remote, "rev-parse", "--verify", "refs/heads/feature").Run()
-			if (pushErr == nil) != tc.wantPush {
-				t.Fatalf("pushed = %t, want %t", pushErr == nil, tc.wantPush)
-			}
+			require.Equal(t, tc.wantPush, (pushErr == nil))
 			calls, err := os.ReadFile(callsPath)
-			if err != nil && !os.IsNotExist(err) {
-				t.Fatal(err)
+			if err != nil {
+				require.ErrorIs(t, err, os.ErrNotExist)
 			}
-			if string(calls) != tc.wantCalls {
-				t.Fatalf("GitHub operations = %q, want %q", calls, tc.wantCalls)
-			}
+			require.Equal(t, tc.wantCalls, string(calls))
 			body, err := os.ReadFile(bodyPath)
 			if strings.Contains(tc.wantCalls, "edit\n") {
 				want := original + "\n\n- [x] Fix task validation."
-				if err != nil || string(body) != want {
-					t.Fatalf("edited body = %q, error = %v; want %q", body, err, want)
-				}
-			} else if !os.IsNotExist(err) {
-				t.Fatalf("unexpected edited body: %q, %v", body, err)
+				require.NoError(t, err)
+				require.Equal(t, want, string(body))
+			} else {
+				require.True(t, os.IsNotExist(err), "unexpected edited body: %q, %v", body, err)
 			}
 		})
 	}

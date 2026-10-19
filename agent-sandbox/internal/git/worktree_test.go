@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveWorktree(t *testing.T) {
@@ -24,38 +26,28 @@ func TestRemoveWorktree(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := openTestRepo(t)
 			worktreeDir := filepath.Join(t.TempDir(), "worktree")
-			if err := repo.AddWorktree(worktreeDir, "feature", true); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, repo.AddWorktree(worktreeDir, "feature", true))
 			if tt.dirty {
-				if err := os.WriteFile(filepath.Join(worktreeDir, "change.txt"), []byte("change\n"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(worktreeDir, "change.txt"), []byte("change\n"), 0o600))
 			}
 
 			err := repo.RemoveWorktree(worktreeDir, tt.force)
 			if tt.wantRemoved {
-				if err != nil {
-					t.Fatal(err)
+				require.NoError(t, err)
+				{
+					_, err := os.Stat(worktreeDir)
+					require.True(t, os.IsNotExist(err), "worktree path still exists after removal: %v", err)
 				}
-				if _, err := os.Stat(worktreeDir); !os.IsNotExist(err) {
-					t.Fatalf("worktree path still exists after removal: %v", err)
-				}
-				if worktreeRegistered(t, repo.Dir, worktreeDir) {
-					t.Fatal("worktree remains registered after removal")
-				}
+				require.False(t, worktreeRegistered(t, repo.Dir, worktreeDir), "worktree remains registered after removal")
 				return
 			}
 
-			if err == nil || !strings.Contains(err.Error(), "git worktree remove") {
-				t.Fatalf("RemoveWorktree() error = %v, want wrapped git error", err)
+			require.ErrorContains(t, err, "git worktree remove")
+			{
+				_, err := os.Stat(worktreeDir)
+				require.NoError(t, err)
 			}
-			if _, err := os.Stat(worktreeDir); err != nil {
-				t.Fatalf("worktree path was removed: %v", err)
-			}
-			if !worktreeRegistered(t, repo.Dir, worktreeDir) {
-				t.Fatal("worktree was unregistered after a refused removal")
-			}
+			require.True(t, worktreeRegistered(t, repo.Dir, worktreeDir), "worktree was unregistered after a refused removal")
 		})
 	}
 }
@@ -63,35 +55,23 @@ func TestRemoveWorktree(t *testing.T) {
 func TestRemoveWorktreeWrapsMissingPathError(t *testing.T) {
 	repo := openTestRepo(t)
 	err := repo.RemoveWorktree(filepath.Join(t.TempDir(), "missing"), false)
-	if err == nil || !strings.Contains(err.Error(), "git worktree remove") {
-		t.Fatalf("RemoveWorktree() error = %v, want wrapped git error", err)
-	}
+	require.ErrorContains(t, err, "git worktree remove")
 }
 
 func TestPruneWorktrees(t *testing.T) {
 	repo := openTestRepo(t)
 	worktreeDir := filepath.Join(t.TempDir(), "worktree")
-	if err := repo.AddWorktree(worktreeDir, "feature", true); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(worktreeDir); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, repo.AddWorktree(worktreeDir, "feature", true))
+	require.NoError(t, os.RemoveAll(worktreeDir))
 
-	if err := repo.PruneWorktrees(); err != nil {
-		t.Fatal(err)
-	}
-	if worktreeRegistered(t, repo.Dir, worktreeDir) {
-		t.Fatal("worktree remains registered after PruneWorktrees")
-	}
+	require.NoError(t, repo.PruneWorktrees())
+	require.False(t, worktreeRegistered(t, repo.Dir, worktreeDir), "worktree remains registered after PruneWorktrees")
 }
 
 func TestPruneWorktreesWrapsGitError(t *testing.T) {
 	repo := &Repo{Dir: filepath.Join(t.TempDir(), "missing")}
 	err := repo.PruneWorktrees()
-	if err == nil || !strings.Contains(err.Error(), "git worktree prune") {
-		t.Fatalf("PruneWorktrees() error = %v, want wrapped git error", err)
-	}
+	require.ErrorContains(t, err, "git worktree prune")
 }
 
 func worktreeRegistered(t *testing.T, repoDir, worktreeDir string) bool {
@@ -106,8 +86,6 @@ func runGitOutput(t *testing.T, repoDir string, args ...string) string {
 
 	command := append([]string{"-C", repoDir}, args...)
 	output, err := exec.Command("git", command...).Output()
-	if err != nil {
-		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
-	}
+	require.NoError(t, err)
 	return string(output)
 }

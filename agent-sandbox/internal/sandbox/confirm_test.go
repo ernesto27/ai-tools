@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfirm(t *testing.T) {
@@ -28,15 +30,9 @@ func TestConfirm(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
 			got, err := confirm(strings.NewReader(tt.input), &out, question)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != tt.want {
-				t.Fatalf("confirm(%q) = %t, want %t", tt.input, got, tt.want)
-			}
-			if got := out.String(); got != tt.wantOutput {
-				t.Fatalf("output = %q, want %q", got, tt.wantOutput)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.wantOutput, out.String())
 		})
 	}
 }
@@ -46,9 +42,7 @@ func TestConfirmReturnsReadError(t *testing.T) {
 	var out bytes.Buffer
 
 	_, err := confirm(errorReader{err: want}, &out, "Continue? [y/N]: ")
-	if !errors.Is(err, want) {
-		t.Fatalf("confirm() error = %v, want %v", err, want)
-	}
+	require.ErrorIs(t, err, want)
 }
 
 type errorReader struct {

@@ -4,8 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
@@ -38,17 +39,11 @@ func TestConsumePRContent(t *testing.T) {
 			switch {
 			case tc.missing:
 			case tc.symlink:
-				if err := os.Symlink(filepath.Join(dir, "README.md"), path); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Symlink(filepath.Join(dir, "README.md"), path))
 			case tc.directory:
-				if err := os.Mkdir(path, 0o700); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(path, 0o700))
 			default:
-				if err := os.WriteFile(path, []byte(tc.data), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(path, []byte(tc.data), 0o600))
 			}
 			if tc.tracked || tc.staged {
 				runGit(t, dir, "add", prContentFile)
@@ -61,28 +56,23 @@ func TestConsumePRContent(t *testing.T) {
 			}
 			content, err := consumePRContent(context.Background(), &git.Repo{Dir: dir})
 			if tc.wantError != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-					t.Fatalf("error = %v, want %q", err, tc.wantError)
-				}
+				require.ErrorContains(t, err, tc.wantError)
 				if !tc.missing {
-					if _, err := os.Lstat(path); err != nil {
-						t.Fatalf("invalid artifact was removed: %v", err)
+					{
+						_, err := os.Lstat(path)
+						require.NoError(t, err)
 					}
 				}
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
+			require.NoError(t, err)
+			require.Equal(t, "Fix login", content.Title)
+			require.Equal(t, "Changes\n\nTests passed", content.Body)
+			{
+				_, err := os.Lstat(path)
+				require.True(t, os.IsNotExist(err), "artifact still exists: %v", err)
 			}
-			if content.Title != "Fix login" || content.Body != "Changes\n\nTests passed" {
-				t.Fatalf("content = %#v", content)
-			}
-			if _, err := os.Lstat(path); !os.IsNotExist(err) {
-				t.Fatalf("artifact still exists: %v", err)
-			}
-			if err := requireCommittedWorktree(&git.Repo{Dir: dir}); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, requireCommittedWorktree(&git.Repo{Dir: dir}))
 		})
 	}
 }
@@ -101,25 +91,18 @@ func TestCheckPRContentPath(t *testing.T) {
 			dir := setupDeleteTestRepo(t)
 			path := filepath.Join(dir, prContentFile)
 			if tc.existing || tc.trackedMissing {
-				if err := os.WriteFile(path, []byte("user data"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(path, []byte("user data"), 0o600))
 			}
 			if tc.trackedMissing {
 				runGit(t, dir, "add", prContentFile)
-				if err := os.Remove(path); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Remove(path))
 			}
 			err := checkPRContentPath(context.Background(), &git.Repo{Dir: dir})
-			if (err != nil) != tc.wantError {
-				t.Fatalf("error = %v, want error %t", err, tc.wantError)
-			}
+			require.Equal(t, tc.wantError, (err != nil))
 			if tc.existing {
 				data, err := os.ReadFile(path)
-				if err != nil || string(data) != "user data" {
-					t.Fatalf("existing file changed: %q, %v", data, err)
-				}
+				require.NoError(t, err)
+				require.Equal(t, "user data", string(data))
 			}
 		})
 	}

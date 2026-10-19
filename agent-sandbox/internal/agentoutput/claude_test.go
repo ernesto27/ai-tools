@@ -2,8 +2,9 @@ package agentoutput
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestClaudeDecoderTextState(t *testing.T) {
@@ -153,12 +154,8 @@ func TestClaudeDecoderMCPInputs(t *testing.T) {
 func assertClaudeEvents(t *testing.T, decoder *ClaudeDecoder, line string, want []Event) {
 	t.Helper()
 	got, err := decoder.Decode([]byte(line))
-	if err != nil {
-		t.Fatalf("Decode(%s): %v", line, err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Decode(%s) = %#v, want %#v", line, got, want)
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got)
 }
 
 func claudeScopedMessage(t *testing.T, role, session, parent, content string) string {
@@ -168,8 +165,6 @@ func claudeScopedMessage(t *testing.T, role, session, parent, content string) st
 		"message": map[string]any{"id": "m1", "content": json.RawMessage(content)},
 	}
 	line, err := json.Marshal(message)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return string(line)
 }

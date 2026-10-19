@@ -1,10 +1,10 @@
 package docker
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/docker/docker/api/types/mount"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHostConfigKeepsExistingMountsWritableAndMakesAttachmentsReadOnly(t *testing.T) {
@@ -16,7 +16,5 @@ func TestHostConfigKeepsExistingMountsWritableAndMakesAttachmentsReadOnly(t *tes
 		{Type: mount.TypeBind, Source: "/host/worktree", Target: "/workspace"},
 		{Type: mount.TypeBind, Source: "/host/Screenshot at 10:30:00.png", Target: "/agent-sandbox-images/1.png", ReadOnly: true},
 	}
-	if !reflect.DeepEqual(config.Mounts, want) {
-		t.Fatalf("Mounts = %#v, want %#v", config.Mounts, want)
-	}
+	require.Equal(t, want, config.Mounts)
 }

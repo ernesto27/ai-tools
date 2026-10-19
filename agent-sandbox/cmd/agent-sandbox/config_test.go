@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
@@ -44,34 +46,22 @@ func TestRunAndResumeHostNetworkConfig(t *testing.T) {
 					// The other section enables host networking so false and omitted
 					// values also verify that defaults never leak between commands.
 					config := fmt.Sprintf(`{"%s":{"branch":"network-check","agent":"codex","query":"inspect"%s},"%s":{"hn":true}}`, section, tt.field, other)
-					if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o644))
 					var flags runFlags
 					cmd := &cobra.Command{}
 					cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 					flags.bind(cmd)
-					if err := cmd.Flags().Parse(tt.args); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, cmd.Flags().Parse(tt.args))
 					err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args())
 					if tt.wantError {
 						assertUsageError(t, err)
-						if !strings.Contains(err.Error(), section+".hn must be a JSON boolean") {
-							t.Fatalf("config error = %v, want hn boolean validation error", err)
-						}
+						require.Contains(t, err.Error(), section+".hn must be a JSON boolean")
 						return
 					}
-					if err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, err)
 					opts, err := sandbox.NewOptions(flags.Options)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if opts.HostNetwork != tt.want {
-						t.Errorf("HostNetwork = %t, want %t", opts.HostNetwork, tt.want)
-					}
+					require.NoError(t, err)
+					assert.Equal(t, tt.want, opts.HostNetwork)
 				})
 			}
 		})
@@ -159,49 +149,31 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 				section = "run"
 			}
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile(localConfigFile, []byte(tt.config), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(tt.config), 0o644))
 
 			var flags runFlags
 			cmd := &cobra.Command{}
 			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 			flags.bind(cmd)
-			if err := cmd.Flags().Parse(tt.args); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, cmd.Flags().Parse(tt.args))
 			promptArgs := cmd.Flags().Args()
 			err := configRunArgs(section, &flags)(cmd, promptArgs)
 			if tt.wantUsage {
 				assertUsageError(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatalf("run args: %v", err)
-			}
+			require.NoError(t, err)
 
 			opts, err := sandbox.NewOptions(flags.Options)
-			if err != nil {
-				t.Fatalf("resolve options: %v", err)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantPrompt, opts.Prompt)
+			if tt.wantBranch != "" {
+				assert.Equal(t, tt.wantBranch, opts.Branch)
 			}
-			if opts.Prompt != tt.wantPrompt {
-				t.Errorf("agent prompt = %q, want %q", opts.Prompt, tt.wantPrompt)
-			}
-			if opts.Branch != tt.wantBranch && tt.wantBranch != "" {
-				t.Errorf("branch = %q, want %q", opts.Branch, tt.wantBranch)
-			}
-			if opts.CommitMessage != tt.wantCommit {
-				t.Errorf("commit message = %q, want %q", opts.CommitMessage, tt.wantCommit)
-			}
-			if opts.Push != tt.wantPush {
-				t.Errorf("push = %t, want %t", opts.Push, tt.wantPush)
-			}
-			if opts.HostNetwork != tt.wantHostNetwork {
-				t.Errorf("host network = %t, want %t", opts.HostNetwork, tt.wantHostNetwork)
-			}
-			if opts.FilePrompt != "" {
-				t.Errorf("file prompt = %q, want empty", opts.FilePrompt)
-			}
+			assert.Equal(t, tt.wantCommit, opts.CommitMessage)
+			assert.Equal(t, tt.wantPush, opts.Push)
+			assert.Equal(t, tt.wantHostNetwork, opts.HostNetwork)
+			assert.Equal(t, "", opts.FilePrompt)
 		})
 	}
 }
@@ -218,24 +190,16 @@ func TestRunAndResumeAPIKeysStayInTheirSections(t *testing.T) {
 			t.Chdir(t.TempDir())
 			config := `{"run":{"agent":"codex","query":"run task","apiKey":"run-key"},` +
 				`"resume":{"agent":"codex","query":"resume task","apiKey":"resume-key"}}`
-			if err := os.WriteFile(localConfigFile, []byte(config), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o600))
 
 			var flags runFlags
 			cmd := &cobra.Command{}
 			cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 			flags.bind(cmd)
-			if err := configRunArgs(tc.section, &flags)(cmd, nil); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, configRunArgs(tc.section, &flags)(cmd, nil))
 			opts, err := sandbox.NewOptions(flags.Options)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if opts.APIKey != tc.wantKey {
-				t.Errorf("APIKey = %q, want selected section key", opts.APIKey)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantKey, opts.APIKey)
 		})
 	}
 }
@@ -258,34 +222,40 @@ func TestLocalConfigFieldsAndValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile(localConfigFile, []byte(tt.config), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(tt.config), 0o600))
 			config, err := readLocalConfig()
 			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("readLocalConfig error = %v, want %q", err, tt.wantErr)
-				}
+				require.ErrorContains(t, err, tt.wantErr)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			section := config.Run
-			if section == nil || section.Branch == nil || *section.Branch != "fix" ||
-				section.Agent == nil || *section.Agent != "codex" ||
-				section.APIKey == nil || *section.APIKey != "key" ||
-				section.Model == nil || *section.Model != "model" ||
-				section.BaseImage == nil || *section.BaseImage != "alpine:latest" ||
-				section.Query == nil || *section.Query != "task" ||
-				section.Push == nil || *section.Push ||
-				section.PR == nil || !*section.PR ||
-				section.HostNetwork == nil || *section.HostNetwork ||
-				section.CommitMessage == nil || *section.CommitMessage != "commit" ||
-				section.FilePrompt == nil || *section.FilePrompt != "prompt.md" ||
-				section.Image == nil || len(*section.Image) != 2 || (*section.Image)[1] != "two.png" {
-				t.Fatalf("decoded config = %+v", section)
-			}
+			require.NotNil(t, section)
+			require.NotNil(t, section.Branch)
+			require.Equal(t, "fix", *section.Branch)
+			require.NotNil(t, section.Agent)
+			require.Equal(t, "codex", *section.Agent)
+			require.NotNil(t, section.APIKey)
+			require.Equal(t, "key", *section.APIKey)
+			require.NotNil(t, section.Model)
+			require.Equal(t, "model", *section.Model)
+			require.NotNil(t, section.BaseImage)
+			require.Equal(t, "alpine:latest", *section.BaseImage)
+			require.NotNil(t, section.Query)
+			require.Equal(t, "task", *section.Query)
+			require.NotNil(t, section.Push)
+			require.False(t, *section.Push, "decoded config = %+v", section)
+			require.NotNil(t, section.PR)
+			require.True(t, *section.PR, "decoded config = %+v", section)
+			require.NotNil(t, section.HostNetwork)
+			require.False(t, *section.HostNetwork, "decoded config = %+v", section)
+			require.NotNil(t, section.CommitMessage)
+			require.Equal(t, "commit", *section.CommitMessage)
+			require.NotNil(t, section.FilePrompt)
+			require.Equal(t, "prompt.md", *section.FilePrompt)
+			require.NotNil(t, section.Image)
+			require.Len(t, *section.Image, 2)
+			require.Equal(t, "two.png", (*section.Image)[1])
 		})
 	}
 }
@@ -314,23 +284,15 @@ func TestRunAndResumeBranchPrecedence(t *testing.T) {
 			t.Run(section+"/"+tt.name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
 				config := strings.ReplaceAll(tt.config, "%s", section)
-				if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o644))
 				var flags runFlags
 				cmd := &cobra.Command{}
 				cmd.Flags().StringVarP(&flags.Branch, "branch", "b", "", "")
 				flags.bind(cmd)
 				args := append([]string{"--agent", "codex", "--query", "task"}, tt.args...)
-				if err := cmd.Flags().Parse(args); err != nil {
-					t.Fatal(err)
-				}
-				if err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args()); err != nil {
-					t.Fatal(err)
-				}
-				if flags.Branch != tt.want {
-					t.Fatalf("branch = %q, want %q", flags.Branch, tt.want)
-				}
+				require.NoError(t, cmd.Flags().Parse(args))
+				require.NoError(t, configRunArgs(section, &flags)(cmd, cmd.Flags().Args()))
+				require.Equal(t, tt.want, flags.Branch)
 			})
 		}
 	}
@@ -376,26 +338,20 @@ func TestRunAndResumeSharedConfigPrecedence(t *testing.T) {
 			t.Run(section+"/"+tt.name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
 				config := fmt.Sprintf(`{"model":"shared-model","agent":"codex","baseImage":"shared-image","push":true,"pr":true,"hn":true,"%s":{"branch":"existing","query":"task"%s}}`, section, tt.sectionFields)
-				if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o644))
 				var flags runFlags
 				cmd := &cobra.Command{}
 				cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "")
 				flags.bind(cmd)
-				if err := cmd.Flags().Parse(tt.args); err != nil {
-					t.Fatal(err)
-				}
-				if err := configRunArgs(section, &flags)(cmd, cmd.Flags().Args()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, cmd.Flags().Parse(tt.args))
+				require.NoError(t, configRunArgs(section, &flags)(cmd, cmd.Flags().Args()))
 				got := flags.Options
-				if got.Model != tt.want.Model || got.AgentName != tt.want.AgentName ||
-					got.BaseImage != tt.want.BaseImage || got.Push != tt.want.Push ||
-					got.PR != tt.want.PR || got.HostNetwork != tt.want.HostNetwork {
-					t.Errorf("merged options = %+v, want model=%q agent=%q baseImage=%q push=%t pr=%t hn=%t",
-						got, tt.want.Model, tt.want.AgentName, tt.want.BaseImage, tt.want.Push, tt.want.PR, tt.want.HostNetwork)
-				}
+				assert.Equal(t, tt.want.Model, got.Model)
+				assert.Equal(t, tt.want.AgentName, got.AgentName)
+				assert.Equal(t, tt.want.BaseImage, got.BaseImage)
+				assert.Equal(t, tt.want.Push, got.Push)
+				assert.Equal(t, tt.want.PR, got.PR)
+				assert.Equal(t, tt.want.HostNetwork, got.HostNetwork)
 			})
 		}
 	}
@@ -422,18 +378,14 @@ func TestTopLevelConfigTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			config := `{` + tt.field + `,"run":{"agent":"codex","query":"task"}}`
-			if err := os.WriteFile(localConfigFile, []byte(config), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o644))
 			var flags runFlags
 			cmd := &cobra.Command{}
 			cmd.Flags().StringVarP(&flags.Branch, flagBranch, "b", "", "")
 			flags.bind(cmd)
 			err := configRunArgs("run", &flags)(cmd, nil)
 			assertUsageError(t, err)
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("config error = %v, want %q", err, tt.wantErr)
-			}
+			require.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
 }

@@ -3,8 +3,10 @@ package sandbox
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitConfigMounts(t *testing.T) {
@@ -30,36 +32,24 @@ func TestGitConfigMounts(t *testing.T) {
 			}
 			for _, file := range tc.files {
 				path := filepath.Join(commonDir, file)
-				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(path, nil, 0600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
+				require.NoError(t, os.WriteFile(path, nil, 0600))
 			}
 			if tc.directory != "" {
-				if err := os.MkdirAll(filepath.Join(commonDir, tc.directory), 0700); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.MkdirAll(filepath.Join(commonDir, tc.directory), 0700))
 			}
 			mounts, err := gitConfigMounts(gitDir, commonDir)
 			if tc.wantError != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-					t.Fatalf("error = %v, want %q", err, tc.wantError)
-				}
+				require.ErrorContains(t, err, tc.wantError)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(mounts) != len(tc.files) {
-				t.Fatalf("got %d mounts, want %d", len(mounts), len(tc.files))
-			}
+			require.NoError(t, err)
+			require.Equal(t, len(tc.files), len(mounts))
 			for i, mount := range mounts {
 				path := filepath.Join(commonDir, tc.files[i])
-				if mount.Host != path || mount.Container != path || !mount.ReadOnly {
-					t.Errorf("mount = %#v, want read-only %s", mount, path)
-				}
+				assert.Equal(t, path, mount.Host)
+				assert.Equal(t, path, mount.Container)
+				assert.True(t, mount.ReadOnly, "mount: %#v", mount)
 			}
 		})
 	}

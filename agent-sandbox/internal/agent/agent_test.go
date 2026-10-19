@@ -3,8 +3,9 @@ package agent
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLookup(t *testing.T) {
@@ -29,18 +30,12 @@ func TestLookup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			agent, err := Lookup(tt.lookup)
 			if tt.wantError != "" {
-				if err == nil || err.Error() != tt.wantError {
-					t.Fatalf("Lookup(%q) error = %v, want %q", tt.lookup, err, tt.wantError)
-				}
+				require.EqualError(t, err, tt.wantError)
 				return
 			}
 
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := agent.Name(); got != tt.wantName {
-				t.Fatalf("Lookup(%q).Name() = %q, want %q", tt.lookup, got, tt.wantName)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantName, agent.Name())
 		})
 	}
 }
@@ -48,21 +43,15 @@ func TestLookup(t *testing.T) {
 func TestRegistryNames(t *testing.T) {
 	want := []string{"codex", "claude", "opencode", "pi"}
 
-	if got := Names(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("Names() = %q, want %q", got, want)
-	}
-	if got := NamesProse(); got != "codex, claude, opencode or pi" {
-		t.Fatalf("NamesProse() = %q", got)
-	}
+	require.Equal(t, want, Names())
+	require.Equal(t, "codex, claude, opencode or pi", NamesProse())
 
 	all := All()
 	got := make([]string, 0, len(all))
 	for _, agent := range all {
 		got = append(got, agent.Name())
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("All() names = %q, want %q", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestDefaultModels(t *testing.T) {
@@ -83,12 +72,8 @@ func TestDefaultModels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			agent, ok := agents[tt.name]
-			if !ok {
-				t.Fatalf("All() is missing agent %q", tt.name)
-			}
-			if got := agent.DefaultModel(); got != tt.want {
-				t.Fatalf("%s.DefaultModel() = %q, want %q", tt.name, got, tt.want)
-			}
+			require.True(t, ok, "All() is missing agent %q", tt.name)
+			require.Equal(t, tt.want, agent.DefaultModel())
 		})
 	}
 }
@@ -97,9 +82,7 @@ func TestRequireDir(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config")
 	missing := filepath.Join(dir, "missing")
-	if err := os.WriteFile(file, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
 
 	tests := []struct {
 		name      string
@@ -114,11 +97,10 @@ func TestRequireDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := requireDir(tt.path, "codex")
-			if tt.wantError == "" && err != nil {
-				t.Fatalf("requireDir(%q) error = %v, want nil", tt.path, err)
-			}
-			if tt.wantError != "" && (err == nil || err.Error() != tt.wantError) {
-				t.Fatalf("requireDir(%q) error = %v, want %q", tt.path, err, tt.wantError)
+			if tt.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.wantError)
 			}
 		})
 	}
@@ -128,9 +110,7 @@ func TestRequireFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.json")
 	missing := filepath.Join(dir, "missing")
-	if err := os.WriteFile(file, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
 
 	tests := []struct {
 		name      string
@@ -145,11 +125,10 @@ func TestRequireFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := requireFile(tt.path, "claude")
-			if tt.wantError == "" && err != nil {
-				t.Fatalf("requireFile(%q) error = %v, want nil", tt.path, err)
-			}
-			if tt.wantError != "" && (err == nil || err.Error() != tt.wantError) {
-				t.Fatalf("requireFile(%q) error = %v, want %q", tt.path, err, tt.wantError)
+			if tt.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.wantError)
 			}
 		})
 	}
@@ -158,7 +137,5 @@ func TestRequireFile(t *testing.T) {
 func TestHostConfigError(t *testing.T) {
 	err := hostConfigError("/missing/config", "pi")
 	want := "/missing/config does not exist; run pi on the host first"
-	if got := err.Error(); got != want {
-		t.Fatalf("hostConfigError() = %q, want %q", got, want)
-	}
+	require.Equal(t, want, err.Error())
 }

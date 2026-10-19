@@ -3,19 +3,15 @@ package agentoutput
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEventKey(t *testing.T) {
 	first := Event{ID: "tool-1", Scope: "parent-a"}
-	if first.key() != (Event{ID: "tool-1", Scope: "parent-a"}).key() {
-		t.Fatal("same ID and scope should produce equal keys")
-	}
-	if first.key() == (Event{ID: "tool-1", Scope: "parent-b"}).key() {
-		t.Fatal("different scopes must have different keys")
-	}
-	if first.key() == (Event{ID: "tool-2", Scope: "parent-a"}).key() {
-		t.Fatal("different IDs must have different keys")
-	}
+	require.Equal(t, (Event{ID: "tool-1", Scope: "parent-a"}).key(), first.key())
+	require.NotEqual(t, (Event{ID: "tool-1", Scope: "parent-b"}).key(), first.key())
+	require.NotEqual(t, (Event{ID: "tool-2", Scope: "parent-a"}).key(), first.key())
 }
 
 func TestEventFailed(t *testing.T) {
@@ -37,9 +33,7 @@ func TestEventFailed(t *testing.T) {
 		{"failed with zero exit", Event{Status: StatusFailed, ExitCode: &zero}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.event.failed(); got != tc.want {
-				t.Fatalf("failed() = %v, want %v", got, tc.want)
-			}
+			require.Equal(t, tc.want, tc.event.failed())
 		})
 	}
 }
@@ -58,9 +52,7 @@ func TestJSONString(t *testing.T) {
 		{"missing", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := jsonString(json.RawMessage(tc.input)); got != tc.want {
-				t.Fatalf("jsonString() = %q, want %q", got, tc.want)
-			}
+			require.Equal(t, tc.want, jsonString(json.RawMessage(tc.input)))
 		})
 	}
 }
@@ -79,9 +71,7 @@ func TestErrorMessage(t *testing.T) {
 		{"missing", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := errorMessage(json.RawMessage(tc.input)); got != tc.want {
-				t.Fatalf("errorMessage() = %q, want %q", got, tc.want)
-			}
+			require.Equal(t, tc.want, errorMessage(json.RawMessage(tc.input)))
 		})
 	}
 }

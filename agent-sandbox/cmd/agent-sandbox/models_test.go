@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatContext(t *testing.T) {
@@ -19,9 +20,7 @@ func TestFormatContext(t *testing.T) {
 		{name: "binary million", tokens: 1_048_576, want: "1.05M"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formatContext(tt.tokens); got != tt.want {
-				t.Errorf("formatContext(%d) = %q, want %q", tt.tokens, got, tt.want)
-			}
+			assert.Equal(t, tt.want, formatContext(tt.tokens))
 		})
 	}
 }
@@ -47,9 +46,7 @@ func TestModelDescription(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := modelDescription(tt.raw); got != tt.want {
-				t.Errorf("modelDescription(%q) = %q, want %q", tt.raw, got, tt.want)
-			}
+			assert.Equal(t, tt.want, modelDescription(tt.raw))
 		})
 	}
 }
@@ -81,11 +78,10 @@ func TestModelColumnsLongName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := modelColumns(tt.modelName, "400K", "$2.00", "$10.00", tt.width)
 			want := tt.wantName + "    400K   $2.00  $10.00"
-			if got != want {
-				t.Errorf("modelColumns() = %q, want %q", got, want)
-			}
-			if width := ansi.StringWidth(got); width != tt.width {
-				t.Errorf("rendered width = %d, want %d", width, tt.width)
+			assert.Equal(t, want, got)
+			{
+				width := ansi.StringWidth(got)
+				assert.Equal(t, tt.width, width)
 			}
 		})
 	}

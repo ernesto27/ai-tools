@@ -2,11 +2,11 @@ package main
 
 import (
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReviewerConfigValidation(t *testing.T) {
@@ -34,16 +34,12 @@ func TestReviewerConfigValidation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile(localConfigFile, []byte(tc.config), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(tc.config), 0o600))
 			_, err := readLocalConfig()
 			if tc.wantError != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
-					t.Fatalf("error = %v, want %q", err, tc.wantError)
-				}
-			} else if err != nil {
-				t.Fatal(err)
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -71,35 +67,22 @@ func TestReviewerConfigCommandIsolation(t *testing.T) {
 		t.Run(tc.command+strings.Join(tc.args, ""), func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			config := `{"agent":"codex","pr":true,"run":{"query":"task","reviewers":[" Alice ","bob-2","alice","BOB-2"]},"resume":{"branch":"feature","query":"continue"}}`
-			if err := os.WriteFile(localConfigFile, []byte(config), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(config), 0o600))
 			root, _ := newRootCmd()
 			cmd, _, err := root.Find([]string{tc.command})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := cmd.ParseFlags(tc.args); err != nil {
-				t.Fatal(err)
-			}
-			if err := cmd.Args(cmd, nil); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			require.NoError(t, cmd.ParseFlags(tc.args))
+			require.NoError(t, cmd.Args(cmd, nil))
 			// Read the same section through a captured options binding to inspect
 			// configuration without starting Docker or taking over the terminal.
 			var flags runFlags
 			probe := &cobra.Command{}
 			flags.bind(probe)
-			if err := probe.ParseFlags(tc.args); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, probe.ParseFlags(tc.args))
 			section := strings.TrimSuffix(tc.command, "-tui")
-			if err := applyLocalConfig(probe, section, &flags); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(flags.Reviewers, tc.want) || flags.PR != tc.wantPR {
-				t.Fatalf("reviewers = %v, PR = %t; want %v, %t", flags.Reviewers, flags.PR, tc.want, tc.wantPR)
-			}
+			require.NoError(t, applyLocalConfig(probe, section, &flags))
+			require.Equal(t, tc.want, flags.Reviewers)
+			require.Equal(t, tc.wantPR, flags.PR)
 		})
 	}
 }

@@ -1,14 +1,15 @@
 package sandbox
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOptionsEffort(t *testing.T) {
@@ -32,12 +33,8 @@ func TestNewOptionsEffort(t *testing.T) {
 					Prompt:    "inspect",
 					Effort:    tc.effort,
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if got.Effort != tc.want {
-					t.Fatalf("effort = %q, want %q", got.Effort, tc.want)
-				}
+				require.NoError(t, err)
+				require.Equal(t, tc.want, got.Effort)
 			})
 		}
 	}
@@ -60,14 +57,10 @@ func TestFullPromptCommitRules(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			prompt := (Options{Prompt: "implement this", PR: tc.pr, Push: tc.push, CommitMessage: tc.message, prBase: "abc123"}).FullPrompt()
 			for _, value := range tc.want {
-				if !strings.Contains(prompt, value) {
-					t.Errorf("prompt does not contain %q", value)
-				}
+				assert.Contains(t, prompt, value)
 			}
 			for _, value := range tc.unwanted {
-				if strings.Contains(prompt, value) {
-					t.Errorf("prompt unexpectedly contains %q", value)
-				}
+				assert.NotContains(t, prompt, value)
 			}
 		})
 	}
@@ -79,13 +72,9 @@ func TestPRContainerOptionsMountGitMetadata(t *testing.T) {
 	runGit(t, repoDir, "config", "user.name", "Test User")
 	runGit(t, repoDir, "config", "user.email", "test@example.com")
 	opts, err := NewOptions(Options{AgentName: "codex", APIKey: "test-key", Branch: "feature", PR: true, Prompt: "fix this"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	runOpts, err := containerOptions(opts, worktree.Path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commonDir := filepath.Join(repoDir, ".git")
 	found := false
 	for _, mount := range runOpts.Mounts {
@@ -93,9 +82,7 @@ func TestPRContainerOptionsMountGitMetadata(t *testing.T) {
 			found = true
 		}
 	}
-	if !found {
-		t.Fatalf("Git metadata mount missing: %#v", runOpts.Mounts)
-	}
+	require.True(t, found, "Git metadata mount missing: %#v", runOpts.Mounts)
 	configProtected := false
 	for _, mount := range runOpts.Mounts {
 		path := filepath.Join(commonDir, "config")
@@ -103,27 +90,24 @@ func TestPRContainerOptionsMountGitMetadata(t *testing.T) {
 			configProtected = true
 		}
 	}
-	if !configProtected {
-		t.Fatalf("read-only Git config mount missing: %#v", runOpts.Mounts)
-	}
+	require.True(t, configProtected, "read-only Git config mount missing: %#v", runOpts.Mounts)
 	for _, value := range []string{"GIT_COMMON_DIR=" + commonDir, "GIT_WORK_TREE=/workspace", "GIT_AUTHOR_NAME=Test User", "GIT_AUTHOR_EMAIL=test@example.com"} {
-		if !slices.Contains(runOpts.Env, value) {
-			t.Errorf("environment missing %q", value)
-		}
+		assert.Contains(t, runOpts.Env, value)
 	}
-	if err := os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("committed in container\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("committed in container\n"), 0o600))
 	for _, args := range [][]string{{"add", "change.txt"}, {"commit", "-m", "agent commit"}} {
 		command := exec.Command("git", append([]string{"-C", worktree.Path}, args...)...)
 		command.Env = append(append(os.Environ(), runOpts.Env...), "GIT_WORK_TREE="+worktree.Path)
-		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("git %v with container environment: %v: %s", args, err, output)
+		{
+			output, err := command.CombinedOutput()
+			require.NoError(t, err, "command output: %s", output)
 		}
 	}
 	command := exec.Command("git", "-C", worktree.Path, "log", "-1", "--format=%s")
-	if output, err := command.Output(); err != nil || strings.TrimSpace(string(output)) != "agent commit" {
-		t.Fatalf("host worktree does not see container commit: %q, %v", output, err)
+	{
+		output, err := command.Output()
+		require.NoError(t, err)
+		require.Equal(t, "agent commit", strings.TrimSpace(string(output)))
 	}
 }
 
@@ -149,9 +133,7 @@ func TestCodexCredentialSelection(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
 			if tc.createHostDir {
-				if err := os.Mkdir(filepath.Join(home, ".codex"), 0o700); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(filepath.Join(home, ".codex"), 0o700))
 			}
 
 			opts, err := NewOptions(Options{
@@ -160,13 +142,9 @@ func TestCodexCredentialSelection(t *testing.T) {
 				Branch:    "test-branch",
 				Prompt:    "inspect this",
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			got, err := containerOptions(opts, worktree.Path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			hostMount := false
 			for _, mount := range got.Mounts {
@@ -174,29 +152,19 @@ func TestCodexCredentialSelection(t *testing.T) {
 					hostMount = true
 				}
 			}
-			if hostMount != tc.wantHostMount {
-				t.Errorf("host Codex mount = %t, want %t", hostMount, tc.wantHostMount)
-			}
+			assert.Equal(t, tc.wantHostMount, hostMount)
 			keyEnv := slices.Contains(got.Env, "OPENAI_API_KEY="+key)
-			if keyEnv != tc.wantKeyEnv {
-				t.Errorf("API key environment = %t, want %t", keyEnv, tc.wantKeyEnv)
-			}
-			if strings.Contains(strings.Join(got.Args, " "), key) {
-				t.Error("API key appeared in Codex command arguments")
-			}
+			assert.Equal(t, tc.wantKeyEnv, keyEnv)
+			assert.NotContains(t, strings.Join(got.Args, " "), key)
 			provider := slices.Contains(got.Args, `model_provider="agent_sandbox_api"`)
-			if provider != tc.wantKeyEnv {
-				t.Errorf("API key provider = %t, want %t", provider, tc.wantKeyEnv)
-			}
+			assert.Equal(t, tc.wantKeyEnv, provider)
 			inMemoryHome := false
 			for _, mount := range got.Tmpfs {
 				if mount.Path == "/codex-home" {
 					inMemoryHome = true
 				}
 			}
-			if inMemoryHome != tc.wantKeyEnv {
-				t.Errorf("in-memory Codex home = %t, want %t", inMemoryHome, tc.wantKeyEnv)
-			}
+			assert.Equal(t, tc.wantKeyEnv, inMemoryHome)
 		})
 	}
 }
@@ -221,26 +189,16 @@ func TestClaudeCredentialSelection(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
 			if tc.createHostDir {
-				if err := os.Mkdir(filepath.Join(home, ".claude"), 0o700); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte("{}"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Mkdir(filepath.Join(home, ".claude"), 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), []byte("{}"), 0o600))
 			}
 
 			opts, err := NewOptions(Options{AgentName: "claude", APIKey: tc.apiKey, Branch: "test-branch", Prompt: "inspect this"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			got, err := containerOptions(opts, worktree.Path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			if len(got.Mounts) != tc.wantMounts {
-				t.Errorf("mount count = %d, want %d", len(got.Mounts), tc.wantMounts)
-			}
+			assert.Equal(t, tc.wantMounts, len(got.Mounts))
 			hostCredentialMounts := 0
 			for _, mount := range got.Mounts {
 				if mount.Host == filepath.Join(home, ".claude") || mount.Host == filepath.Join(home, ".claude.json") {
@@ -251,19 +209,11 @@ func TestClaudeCredentialSelection(t *testing.T) {
 			if tc.createHostDir {
 				wantHostCredentialMounts = 2
 			}
-			if hostCredentialMounts != wantHostCredentialMounts {
-				t.Errorf("host Claude credential mounts = %d, want %d", hostCredentialMounts, wantHostCredentialMounts)
-			}
+			assert.Equal(t, wantHostCredentialMounts, hostCredentialMounts)
 			keyEnv := slices.Contains(got.Env, "ANTHROPIC_API_KEY="+key)
-			if keyEnv != tc.wantKeyEnv {
-				t.Errorf("Claude API key environment present = %t, want %t", keyEnv, tc.wantKeyEnv)
-			}
-			if strings.Contains(strings.Join(got.Args, " "), key) {
-				t.Error("API key appeared in Claude command arguments")
-			}
-			if !slices.Contains(got.Args, "--print") {
-				t.Error("Claude key path must run in non-interactive print mode")
-			}
+			assert.Equal(t, tc.wantKeyEnv, keyEnv)
+			assert.NotContains(t, strings.Join(got.Args, " "), key)
+			assert.Contains(t, got.Args, "--print", "Claude key path must run in non-interactive print mode")
 			for _, arg := range []string{"--output-format", "stream-json", "--verbose", "--include-partial-messages"} {
 				count := 0
 				for _, actual := range got.Args {
@@ -271,21 +221,14 @@ func TestClaudeCredentialSelection(t *testing.T) {
 						count++
 					}
 				}
-				if count != 1 {
-					t.Errorf("Claude argument %q count = %d, want 1", arg, count)
-				}
+				assert.Equal(t, 1, count)
 			}
-			if !got.Interactive || got.TTY {
-				t.Error("Claude stdin and TTY settings must remain unchanged")
-			}
-			if (len(got.Tmpfs) == 1 && got.Tmpfs[0].Path == "/claude-home") != tc.wantKeyEnv {
-				t.Errorf("disposable Claude home = %v, want %t", got.Tmpfs, tc.wantKeyEnv)
-			}
+			assert.True(t, got.Interactive, "Claude stdin settings must remain unchanged")
+			assert.False(t, got.TTY, "Claude TTY settings must remain unchanged")
+			assert.Equal(t, tc.wantKeyEnv, (len(got.Tmpfs) == 1 && got.Tmpfs[0].Path == "/claude-home"))
 			if tc.wantKeyEnv {
 				for _, env := range []string{"CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST=1", "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0"} {
-					if !slices.Contains(got.Env, env) {
-						t.Errorf("missing Claude key-mode environment %q", env)
-					}
+					assert.Contains(t, got.Env, env)
 				}
 			}
 		})
@@ -297,9 +240,7 @@ func TestNewOptionsRejectsAPIKeyForOtherAgents(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewOptions(Options{AgentName: name, APIKey: "test-api-key", Branch: "test-branch"})
 			var usageErr UsageError
-			if !errors.As(err, &usageErr) {
-				t.Fatalf("error = %v, want UsageError", err)
-			}
+			require.ErrorAs(t, err, &usageErr)
 		})
 	}
 }
@@ -309,29 +250,23 @@ func TestNewOptionsGeneratesBranchWhenOmitted(t *testing.T) {
 		AgentName: "codex",
 		Prompt:    "create a file",
 	})
-	if err != nil {
-		t.Fatalf("NewOptions() error = %v", err)
-	}
+	require.NoError(t, err)
 
-	if !regexp.MustCompile(`^[a-z]{8}-[0-9]{6}$`).MatchString(opts.Branch) {
-		t.Fatalf("NewOptions() branch = %q, want eight lowercase letters and six digits", opts.Branch)
-	}
+	require.Regexp(t, `^[a-z]{8}-[0-9]{6}$`, opts.Branch)
 }
 
 func TestNewOptionsResolvesSupportedAgentImagePaths(t *testing.T) {
 	image := filepath.Join(t.TempDir(), "mockup.png")
-	if err := os.WriteFile(image, []byte("not a real image"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(image, []byte("not a real image"), 0o600))
 
 	for _, name := range []string{"codex", "claude"} {
 		t.Run(name, func(t *testing.T) {
 			opts, err := NewOptions(Options{AgentName: name, Prompt: "inspect it", Images: []string{image}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got, want := opts.Images, []string{image}; len(got) != len(want) || got[0] != want[0] {
-				t.Fatalf("Images = %q, want %q", got, want)
+			require.NoError(t, err)
+			{
+				got, want := opts.Images, []string{image}
+				require.Equal(t, len(want), len(got))
+				require.Equal(t, want[0], got[0])
 			}
 		})
 	}
@@ -344,9 +279,7 @@ func TestNewOptionsRejectsNonRegularSupportedAgentImages(t *testing.T) {
 			t.Run(name+"/"+filepath.Base(image), func(t *testing.T) {
 				_, err := NewOptions(Options{AgentName: name, Prompt: "inspect it", Images: []string{image}})
 				var usageErr UsageError
-				if !errors.As(err, &usageErr) {
-					t.Fatalf("error = %v, want UsageError", err)
-				}
+				require.ErrorAs(t, err, &usageErr)
 			})
 		}
 	}
@@ -357,11 +290,11 @@ func TestNewOptionsIgnoresImagesForUnsupportedAgents(t *testing.T) {
 	for _, name := range []string{"opencode", "pi"} {
 		t.Run(name, func(t *testing.T) {
 			opts, err := NewOptions(Options{AgentName: name, Prompt: "inspect it", Images: []string{missing}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got, want := opts.Images, []string{missing}; len(got) != len(want) || got[0] != want[0] {
-				t.Fatalf("Images = %q, want ignored input %q", got, want)
+			require.NoError(t, err)
+			{
+				got, want := opts.Images, []string{missing}
+				require.Equal(t, len(want), len(got))
+				require.Equal(t, want[0], got[0])
 			}
 		})
 	}

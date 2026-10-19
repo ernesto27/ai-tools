@@ -1,8 +1,9 @@
 package sandbox
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 )
@@ -43,9 +44,7 @@ func TestAttachmentPath(t *testing.T) {
 			} {
 				t.Run(tt.name, func(t *testing.T) {
 					want := kind.root + tt.want
-					if got := kind.kind.path(tt.index, tt.host); got != want {
-						t.Fatalf("path = %q, want %q", got, want)
-					}
+					require.Equal(t, want, kind.kind.path(tt.index, tt.host))
 				})
 			}
 		})
@@ -78,9 +77,7 @@ func TestAddAttachmentMounts(t *testing.T) {
 				t.Run(tt.name, func(t *testing.T) {
 					opts := docker.RunOptions{Mounts: []docker.Mount{existing}}
 					kind.kind.addMounts(&opts, tt.hosts)
-					if !reflect.DeepEqual(opts.Mounts, tt.want) {
-						t.Fatalf("mounts = %#v, want %#v", opts.Mounts, tt.want)
-					}
+					require.Equal(t, tt.want, opts.Mounts)
 				})
 			}
 		})
@@ -120,9 +117,7 @@ func TestAttachmentManifest(t *testing.T) {
 			} {
 				t.Run(tt.name, func(t *testing.T) {
 					got := kind.kind.manifest(tt.hosts)
-					if got != tt.want {
-						t.Fatalf("manifest = %q, want %q", got, tt.want)
-					}
+					require.Equal(t, tt.want, got)
 				})
 			}
 		})

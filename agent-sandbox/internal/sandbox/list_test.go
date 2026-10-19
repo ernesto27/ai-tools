@@ -5,8 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWorktreeListAndBranchesUseCurrentRepositoryRecords(t *testing.T) {
@@ -17,40 +19,24 @@ func TestWorktreeListAndBranchesUseCurrentRepositoryRecords(t *testing.T) {
 		{Repo: t.TempDir(), Branch: "other-repo", Path: "/worktrees/other"},
 	}
 	for _, record := range records {
-		if err := recordWorktree(record); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, recordWorktree(record))
 	}
 
 	found, err := sandboxWorktrees()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found.repo.Dir != repoDir {
-		t.Fatalf("sandboxWorktrees() repository = %q, want %q", found.repo.Dir, repoDir)
-	}
+	require.NoError(t, err)
+	require.Equal(t, repoDir, found.repo.Dir)
 	wantWorktrees := records[:2]
-	if !reflect.DeepEqual(found.worktrees, wantWorktrees) {
-		t.Fatalf("sandboxWorktrees() worktrees = %#v, want %#v", found.worktrees, wantWorktrees)
-	}
+	require.Equal(t, wantWorktrees, found.worktrees)
 
 	var out bytes.Buffer
-	if err := WorktreeList(&out); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, WorktreeList(&out))
 	wantOutput := "short        /worktrees/short\n" +
 		"much-longer  /worktrees/much-longer\n"
-	if got := out.String(); got != wantOutput {
-		t.Fatalf("WorktreeList() output = %q, want %q", got, wantOutput)
-	}
+	require.Equal(t, wantOutput, out.String())
 
 	branches, err := WorktreeBranches()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := []string{"short", "much-longer"}; !reflect.DeepEqual(branches, want) {
-		t.Fatalf("WorktreeBranches() = %q, want %q", branches, want)
-	}
+	require.NoError(t, err)
+	require.Equal(t, []string{"short", "much-longer"}, branches)
 }
 
 func TestPrintWorktrees(t *testing.T) {
@@ -63,9 +49,7 @@ func TestPrintWorktrees(t *testing.T) {
 	printWorktrees(&out, worktrees)
 
 	want := "a     /worktrees/a\nlong  /worktrees/long\n"
-	if got := out.String(); got != want {
-		t.Fatalf("printWorktrees() output = %q, want %q", got, want)
-	}
+	require.Equal(t, want, out.String())
 }
 
 func TestSandboxWorktreesRequiresGitRepository(t *testing.T) {
@@ -74,9 +58,7 @@ func TestSandboxWorktreesRequiresGitRepository(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	_, err := sandboxWorktrees()
-	if err == nil {
-		t.Fatal("sandboxWorktrees() returned no error outside a Git repository")
-	}
+	require.Error(t, err)
 }
 
 func setupListTestRepo(t *testing.T) string {
@@ -84,8 +66,9 @@ func setupListTestRepo(t *testing.T) string {
 
 	repoDir := t.TempDir()
 	command := exec.Command("git", "-C", repoDir, "init", "--quiet")
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, output)
+	{
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, "command output: %s", output)
 	}
 
 	changeToDir(t, repoDir)
@@ -97,16 +80,10 @@ func changeToDir(t *testing.T, dir string) {
 	t.Helper()
 
 	previous, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(dir))
 	t.Cleanup(func() {
-		if err := os.Chdir(previous); err != nil {
-			t.Errorf("restoring working directory: %v", err)
-		}
+		assert.NoError(t, os.Chdir(previous))
 	})
 }
 
@@ -114,39 +91,25 @@ func TestWorktreeListEmpty(t *testing.T) {
 	setupListTestRepo(t)
 
 	var out bytes.Buffer
-	if err := WorktreeList(&out); err != nil {
-		t.Fatal(err)
-	}
-	if got := out.String(); got != "" {
-		t.Fatalf("WorktreeList() output = %q, want empty output", got)
-	}
+	require.NoError(t, WorktreeList(&out))
+	require.Equal(t, "", out.String())
 }
 
 func TestWorktreeBranchesEmpty(t *testing.T) {
 	setupListTestRepo(t)
 
 	branches, err := WorktreeBranches()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if branches != nil {
-		t.Fatalf("WorktreeBranches() = %q, want nil", branches)
-	}
+	require.NoError(t, err)
+	require.Nil(t, branches)
 }
 
 func TestSandboxWorktreesResolvesRepositoryPath(t *testing.T) {
 	repoDir := setupListTestRepo(t)
 	link := filepath.Join(t.TempDir(), "repo")
-	if err := os.Symlink(repoDir, link); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Symlink(repoDir, link))
 	changeToDir(t, link)
 
 	found, err := sandboxWorktrees()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found.repo.Dir != repoDir {
-		t.Fatalf("sandboxWorktrees() repository = %q, want %q", found.repo.Dir, repoDir)
-	}
+	require.NoError(t, err)
+	require.Equal(t, repoDir, found.repo.Dir)
 }

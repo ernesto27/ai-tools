@@ -1,8 +1,9 @@
 package agent
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestClaudeArgsStreamJSON(t *testing.T) {
@@ -23,9 +24,7 @@ func TestClaudeArgsStreamJSON(t *testing.T) {
 			}{{"host login", claude{}.Args}, {"API key", claude{}.APIKeyArgs}} {
 				t.Run(mode.name, func(t *testing.T) {
 					want := append([]string{"--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", "bypassPermissions", "--effort", "high"}, tc.wantTail...)
-					if got := mode.args(tc.model, "high", tc.prompt, tc.images); !reflect.DeepEqual(got, want) {
-						t.Fatalf("Args() = %q, want %q", got, want)
-					}
+					require.Equal(t, want, mode.args(tc.model, "high", tc.prompt, tc.images))
 				})
 			}
 		})

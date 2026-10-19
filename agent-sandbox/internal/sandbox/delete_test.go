@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestWorktreeDelete(t *testing.T) {
@@ -26,46 +28,32 @@ func TestWorktreeDelete(t *testing.T) {
 			repoDir := setupDeleteTestRepo(t)
 			worktree := addDeleteTestWorktree(t, repoDir, "feature")
 			if tt.dirty {
-				if err := os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("change"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(worktree.Path, "change.txt"), []byte("change"), 0o600))
 			}
-			if err := recordWorktree(worktree); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, recordWorktree(worktree))
 
 			var out bytes.Buffer
 			err := WorktreeDelete(worktree.Branch, tt.force, &out)
 			if tt.wantRemoved {
-				if err != nil {
-					t.Fatal(err)
+				require.NoError(t, err)
+				{
+					_, err := os.Stat(worktree.Path)
+					require.True(t, os.IsNotExist(err), "worktree path still exists after deletion: %v", err)
 				}
-				if _, err := os.Stat(worktree.Path); !os.IsNotExist(err) {
-					t.Fatalf("worktree path still exists after deletion: %v", err)
-				}
-				if branchExists(t, repoDir, worktree.Branch) {
-					t.Fatalf("branch %q still exists after deletion", worktree.Branch)
-				}
+				require.False(t, branchExists(t, repoDir, worktree.Branch), "branch %q still exists after deletion", worktree.Branch)
 				records, err := recordedWorktrees(repoDir)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(records) != 0 {
-					t.Fatalf("records after deletion = %#v, want none", records)
-				}
+				require.NoError(t, err)
+				require.Empty(t, records)
 				return
 			}
 
 			want := worktree.Path + " has uncommitted changes; pass --force to delete it anyway"
-			if err == nil || err.Error() != want {
-				t.Fatalf("WorktreeDelete() error = %v, want %q", err, want)
+			require.EqualError(t, err, want)
+			{
+				_, err := os.Stat(worktree.Path)
+				require.NoError(t, err)
 			}
-			if _, err := os.Stat(worktree.Path); err != nil {
-				t.Fatalf("worktree path was removed: %v", err)
-			}
-			if !branchExists(t, repoDir, worktree.Branch) {
-				t.Fatalf("branch %q was deleted", worktree.Branch)
-			}
+			require.True(t, branchExists(t, repoDir, worktree.Branch), "branch %q was deleted", worktree.Branch)
 		})
 	}
 }
@@ -75,31 +63,19 @@ func TestWorktreeDeleteRejectsUnrecordedBranch(t *testing.T) {
 
 	err := WorktreeDelete("missing", false, &bytes.Buffer{})
 	want := "no sandbox worktree on branch missing; run worktree-list to see the ones there are"
-	if err == nil || err.Error() != want {
-		t.Fatalf("WorktreeDelete() error = %v, want %q", err, want)
-	}
+	require.EqualError(t, err, want)
 }
 
 func TestWorktreeDeletePrunesMissingDirectory(t *testing.T) {
 	repoDir := setupDeleteTestRepo(t)
 	worktree := addDeleteTestWorktree(t, repoDir, "feature")
-	if err := recordWorktree(worktree); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(worktree.Path); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, recordWorktree(worktree))
+	require.NoError(t, os.RemoveAll(worktree.Path))
 
 	var out bytes.Buffer
-	if err := WorktreeDelete(worktree.Branch, false, &out); err != nil {
-		t.Fatal(err)
-	}
-	if got := out.String(); !strings.Contains(got, "Pruned the record of "+worktree.Path) {
-		t.Fatalf("WorktreeDelete() output = %q, want prune notice", got)
-	}
-	if branchExists(t, repoDir, worktree.Branch) {
-		t.Fatalf("branch %q still exists after deletion", worktree.Branch)
-	}
+	require.NoError(t, WorktreeDelete(worktree.Branch, false, &out))
+	require.Contains(t, out.String(), "Pruned the record of "+worktree.Path)
+	require.False(t, branchExists(t, repoDir, worktree.Branch), "branch %q still exists after deletion", worktree.Branch)
 }
 
 func TestWorktreeDeleteAll(t *testing.T) {
@@ -119,33 +95,25 @@ func TestWorktreeDeleteAll(t *testing.T) {
 			first := addDeleteTestWorktree(t, repoDir, "first")
 			second := addDeleteTestWorktree(t, repoDir, "second")
 			for _, worktree := range []worktreeRecord{first, second} {
-				if err := recordWorktree(worktree); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, recordWorktree(worktree))
 			}
 
 			var out bytes.Buffer
 			err := WorktreeDeleteAll(tt.assumeYes, strings.NewReader(tt.input), &out)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if !tt.wantDelete {
-				if !strings.Contains(out.String(), "Aborted; nothing was deleted.") {
-					t.Fatalf("WorktreeDeleteAll() output = %q, want abort notice", out.String())
-				}
-				if !branchExists(t, repoDir, first.Branch) || !branchExists(t, repoDir, second.Branch) {
-					t.Fatal("WorktreeDeleteAll() deleted a branch after a declined confirmation")
-				}
+				require.Contains(t, out.String(), "Aborted; nothing was deleted.")
+				require.True(t, branchExists(t, repoDir, first.Branch), "WorktreeDeleteAll() deleted a branch after a declined confirmation")
+				require.True(t, branchExists(t, repoDir, second.Branch), "WorktreeDeleteAll() deleted a branch after a declined confirmation")
 				return
 			}
 
 			for _, worktree := range []worktreeRecord{first, second} {
-				if _, err := os.Stat(worktree.Path); !os.IsNotExist(err) {
-					t.Fatalf("worktree path still exists after deletion: %v", err)
+				{
+					_, err := os.Stat(worktree.Path)
+					require.True(t, os.IsNotExist(err), "worktree path still exists after deletion: %v", err)
 				}
-				if branchExists(t, repoDir, worktree.Branch) {
-					t.Fatalf("branch %q still exists after deletion", worktree.Branch)
-				}
+				require.False(t, branchExists(t, repoDir, worktree.Branch), "branch %q still exists after deletion", worktree.Branch)
 			}
 		})
 	}
@@ -166,9 +134,8 @@ func TestFindWorktree(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.branch, func(t *testing.T) {
 			got, found := findWorktree(worktrees, tt.branch)
-			if got != tt.want || found != tt.found {
-				t.Fatalf("findWorktree(%q) = (%#v, %t), want (%#v, %t)", tt.branch, got, found, tt.want, tt.found)
-			}
+			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.found, found)
 		})
 	}
 }
@@ -176,9 +143,7 @@ func TestFindWorktree(t *testing.T) {
 func TestIsInside(t *testing.T) {
 	root := t.TempDir()
 	child := filepath.Join(root, "child")
-	if err := os.Mkdir(child, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(child, 0o755))
 	sibling := t.TempDir()
 
 	tests := []struct {
@@ -196,12 +161,8 @@ func TestIsInside(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := isInside(tt.dir, tt.root)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != tt.want {
-				t.Fatalf("isInside(%q, %q) = %t, want %t", tt.dir, tt.root, got, tt.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -209,17 +170,14 @@ func TestIsInside(t *testing.T) {
 func TestResolvePath(t *testing.T) {
 	dir := t.TempDir()
 	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(dir, link); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Symlink(dir, link))
 
-	if got := resolvePath(link); got != dir {
-		t.Fatalf("resolvePath(%q) = %q, want %q", link, got, dir)
-	}
+	require.Equal(t, dir, resolvePath(link))
 
 	missing := filepath.Join(dir, "missing", "path")
-	if got, want := resolvePath(missing), filepath.Clean(missing); got != want {
-		t.Fatalf("resolvePath(%q) = %q, want %q", missing, got, want)
+	{
+		got, want := resolvePath(missing), filepath.Clean(missing)
+		require.Equal(t, want, got)
 	}
 }
 
@@ -228,9 +186,7 @@ func setupDeleteTestRepo(t *testing.T) string {
 
 	repoDir := t.TempDir()
 	runGit(t, repoDir, "init", "--quiet")
-	if err := os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("initial\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("initial\n"), 0o600))
 	runGit(t, repoDir, "add", "README.md")
 	runGit(t, repoDir,
 		"-c", "user.name=Test User",
@@ -261,7 +217,8 @@ func runGit(t *testing.T, repoDir string, args ...string) {
 	t.Helper()
 
 	command := exec.Command("git", append([]string{"-C", repoDir}, args...)...)
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
+	{
+		output, err := command.CombinedOutput()
+		require.NoError(t, err, "command output: %s", output)
 	}
 }

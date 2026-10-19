@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPumpPreservesStreamJSON(t *testing.T) {
@@ -29,26 +30,23 @@ func TestPumpPreservesStreamJSON(t *testing.T) {
 			errOut := stdcopy.NewStdWriter(&frames, stdcopy.Stderr)
 			// Split even within Unicode and JSON tokens, with stderr interleaved.
 			midpoint := len(tc.stdout) / 2
-			if _, err := io.WriteString(out, tc.stdout[:midpoint]); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(out, tc.stdout[:midpoint])
+				require.NoError(t, err)
 			}
-			if _, err := io.WriteString(errOut, "stdin warning\n"); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(errOut, "stdin warning\n")
+				require.NoError(t, err)
 			}
-			if _, err := io.WriteString(out, tc.stdout[midpoint:]); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(out, tc.stdout[midpoint:])
+				require.NoError(t, err)
 			}
 			client := &Client{stdout: &stdout, stderr: &stderr}
 			done := client.pump(types.HijackedResponse{Reader: bufio.NewReader(&frames)}, RunOptions{})
-			if err := awaitPump(t, done); err != nil {
-				t.Fatal(err)
-			}
-			if stdout.String() != tc.stdout {
-				t.Fatal("stdout changed or lost bytes")
-			}
-			if stderr.String() != "stdin warning\n" {
-				t.Fatalf("stderr = %q", stderr.String())
-			}
+			require.NoError(t, awaitPump(t, done))
+			require.Equal(t, tc.stdout, stdout.String())
+			require.Equal(t, "stdin warning\n", stderr.String())
 		})
 	}
 }
@@ -67,41 +65,35 @@ func (w *observedOutput) Write(p []byte) (int, error) {
 
 func TestPumpForwardsBeforeEOF(t *testing.T) {
 	reader, writer := net.Pipe()
-	if err := writer.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, writer.SetWriteDeadline(time.Now().Add(5*time.Second)))
 	t.Cleanup(func() { reader.Close(); writer.Close() })
 	output := &observedOutput{writes: make(chan string, 2)}
 	client := &Client{stdout: output, stderr: io.Discard}
 	done := client.pump(types.HijackedResponse{Reader: bufio.NewReader(reader)}, RunOptions{})
 	partial := "{\"type\":\"stream_event\",\"text\":\"working\"}\n"
-	if _, err := io.WriteString(stdcopy.NewStdWriter(writer, stdcopy.Stdout), partial); err != nil {
-		t.Fatal(err)
+	{
+		_, err := io.WriteString(stdcopy.NewStdWriter(writer, stdcopy.Stdout), partial)
+		require.NoError(t, err)
 	}
 	select {
 	case got := <-output.writes:
-		if got != partial {
-			t.Fatalf("live output = %q", got)
-		}
+		require.Equal(t, partial, got)
 	case <-time.After(5 * time.Second):
-		t.Fatal("output did not arrive before EOF")
+		require.FailNow(t, "Unexpected test failure", "output did not arrive before EOF")
 	}
 	select {
 	case err := <-done:
-		t.Fatalf("pump stopped before EOF: %v", err)
+		require.FailNowf(t, "Unexpected test failure", "pump stopped before EOF: %v", err)
 	default:
 	}
 	final := "{\"type\":\"result\",\"result\":\"done\"}"
-	if _, err := io.WriteString(stdcopy.NewStdWriter(writer, stdcopy.Stdout), final); err != nil {
-		t.Fatal(err)
+	{
+		_, err := io.WriteString(stdcopy.NewStdWriter(writer, stdcopy.Stdout), final)
+		require.NoError(t, err)
 	}
 	writer.Close()
-	if err := awaitPump(t, done); err != nil {
-		t.Fatal(err)
-	}
-	if output.String() != partial+final {
-		t.Fatal("final output changed or lost bytes")
-	}
+	require.NoError(t, awaitPump(t, done))
+	require.Equal(t, partial+final, output.String())
 }
 
 type failedOutput struct{ err error }
@@ -112,15 +104,14 @@ func TestPumpReportsOutputFailure(t *testing.T) {
 	for _, stream := range []stdcopy.StdType{stdcopy.Stdout, stdcopy.Stderr} {
 		t.Run(map[stdcopy.StdType]string{stdcopy.Stdout: "stdout", stdcopy.Stderr: "stderr"}[stream], func(t *testing.T) {
 			var frames bytes.Buffer
-			if _, err := io.WriteString(stdcopy.NewStdWriter(&frames, stream), "event\n"); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(stdcopy.NewStdWriter(&frames, stream), "event\n")
+				require.NoError(t, err)
 			}
 			failure := errors.New("output unavailable")
 			client := &Client{stdout: failedOutput{failure}, stderr: failedOutput{failure}}
 			done := client.pump(types.HijackedResponse{Reader: bufio.NewReader(&frames)}, RunOptions{})
-			if err := awaitPump(t, done); !errors.Is(err, failure) {
-				t.Fatalf("error = %v, want %v", err, failure)
-			}
+			require.ErrorIs(t, awaitPump(t, done), failure)
 		})
 	}
 }
@@ -131,7 +122,7 @@ func awaitPump(t *testing.T, done <-chan error) error {
 	case err := <-done:
 		return err
 	case <-time.After(5 * time.Second):
-		t.Fatal("output pump did not finish")
+		require.FailNow(t, "Unexpected test failure", "output pump did not finish")
 		return nil
 	}
 }
@@ -162,28 +153,24 @@ func TestPumpFormatsOnlyStdoutAndFlushes(t *testing.T) {
 	}{{"flush trailing event", nil}, {"flush failure", failure}} {
 		t.Run(tc.name, func(t *testing.T) {
 			var frames, stdout, stderr bytes.Buffer
-			if _, err := io.WriteString(stdcopy.NewStdWriter(&frames, stdcopy.Stdout), "event without newline"); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(stdcopy.NewStdWriter(&frames, stdcopy.Stdout), "event without newline")
+				require.NoError(t, err)
 			}
-			if _, err := io.WriteString(stdcopy.NewStdWriter(&frames, stdcopy.Stderr), "Warning: unchanged\n"); err != nil {
-				t.Fatal(err)
+			{
+				_, err := io.WriteString(stdcopy.NewStdWriter(&frames, stdcopy.Stderr), "Warning: unchanged\n")
+				require.NoError(t, err)
 			}
 			formatter := &bufferedTestFormatter{closeErr: tc.closeErr}
 			opts := RunOptions{FormatStdout: func(out io.Writer) io.WriteCloser { formatter.out = out; return formatter }}
 			client := &Client{stdout: &stdout, stderr: &stderr}
 			err := awaitPump(t, client.pump(types.HijackedResponse{Reader: bufio.NewReader(&frames)}, opts))
-			if !errors.Is(err, tc.closeErr) {
-				t.Fatalf("pump error = %v, want %v", err, tc.closeErr)
+			require.ErrorIs(t, err, tc.closeErr)
+			require.True(t, formatter.closed, "formatter was not closed")
+			if tc.closeErr == nil {
+				require.Equal(t, "EVENT WITHOUT NEWLINE", stdout.String())
 			}
-			if !formatter.closed {
-				t.Fatal("formatter was not closed")
-			}
-			if tc.closeErr == nil && stdout.String() != "EVENT WITHOUT NEWLINE" {
-				t.Fatalf("stdout = %q", stdout.String())
-			}
-			if stderr.String() != "Warning: unchanged\n" {
-				t.Fatalf("stderr = %q", stderr.String())
-			}
+			require.Equal(t, "Warning: unchanged\n", stderr.String())
 		})
 	}
 }

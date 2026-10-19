@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type scriptedDecoder struct {
@@ -113,27 +115,24 @@ func TestWriterRendering(t *testing.T) {
 			}
 			var out bytes.Buffer
 			writer := New(&out, "fix-login", decoder)
-			if got, want := out.String(), "test-agent / fix-login\n---------------------------------------------\n"; got != want {
-				t.Fatalf("header = %q, want %q", got, want)
+			{
+				got, want := out.String(), "test-agent / fix-login\n---------------------------------------------\n"
+				require.Equal(t, want, got)
 			}
 			out.Reset()
 			base := time.Date(2026, 1, 1, 10, 32, 2, 200_000_000, time.UTC)
 			for i, s := range tc.steps {
 				writer.now = func() time.Time { return base.Add(s.after) }
-				if n, err := writer.Write([]byte("event\n")); err != nil || n != len("event\n") {
-					t.Fatalf("step %d: Write = %d, %v", i, n, err)
+				{
+					n, err := writer.Write([]byte("event\n"))
+					require.NoError(t, err)
+					require.Equal(t, len("event\n"), n)
 				}
-				if got := out.String(); got != s.want {
-					t.Fatalf("step %d: output = %q, want %q", i, got, s.want)
-				}
+				require.Equal(t, s.want, out.String(), "step %d", i)
 				out.Reset()
 			}
-			if err := writer.Close(); err != nil {
-				t.Fatal(err)
-			}
-			if got := out.String(); got != "---------------------------------------------\n" {
-				t.Fatalf("footer = %q", got)
-			}
+			require.NoError(t, writer.Close())
+			require.Equal(t, "---------------------------------------------\n", out.String())
 		})
 	}
 }
@@ -154,22 +153,18 @@ func TestWriterCloseWithPendingCommand(t *testing.T) {
 	writer := New(out, "fix-login", decoder)
 	writer.now = func() time.Time { return time.Date(2026, 1, 1, 10, 32, 2, 0, time.UTC) }
 	// A canceled execution can end with a start event lacking a final newline.
-	if _, err := writer.Write([]byte("start")); err != nil {
-		t.Fatal(err)
+	{
+		_, err := writer.Write([]byte("start"))
+		require.NoError(t, err)
 	}
 	out.Reset()
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, writer.Close())
 	want := "10:32:02  > COMMAND\n            long-running\n\n---------------------------------------------\n"
-	if got := out.String(); got != want {
-		t.Fatalf("close output = %q, want %q", got, want)
-	}
-	if out.closed {
-		t.Fatal("writer closed its destination")
-	}
-	if _, err := out.WriteString("host status\n"); err != nil {
-		t.Fatalf("destination unusable after Close: %v", err)
+	require.Equal(t, want, out.String())
+	require.False(t, out.closed, "writer closed its destination")
+	{
+		_, err := out.WriteString("host status\n")
+		require.NoError(t, err)
 	}
 }
 
@@ -184,9 +179,7 @@ func TestClean(t *testing.T) {
 		{"Unicode", "你好", "你好"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := clean(tc.input); got != tc.want {
-				t.Fatalf("clean() = %q, want %q", got, tc.want)
-			}
+			require.Equal(t, tc.want, clean(tc.input))
 		})
 	}
 }

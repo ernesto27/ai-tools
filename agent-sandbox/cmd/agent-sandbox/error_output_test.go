@@ -11,6 +11,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
@@ -45,18 +47,13 @@ func TestReportError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
 			cmd := &cobra.Command{Use: tt.command}
-			if got := reportError(cmd, &out, tt.err, 80, false); got != tt.status {
-				t.Fatalf("status = %d, want %d", got, tt.status)
-			}
+			status := reportError(cmd, &out, tt.err, 80, false)
+			require.Equal(t, tt.status, status)
 			for _, want := range tt.want {
-				if !strings.Contains(out.String(), want) {
-					t.Errorf("missing %q in %q", want, out.String())
-				}
+				assert.Contains(t, out.String(), want)
 			}
 			for _, absent := range tt.absent {
-				if strings.Contains(out.String(), absent) {
-					t.Errorf("unexpected %q in %q", absent, out.String())
-				}
+				assert.NotContains(t, out.String(), absent)
 			}
 		})
 	}
@@ -73,21 +70,19 @@ func TestErrorLayout(t *testing.T) {
 				Details:  []clierror.Detail{{Label: "Path", Value: path}},
 				Hints:    []string{"Inspect the registered worktrees before deciding how to proceed."},
 			}, clierror.General, width, true)
-			if !strings.Contains(out.String(), "\x1b[") || !strings.Contains(out.String(), path) {
-				t.Fatalf("missing color or intact path: %q", out.String())
-			}
+			require.Contains(t, out.String(), "\x1b[")
+			require.Contains(t, out.String(), path)
 			for _, line := range strings.Split(ansi.Strip(out.String()), "\n") {
-				if !strings.Contains(line, path) && ansi.StringWidth(line) > width {
-					t.Errorf("line exceeds width %d: %q", width, line)
+				if !strings.Contains(line, path) {
+					assert.LessOrEqual(t, ansi.StringWidth(line), width, "line: %q", line)
 				}
 			}
 		})
 	}
 	var captured bytes.Buffer
 	t.Setenv("NO_COLOR", "")
-	if _, color := errorTerminal(&captured); color {
-		t.Fatal("captured output must not receive ANSI color")
-	}
+	_, color := errorTerminal(&captured)
+	assert.False(t, color, "captured output must not receive ANSI color")
 }
 
 func TestConfigurationDiagnostics(t *testing.T) {
@@ -98,24 +93,17 @@ func TestConfigurationDiagnostics(t *testing.T) {
 	} {
 		t.Run(content, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile(localConfigFile, []byte(content), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(localConfigFile, []byte(content), 0o600))
 			root, _ := newRootCmd()
 			root.SetArgs([]string{"run", "-a", "codex", "-q", "inspect"})
 			cmd, err := root.ExecuteC()
-			if err == nil {
-				t.Fatal("invalid configuration accepted")
-			}
+			require.Error(t, err, "invalid configuration accepted")
 			var out bytes.Buffer
-			if status := reportError(cmd, &out, err, 80, false); status != 2 {
-				t.Fatalf("status = %d, want 2", status)
-			}
-			if !strings.Contains(out.String(), "Category: Configuration") ||
-				!strings.Contains(out.String(), localConfigFile) ||
-				strings.Contains(out.String(), "test-secret-never-display") {
-				t.Fatalf("unsafe or incomplete diagnostic: %q", out.String())
-			}
+			status := reportError(cmd, &out, err, 80, false)
+			require.Equal(t, 2, status)
+			assert.Contains(t, out.String(), "Category: Configuration")
+			assert.Contains(t, out.String(), localConfigFile)
+			assert.NotContains(t, out.String(), "test-secret-never-display")
 		})
 	}
 }

@@ -5,6 +5,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetModelsByProviderRealAPI(t *testing.T) {
@@ -22,43 +25,32 @@ func TestGetModelsByProviderRealAPI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			models, err := NewOpenRouter().GetModelsByProvider(tt.provider)
-			if err != nil {
-				t.Fatalf("GetModelsByProvider(%q): %v", tt.provider, err)
-			}
+			require.NoError(t, err)
 			if tt.wantEmpty {
-				if len(models) != 0 {
-					t.Fatalf("unknown author returned %d models, want 0", len(models))
-				}
+				require.Empty(t, models)
 				return
 			}
-			if len(models) == 0 {
-				t.Fatal("expected at least one model")
-			}
+			require.NotEmpty(t, models)
 			t.Logf("received %d models for %s", len(models), tt.provider)
 
 			// The catalog changes, so validate usable fields instead of fixed models or prices.
 			for i, model := range models {
-				if model.InputPrice == "" || model.OutputPrice == "" {
-					t.Errorf("model %q: formatted prices are missing", model.ID)
-				}
+				assert.NotEmpty(t, model.InputPrice, "model %q", model.ID)
+				assert.NotEmpty(t, model.OutputPrice, "model %q", model.ID)
 				author, slug, ok := strings.Cut(model.ID, "/")
 				// OpenRouter also returns aliases whose author starts with a tilde.
-				if !ok || strings.TrimPrefix(author, "~") != tt.provider || strings.TrimSpace(slug) == "" {
-					t.Errorf("model %d: invalid ID %q for author %s", i, model.ID, tt.provider)
-				}
-				if strings.TrimSpace(model.Name) == "" {
-					t.Errorf("model %d: name is empty", i)
-				}
-				if strings.TrimSpace(model.Description) == "" {
-					t.Errorf("model %q: description is empty", model.Name)
-				}
-				if model.ContextLength <= 0 {
-					t.Errorf("model %q: context length = %d, want positive", model.Name, model.ContextLength)
-				}
+				assert.True(t, ok, "model %d: invalid ID %q", i, model.ID)
+				assert.Equal(t, tt.provider, strings.TrimPrefix(author, "~"))
+				assert.NotEmpty(t, strings.TrimSpace(slug), "model %d: invalid ID %q", i, model.ID)
+				assert.NotEqual(t, "", strings.TrimSpace(model.Name))
+				assert.NotEqual(t, "", strings.TrimSpace(model.Description))
+				assert.Greater(t, model.ContextLength, 0)
 				for label, raw := range map[string]string{"input": model.Pricing.Input, "output": model.Pricing.Output} {
 					price, err := strconv.ParseFloat(raw, 64)
-					if err != nil || price < 0 || math.IsNaN(price) || math.IsInf(price, 0) {
-						t.Errorf("model %q: invalid %s price %q", model.Name, label, raw)
+					if assert.NoError(t, err, "model %q: invalid %s price %q", model.Name, label, raw) {
+						assert.GreaterOrEqual(t, price, float64(0))
+						assert.False(t, math.IsNaN(price), "model %q: %s price", model.Name, label)
+						assert.False(t, math.IsInf(price, 0), "model %q: %s price", model.Name, label)
 					}
 				}
 			}
@@ -86,12 +78,8 @@ func TestPricePerMillion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.raw, func(t *testing.T) {
 			got, err := pricePerMillion(tt.raw)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("pricePerMillion(%q) error = %v, wantErr %t", tt.raw, err, tt.wantErr)
-			}
-			if got != tt.want {
-				t.Errorf("pricePerMillion(%q) = %q, want %q", tt.raw, got, tt.want)
-			}
+			require.Equal(t, tt.wantErr, (err != nil))
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

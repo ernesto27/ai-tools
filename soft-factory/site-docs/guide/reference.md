@@ -5,7 +5,6 @@ Run workflow commands from your project directory.
 | Command | Behavior |
 | --- | --- |
 | `software-factory` | Implement using `run.branch`, then review code, review security, classify risk, and explain changes. |
-| `software-factory review` | Review and correct existing changes using `resume.branch`, then classify risk. |
 | `software-factory continue` | Continue implementation and all enabled stages using `resume.branch`. |
 | `software-factory resume <path>` | Recover a logged run from its saved stage status, appending to the same log folder; uses `resume.branch`. |
 | `software-factory doctor` | Check `agent-sandbox`, `git`, and `docker` on `PATH`; no configuration required. |

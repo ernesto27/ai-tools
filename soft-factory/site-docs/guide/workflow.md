@@ -7,8 +7,7 @@
 5. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
 6. Explain the final changes (default and `continue`).
 
-The standalone `review` command starts at code review and finishes at risk
-classification. [Reports](reports.md) document results and verification gaps.
+[Reports](reports.md) document results and verification gaps.
 
 Choose agents and models independently for each stage with
 [`stages` in configuration](configuration.md#stage-agents-and-models).
@@ -18,16 +17,6 @@ Each code or security review follows **review → corrections when needed → ve
 with up to three rounds. Failures before the final walkthrough stop the
 workflow. A walkthrough failure warns and does not change the exit status
 for default and `continue` runs; during `resume`, it returns an error.
-
-## Review existing changes
-
-Skip implementation and review the changes in the sandbox worktree selected by `resume.branch`:
-
-```bash
-software-factory review
-```
-
-This command can modify files to correct review findings.
 
 ## Continue an existing task
 
@@ -47,8 +36,7 @@ configured branches differ. List available worktrees with
 `resume.branch` select the same branch. A continue creates the branch folder
 if needed and keeps its files separate from all earlier invocations. See
 [execution logs](reports.md#execution-logs) for examples. It runs implementation
-again rather than resuming at the last failed stage. To run
-only reviews and risk classification, use `software-factory review` instead.
+again rather than resuming at the last failed stage.
 
 Keep the original task in `run.filePrompt`, or supply `--jira` again when
 continuing a Jira task. Supporting documents and enabled stages still apply.
@@ -86,6 +74,5 @@ reviews are skipped during recovery, their archived evidence is restored for
 risk classification. Missing required evidence stops recovery.
 
 A missing status file prevents recovery, including for older log folders that
-predate it. Use `continue` to start a fresh invocation, or `review` to rerun
-only reviews and risk classification. See [reports](reports.md#execution-logs)
+predate it. Use `continue` to start a fresh invocation. See [reports](reports.md#execution-logs)
 for the saved files.

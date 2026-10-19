@@ -6,12 +6,6 @@ Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in your environment or in a local `.env` f
 software-factory --jira 'https://your-company.atlassian.net/browse/ENG-123'
 ```
 
-To review existing changes against a Jira task:
-
-```bash
-software-factory --jira 'https://your-company.atlassian.net/browse/ENG-123' review
-```
-
 The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `software-factory.json` is still required.
 
 See [Jira setup](#jira-setup) for credentials and configuration.

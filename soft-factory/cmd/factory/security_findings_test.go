@@ -43,7 +43,6 @@ func prepareSecurityWorkflow(t *testing.T) string {
 	}
 	return root
 }
-
 func TestSecurityReportingWorkflows(t *testing.T) {
 	for _, tc := range []struct {
 		name, command, save, disabled, status string
@@ -52,9 +51,6 @@ func TestSecurityReportingWorkflows(t *testing.T) {
 	}{
 		{"default", "", "true", "", "", 4, 1, true},
 		{"continue", "continue", "true", "", "", 4, 1, true},
-		{"review", "review", "true", "", "", 3, 1, true},
-		{"review false", "review", "false", "", "", 3, 0, false},
-		{"review disabled", "review", "true", `,"securityReview"`, "", 2, 0, false},
 		{"default disabled", "", "true", `,"securityReview"`, "", 3, 0, true},
 		{"resume failed security", "resume", "true", "", "securityReview,FAILED\n", 2, 1, true},
 		{"resume successful security", "resume", "true", "", "securityReview,SUCCEEDED\n", 1, 0, true},
@@ -150,63 +146,9 @@ func TestSecurityReportingWorkflows(t *testing.T) {
 					}
 				}
 			}
-			if tc.command == "review" && (strings.Contains(string(summary), "IMPLEMENTATION") || strings.Contains(string(summary), "REVIEW CHANGES")) {
-				t.Fatalf("standalone review ran extra stages: %s", summary)
-			}
 			if tc.command == "resume" && !strings.HasPrefix(string(summary), historical) {
 				t.Fatal("resume overwrote historical summary")
 			}
 		})
-	}
-}
-
-func TestResumeStandaloneSecurityReview(t *testing.T) {
-	root := prepareSecurityWorkflow(t)
-	cfg := `{"stages":{"securityReview":{"saveFindings":true}},"agentSandbox":{"agent":"codex","branch":"task","run":{"filePrompt":"task.txt"}}}`
-	if err := os.WriteFile(factoryConfigFile, []byte(cfg), 0600); err != nil {
-		t.Fatal(err)
-	}
-	// Use the real log constructor to persist the standalone workflow identity.
-	run, err := executionlog.NewRun("task", executionlog.CommandReview, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := run.Path()
-	run.Finish(nil) // Empty status models interruption before the first result.
-	cmd := newRootCmd(runWorkflow)
-	cmd.SetArgs([]string{"resume", path})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	file, err := os.Open(filepath.Join(root, "capture.jsonl"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-	decoder := json.NewDecoder(file)
-	calls := 0
-	for {
-		var capture workflowCapture
-		err := decoder.Decode(&capture)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		calls++
-		if capture.Args[0] != "resume" || strings.Contains(capture.Prompt, "write the walkthrough") {
-			t.Fatalf("unexpected standalone recovery stage: %+v", capture)
-		}
-	}
-	if calls != 3 {
-		t.Fatalf("standalone recovery ran %d stages, want only code review, security review, and risk classification", calls)
-	}
-	summary, err := os.ReadFile(filepath.Join(path, "summary.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(summary), "IMPLEMENTATION") || strings.Contains(string(summary), "REVIEW CHANGES") || !strings.Contains(string(summary), "UNRESOLVED") {
-		t.Fatalf("standalone recovery summary: %s", summary)
 	}
 }

@@ -20,7 +20,7 @@ failures; see [transport details](configuration.md#sandbox-settings-transport).
 
 ## The sandbox branch cannot be found
 
-For `review` or `continue`, set `resume.branch` to an existing sandbox branch.
+For `continue`, set `resume.branch` to an existing sandbox branch.
 Use `agent-sandbox worktree-list` to list them. In the default workflow,
 disabling implementation still requires the `run.branch` worktree to exist.
 
@@ -59,15 +59,13 @@ for a Jira task. Recovery needs the original summary, stage status, and any
 earlier review evidence needed for risk classification.
 
 If those files are unavailable, use `software-factory continue` to run
-implementation and subsequent enabled stages in a new invocation, or
-`software-factory review` to run only reviews and risk classification.
+implementation and subsequent enabled stages in a new invocation.
 See [resuming a run](workflow.md#resume-a-failed-or-interrupted-run) and
 [execution logs](reports.md#execution-logs).
 
 ## The final walkthrough is missing
 
-The standalone `review` command does not run the walkthrough. Default and
-`continue` workflows warn if walkthrough generation or saving fails, keeping
+Default and `continue` workflows warn if walkthrough generation or saving fails, keeping
 the result of earlier stages. During `resume`, a walkthrough failure returns
 an error so recovery can be retried. Check whether `reviewChanges` is disabled,
 then check terminal warnings and [reports](reports.md). If execution logging

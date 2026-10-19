@@ -72,7 +72,7 @@ func TestWorkflowSandboxHelper(t *testing.T) {
 }
 
 func TestUnifiedWorkflowEntryPoints(t *testing.T) {
-	for _, command := range []string{"default", "continue", "review", "resume"} {
+	for _, command := range []string{"default", "continue", "resume"} {
 		t.Run(command, func(t *testing.T) {
 			root := t.TempDir()
 			t.Chdir(root)
@@ -131,9 +131,6 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 			defer file.Close()
 			decoder := json.NewDecoder(file)
 			count := 4
-			if command == "review" {
-				count = 3
-			}
 			for i := 0; i < count; i++ {
 				var got workflowCapture
 				if err := decoder.Decode(&got); err != nil {
@@ -141,9 +138,6 @@ func TestUnifiedWorkflowEntryPoints(t *testing.T) {
 				}
 				mode, branch, agent, model := "resume", "old-task", "resume-agent", "resume-model"
 				stage := i
-				if command == "review" {
-					stage++
-				}
 				if command == "default" {
 					branch = "new-task"
 					if stage == 0 {

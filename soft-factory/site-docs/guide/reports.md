@@ -9,14 +9,11 @@ plus a run summary and the final walkthrough.
 | `software-factory` | `logs/<sanitized-branch>/run-<UTC-timestamp>/summary.log`, stage `.log` files, and `05-reviewChanges.md` when the walkthrough runs successfully. |
 | `software-factory continue` | The same files in `logs/<sanitized-branch>/continue-<UTC-timestamp>/` for `resume.branch`. |
 | `software-factory resume <path>` | Appends stage logs, progress, and summary entries to the supplied invocation folder; saves the walkthrough there. |
-| `software-factory review` | By default, risk-classification output in `docs/risk-classification-<datetime>.md` when that stage runs. When security review is enabled with `saveFindings: true`, execution logs and `summary.log` in `logs/<sanitized-branch>/review-<UTC-timestamp>/`. No final walkthrough. |
 
 Code and security reviews also write temporary reports in the sandbox worktree
 for risk classification to read. These are normally removed after risk
-classification, or when that stage is disabled. By default, the standalone `review`
-command does not archive code and security review output, so read those
-findings in the terminal. Logged workflows also archive successful code and
-security review evidence as `codeReview.txt` and `securityReview.txt` in the
+classification, or when that stage is disabled. Logged workflows archive
+successful code and security review evidence as `codeReview.txt` and `securityReview.txt` in the
 invocation folder so `resume` can reuse it after worktree cleanup.
 
 The `05-reviewChanges.md` walkthrough shows the changed code lines,
@@ -76,9 +73,7 @@ and that stage's result. A stage that never starts has no file. The CLI prints
 the directory path when the run starts and continues to show stage output
 live. The final stage writes `05-reviewChanges.md` as the only Markdown file
 in the run directory. The code review, security review, and risk classification
-output stays in their stage logs. The standalone `review` command does not run
-the final stage. It creates execution logs only when security review is enabled
-with `stages.securityReview.saveFindings: true`.
+output stays in their stage logs.
 
 The first four stage logs identify the configured agent and model and where
 each value came from. A [stage override](configuration.md#stage-agents-and-models) names its

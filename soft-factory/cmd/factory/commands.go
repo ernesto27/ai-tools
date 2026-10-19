@@ -30,18 +30,6 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.filePrompt")
 
-	root.AddCommand(&cobra.Command{
-		Use:   "review",
-		Short: "Run code review, security review, and risk classification on existing changes.",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := optionsFrom(cmd, false)
-			if err != nil {
-				return err
-			}
-			return run(opts)
-		},
-	})
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newUpdateCmd())
 	root.AddCommand(newContinueCmd(run))

@@ -111,13 +111,13 @@ Omitting the property or using `[]` runs every stage as before:
 }
 ```
 
-| Stage | Default workflow | `review` | `continue` |
-| --- | --- | --- | --- |
-| `implementation` | Yes | No | Yes |
-| `codeReview` | Yes | Yes | Yes |
-| `securityReview` | Yes | Yes | Yes |
-| `riskClassification` | Yes | Yes | Yes |
-| `reviewChanges` | Yes | No | Yes |
+| Stage | Default workflow | `continue` |
+| --- | --- | --- |
+| `implementation` | Yes | Yes |
+| `codeReview` | Yes | Yes |
+| `securityReview` | Yes | Yes |
+| `riskClassification` | Yes | Yes |
+| `reviewChanges` | Yes | Yes |
 
 Names are exact and case-sensitive. Kebab-case names such as
 `security-review`, other spellings, blank or padded names, `null`, and
@@ -128,7 +128,7 @@ Error: validate factory configuration: disabledStages[0]: unknown stage "securit
 ```
 
 Duplicates are allowed. Listing a stage that the selected command never runs,
-such as `implementation` with `review`, has no effect. Each skipped stage
+such as `implementation` with `continue`, has no effect. Each skipped stage
 prints `Skipping disabled stage: <name>` and, in the default workflow and
 `continue`, adds that line to `summary.log`. Skipped stages start no agent,
 create no stage log or report, and do not load their configured custom skill,
@@ -197,7 +197,7 @@ Example for a local task:
 }
 ```
 
-Choose a new branch name for each new task. For review-only runs, use an existing sandbox branch in `resume.branch`; list available branches with `agent-sandbox worktree-list`.
+Choose a new branch name for each new task. For `continue`, use an existing sandbox branch in `resume.branch`; list available branches with `agent-sandbox worktree-list`.
 
 Example for a Jira task, where `--jira` supplies the task instead of a local file:
 
@@ -288,7 +288,7 @@ go build -o /tmp/software-factory ./cmd/factory
 install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
 ```
 
-Run `software-factory` or `software-factory review` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
+Run `software-factory` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
 
 Run `software-factory -v` or `software-factory --version` to print the binary's release tag. Binaries built locally without an injected release tag print `dev`. These flags do not require configuration files.
 
@@ -323,8 +323,7 @@ and that stage's result. A stage that never starts has no file. The CLI prints
 the directory path when the run starts and continues to show stage output
 live. The final stage writes `05-review-changes.md` as the only Markdown file
 in the default run directory. The code review, security review, and risk classification
-output stays in their stage logs. The standalone `review` command does not run
-the final stage or create these logs; its three reports remain in `docs/`.
+output stays in their stage logs.
 
 Each review stage allows up to three rounds. Reviews require reviewer and fixer subagents; unavailable subagents or incomplete necessary verification are reported as **BLOCKED**.
 
@@ -335,26 +334,14 @@ flowchart TD
     Task[Local task file or Jira issue] --> Context[Add local documents and Google Docs]
     Context --> Mode{Command}
     Mode -->|Default| Implement[Implement task in sandbox worktree]
-    Mode -->|review| Code[Code review and corrections]
     Implement --> Code
     Code --> Security[Security review and corrections]
     Security --> Risk[Classify final risk]
     Risk -->|Default workflow| Changes[Explain final changes]
-    Risk -->|review command| ReviewReports[Reports in terminal and docs/]
     Changes --> DefaultReports[Reports in terminal and logs/]
 ```
 
 Each code or security review follows **review → corrections when needed → verification**, with up to three rounds. Failures before the final walkthrough stop the workflow. A walkthrough failure warns and does not change the exit status.
-
-## Review existing changes
-
-Skip implementation and review the changes in the sandbox worktree selected by `resume.branch`:
-
-```bash
-go run ./cmd/factory review
-```
-
-This command can modify files to correct review findings.
 
 ## Use a Jira task
 
@@ -362,12 +349,6 @@ Set `JIRA_EMAIL` and `JIRA_API_TOKEN` in your environment or in a local `.env` f
 
 ```bash
 go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123'
-```
-
-To review existing changes against a Jira task:
-
-```bash
-go run ./cmd/factory --jira 'https://your-company.atlassian.net/browse/ENG-123' review
 ```
 
 The issue summary and description replace the local task for every stage. Comments and attachments are not included. Supporting documents still apply, and `software-factory.json` is still required.
@@ -421,9 +402,6 @@ See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions
 Reports appear in the terminal. The default workflow saves the code review,
 security review, and risk classification output in their `.log` files, and
 only the final walkthrough as `logs/<run>/05-review-changes.md`.
-The standalone `review` command saves its three reports as timestamped
-Markdown files in `docs/` because it has no run log directory.
-
 The default workflow's `05-review-changes.md` shows the changed code lines,
 file-by-file explanations, findings, and flow diagrams. Terminal setup and
 command output from that final stage are shown live but are not saved in the

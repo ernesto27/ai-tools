@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -34,26 +33,6 @@ type StageConfig struct {
 type SecurityReviewConfig struct {
 	StageConfig
 	SaveFindings bool `json:"saveFindings,omitempty"`
-}
-
-func (c *SecurityReviewConfig) UnmarshalJSON(data []byte) error {
-	type plain SecurityReviewConfig
-	var raw struct {
-		SaveFindings json.RawMessage `json:"saveFindings"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	valueText := string(bytes.TrimSpace(raw.SaveFindings))
-	if raw.SaveFindings != nil && valueText != "true" && valueText != "false" {
-		return fmt.Errorf("stages.securityReview.saveFindings must be a boolean")
-	}
-	var value plain
-	if err := json.Unmarshal(data, &value); err != nil {
-		return err
-	}
-	*c = SecurityReviewConfig(value)
-	return nil
 }
 
 type StagesConfig struct {

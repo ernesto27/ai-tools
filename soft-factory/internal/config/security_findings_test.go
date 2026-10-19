@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
 func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 	for _, tc := range []struct {
-		value         string
-		want, invalid bool
+		value   string
+		want    bool
+		invalid bool
 	}{
 		{"", false, false}, {"false", false, false}, {"true", true, false},
-		{"null", false, true}, {`"true"`, false, true}, {"1", false, true}, {"[]", false, true}, {"{}", false, true},
+		{"null", false, false}, {`"true"`, false, true}, {"1", false, true}, {"[]", false, true}, {"{}", false, true},
 	} {
 		t.Run("value="+tc.value, func(t *testing.T) {
 			property := ""
@@ -28,8 +28,8 @@ func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 			}
 			cfg, err := Load(path)
 			if tc.invalid {
-				if err == nil || !strings.Contains(err.Error(), "stages.securityReview.saveFindings") {
-					t.Fatalf("expected named validation error, got %v", err)
+				if err == nil {
+					t.Fatal("expected native JSON type error")
 				}
 				return
 			}

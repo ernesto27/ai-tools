@@ -98,7 +98,7 @@ func Run(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 		return 0, err
 	}
 	if _, err := os.Stat(worktreeDir); err == nil {
-		return 0, fmt.Errorf("worktree path already exists: %s", worktreeDir)
+		return 0, existingWorktreeError(ctx, repo, opts.Branch, worktreeDir)
 	}
 	runtime.emit(Event{Phase: "Creating worktree"})
 	newBranch := !repo.BranchExists(opts.Branch)
@@ -201,7 +201,7 @@ func resumableWorktree(branch string) (repoWorktrees, worktreeRecord, error) {
 
 	worktree, ok := findWorktree(found.worktrees, branch)
 	if !ok {
-		return repoWorktrees{}, worktreeRecord{}, fmt.Errorf("no sandbox worktree on branch %s; run worktree-list to see the ones there are", branch)
+		return repoWorktrees{}, worktreeRecord{}, missingWorktreeError(branch)
 	}
 
 	if _, err := os.Stat(worktree.Path); err != nil {
@@ -211,10 +211,6 @@ func resumableWorktree(branch string) (repoWorktrees, worktreeRecord, error) {
 		return repoWorktrees{}, worktreeRecord{}, err
 	}
 	return found, worktree, nil
-}
-
-func staleWorktreeError(worktree worktreeRecord) error {
-	return fmt.Errorf("sandbox worktree %s at %s is stale; run worktree-delete -b %s to remove its record", worktree.Branch, worktree.Path, worktree.Branch)
 }
 
 // undoWorktree removes a worktree the run has just created, for the failure

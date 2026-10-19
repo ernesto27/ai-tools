@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 )
 
 type Client struct {
@@ -63,7 +65,7 @@ func (c *Client) MatchesRemote(remote string) bool {
 
 func (c *Client) Validate(ctx context.Context) error {
 	if _, err := exec.LookPath("gh"); err != nil {
-		return fmt.Errorf("--pr requires GitHub CLI (gh) on the host: %w", err)
+		return clierror.MissingDependency("gh", "publish pull requests", err)
 	}
 	if _, err := c.command(ctx, nil, "auth", "status", "--active", "--hostname", c.host); err != nil {
 		return fmt.Errorf("checking GitHub authentication; run gh auth login --hostname %s: %w", c.host, err)

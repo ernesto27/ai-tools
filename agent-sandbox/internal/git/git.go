@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 )
 
 // Repo is a git repository addressed by one of its working directories.
@@ -27,6 +29,9 @@ func Open(dir string) (*Repo, error) {
 
 	root, err := repo.output("rev-parse", "--show-toplevel")
 	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, clierror.MissingDependency("git", "inspect the repository", err)
+		}
 		return nil, fmt.Errorf("%s is not inside a Git repository", dir)
 	}
 

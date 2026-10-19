@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/config"
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
@@ -162,7 +163,19 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 // readLocalConfig validates both supported sections even though only one is
 // applied. This catches misspellings when a user first runs either command;
 // worktree management verbs never call this function.
-func readLocalConfig() (config.Config, error) {
+func readLocalConfig() (cfgResult config.Config, resultErr error) {
+	defer func() {
+		if resultErr != nil {
+			resultErr = &clierror.Error{
+				Category: clierror.Configuration,
+				Summary:  "Could not load project configuration.",
+				Details:  []clierror.Detail{{Label: "File", Value: localConfigFile}},
+				Hints:    []string{"Check the file permissions and correct the JSON syntax or field described in the cause."},
+				Cause:    resultErr,
+			}
+		}
+	}()
+
 	data, err := os.ReadFile(localConfigFile)
 	if errors.Is(err, os.ErrNotExist) {
 		return config.Config{}, nil

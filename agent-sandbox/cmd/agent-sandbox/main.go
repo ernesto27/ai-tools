@@ -14,15 +14,11 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
-
-	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
 func main() {
@@ -46,26 +42,6 @@ func main() {
 }
 
 func fail(cmd *cobra.Command, err error) {
-	var usageErr sandbox.UsageError
-	if errors.As(err, &usageErr) {
-		if message := usageErr.Error(); message != "" {
-			fmt.Fprintf(os.Stderr, "error: %s\n", message)
-		}
-		fmt.Fprint(os.Stderr, cmd.UsageString())
-		os.Exit(sandbox.ExitUsage)
-	}
-
-	if errors.Is(err, context.Canceled) {
-		fmt.Fprintln(os.Stderr, "interrupted; the container was stopped")
-		os.Exit(sandbox.ExitInterrupted)
-	}
-
-	fmt.Fprintf(os.Stderr, "error: %s\n", err)
-
-	status := sandbox.ExitFailure
-	var statusErr sandbox.StatusError
-	if errors.As(err, &statusErr) {
-		status = statusErr.Status
-	}
-	os.Exit(status)
+	width, color := errorTerminal(os.Stderr)
+	os.Exit(reportError(cmd, os.Stderr, err, width, color))
 }

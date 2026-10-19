@@ -31,6 +31,14 @@ cmd/agent-sandbox -> config
   [models.go](../cmd/agent-sandbox/models.go) owns the model browser's terminal
   layout, provider selection, and asynchronous OpenRouter requests. Request
   identifiers prevent older responses from replacing a newer selection.
+- [internal/clierror](../internal/clierror/error.go) carries structured error
+  categories, summaries, details, recovery hints, and wrapped causes without
+  printing or invoking commands. The CLI's
+  [error_output.go](../cmd/agent-sandbox/error_output.go) renders plain-command
+  failures to stderr with terminal-aware color and wrapping. Existing usage and
+  exit-status handling remain in the CLI; TUI final output retains its format.
+  Sandbox, Git, GitHub, and configuration code annotate the initial worktree,
+  missing executable, and configuration cases where facts are available.
 - [config](../config/config.go) exposes the public `Config` and `Section` JSON
   types and a `DefaultModel` accessor backed by `internal/agent`. The CLI owns
   file loading, validation, reviewer normalization, and flag merging.

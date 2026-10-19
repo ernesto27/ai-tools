@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 )
 
 // worktreeLock holds the advisory lock that gives one resumed agent exclusive
@@ -28,7 +30,13 @@ func lockWorktree(worktree worktreeRecord) (*worktreeLock, error) {
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		file.Close()
 		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
-			return nil, fmt.Errorf("sandbox worktree %s is already in use by another session", worktree.Branch)
+			return nil, &clierror.Error{
+				Category: clierror.Worktree,
+				Summary:  "The worktree is already in use.",
+				Details:  []clierror.Detail{{Label: "Branch", Value: worktree.Branch}, {Label: "Path", Value: worktree.Path}},
+				Hints:    []string{"Finish or stop the session using this worktree, then retry. Do not delete its lock file."},
+				Cause:    fmt.Errorf("sandbox worktree %s is already in use by another session", worktree.Branch),
+			}
 		}
 		return nil, fmt.Errorf("locking sandbox worktree %s: %w", worktree.Path, err)
 	}

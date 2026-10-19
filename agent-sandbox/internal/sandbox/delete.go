@@ -19,7 +19,7 @@ func WorktreeDelete(branch string, force bool, out io.Writer) error {
 
 	worktree, ok := findWorktree(found.worktrees, branch)
 	if !ok {
-		return fmt.Errorf("no sandbox worktree on branch %s; run worktree-list to see the ones there are", branch)
+		return missingWorktreeError(branch)
 	}
 
 	executionDir, err := os.Getwd()

@@ -1,8 +1,10 @@
 package sandbox
 
 import (
-	"fmt"
+	"errors"
 	"os/exec"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 )
 
 // OpenWorktree finds a sandbox-created worktree in the current repository and
@@ -15,8 +17,12 @@ func OpenWorktree(branch string) error {
 
 	worktree, exists := findWorktree(found.worktrees, branch)
 	if !exists {
-		return fmt.Errorf("no sandbox worktree on branch %s; run worktree-list to see the ones there are", branch)
+		return missingWorktreeError(branch)
 	}
 
-	return exec.Command("code", worktree.Path).Run()
+	err = exec.Command("code", worktree.Path).Run()
+	if errors.Is(err, exec.ErrNotFound) {
+		return clierror.MissingDependency("code", "open the worktree in VS Code", err)
+	}
+	return err
 }

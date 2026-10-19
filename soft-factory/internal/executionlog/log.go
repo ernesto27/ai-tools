@@ -26,8 +26,6 @@ const (
 	CommandRun = "run"
 	// CommandContinue identifies a continued workflow invocation.
 	CommandContinue = "continue"
-	// CommandReview identifies a standalone review with execution logs.
-	CommandReview = "review"
 
 	statusInterrupted = "INTERRUPTED"
 	statusFailed      = "FAILED"
@@ -74,14 +72,14 @@ type Run struct {
 }
 
 // NewRun initializes a private invocation directory under the branch's log folder.
-// command identifies the invocation as "run", "continue", or "review".
+// command identifies the invocation as "run" or "continue".
 // planned lists, in order, the stage labels this run will execute; stages
 // disabled for the run are omitted from the header.
 func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 	if strings.TrimSpace(branch) == "" {
 		return nil, fmt.Errorf("execution log requires a branch")
 	}
-	if command != CommandRun && command != CommandContinue && command != CommandReview {
+	if command != CommandRun && command != CommandContinue {
 		return nil, fmt.Errorf("unsupported execution log command %q", command)
 	}
 	workingDirectory, err := os.Getwd()
@@ -121,14 +119,6 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 		stageStatus.Close()
 		return nil, fmt.Errorf("write summary header: %w", writeErr)
 	}
-	if command == CommandReview {
-		if err := os.WriteFile(filepath.Join(path, "command.txt"), []byte(CommandReview+"\n"), 0600); err != nil {
-			file.Close()
-			stageStatus.Close()
-			return nil, fmt.Errorf("save review invocation command: %w", err)
-		}
-	}
-
 	return &Run{
 			path:        path,
 			header:      header,

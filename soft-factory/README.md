@@ -159,7 +159,7 @@ Continue using Agent Sandbox's existing host authentication.
 settings and Agent Sandbox applies defaults and command requirements. A missing
 local task path may still cause a contextual Factory file-read error. The
 original local task always comes from `agentSandbox.run.filePrompt`, including
-continuation, standalone review, and recovery, unless `--jira` supplies it.
+continuation and recovery, unless `--jira` supplies it.
 
 ### `agentSandbox`: agent and task
 

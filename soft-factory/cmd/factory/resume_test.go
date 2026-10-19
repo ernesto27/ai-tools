@@ -28,7 +28,7 @@ func TestResumeStartingStage(t *testing.T) {
 				if opts.StartStage != tc.want {
 					t.Errorf("stage = %q; want %q", opts.StartStage, tc.want)
 				}
-				if opts.ResumePath != path || !opts.Continue || !opts.Implement {
+				if opts.ResumePath != path || !opts.Continue {
 					t.Errorf("unexpected options: %+v", opts)
 				}
 				return nil

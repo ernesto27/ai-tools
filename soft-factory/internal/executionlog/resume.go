@@ -11,22 +11,6 @@ import (
 	"soft-factory/internal/config"
 )
 
-// IsReviewRun preserves the stage scope of newly logged standalone reviews.
-// Older implementation workflows have no command marker.
-func IsReviewRun(path string) (bool, error) {
-	data, err := os.ReadFile(filepath.Join(path, "command.txt"))
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("read invocation command: %w", err)
-	}
-	if strings.TrimSpace(string(data)) != CommandReview {
-		return false, fmt.Errorf("invalid invocation command in %q", path)
-	}
-	return true, nil
-}
-
 // OpenRun reopens the supplied log directory without creating a new invocation.
 func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 	path, err := RunPath(path)

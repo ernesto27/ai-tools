@@ -19,7 +19,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := optionsFrom(cmd, true)
+			opts, err := optionsFrom(cmd)
 			if err != nil {
 				return err
 			}
@@ -37,7 +37,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	return root
 }
 
-func optionsFrom(cmd *cobra.Command, implement bool) (workflowOptions, error) {
+func optionsFrom(cmd *cobra.Command) (workflowOptions, error) {
 	flags := cmd.Flags()
 	issueURL, err := flags.GetString("jira")
 	if err != nil {
@@ -46,5 +46,5 @@ func optionsFrom(cmd *cobra.Command, implement bool) (workflowOptions, error) {
 	if flags.Changed("jira") && strings.TrimSpace(issueURL) == "" {
 		return workflowOptions{}, fmt.Errorf("--jira requires a non-empty issue URL")
 	}
-	return workflowOptions{IssueURL: issueURL, Implement: implement}, nil
+	return workflowOptions{IssueURL: issueURL}, nil
 }

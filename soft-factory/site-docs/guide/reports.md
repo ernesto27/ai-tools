@@ -136,8 +136,6 @@ for each collected attempt. Risk classification receives the unapplied findings
 as evidence and must not describe them as fixed.
 
 Each executed attempt gets its own appended summary entry and fresh report.
-Logged standalone review invocations also save `command.txt` so recovery keeps
-implementation and the final walkthrough out of that workflow.
 Resume preserves historical entries; an already successful security stage that
 is skipped during recovery gets no new entry. Collection or summary-write
 failures warn without enabling corrections or commits. Collected archives are

@@ -1,7 +1,6 @@
 package executionlog
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"

@@ -25,6 +25,7 @@ All property names use lower camelCase, including nested properties. These are a
 | `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
 | `stages` | Optional agent and model overrides for individual stages. See [Stage agents and models](#stage-agents-and-models). |
 | `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
+| `stages.securityReview.saveFindings` | Optional boolean; `true` saves security findings and suggested fixes without applying corrections or committing. Defaults to `false`. |
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
 | `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
@@ -105,13 +106,13 @@ Omitting the property or using `[]` runs every stage as before:
 }
 ```
 
-| Stage | Default workflow | `review` | `continue` |
-| --- | --- | --- | --- |
-| `implementation` | Yes | No | Yes |
-| `codeReview` | Yes | Yes | Yes |
-| `securityReview` | Yes | Yes | Yes |
-| `riskClassification` | Yes | Yes | Yes |
-| `reviewChanges` | Yes | No | Yes |
+| Stage | Default workflow | `continue` |
+| --- | --- | --- |
+| `implementation` | Yes | Yes |
+| `codeReview` | Yes | Yes |
+| `securityReview` | Yes | Yes |
+| `riskClassification` | Yes | Yes |
+| `reviewChanges` | Yes | Yes |
 
 Names are exact and case-sensitive. Kebab-case names such as
 `security-review`, other spellings, blank or padded names, `null`, and
@@ -122,9 +123,9 @@ Error: validate factory configuration: disabledStages[0]: unknown stage "securit
 ```
 
 Duplicates are allowed. Listing a stage that the selected command never runs,
-such as `implementation` with `review`, has no effect. Each skipped stage
-prints `Skipping disabled stage: <name>` and, in the default workflow and
-`continue`, adds that line to `summary.log`. Skipped stages start no agent,
+such as `implementation` with `continue`, has no effect. Each skipped stage
+prints `Skipping disabled stage: <name>` and, when execution logging is enabled,
+adds that line to `summary.log`. Skipped stages start no agent,
 create no stage log or report, and do not load their configured custom skill,
 so a missing skill file does not block a disabled stage. Skill names are still
 validated.
@@ -193,7 +194,7 @@ model. When changing agents, ensure any inherited model is compatible with
 the new agent, or set both fields.
 
 The default workflow inherits `run` settings for implementation and `resume`
-settings for later stages. `continue`, `review`, and `resume <path>` inherit `resume` settings.
+settings for later stages. `continue` and `resume <path>` inherit `resume` settings.
 Soft Factory resolves supported embedded settings into command-line arguments.
 Stage agent and model overrides are independent and take priority over the
 applicable section, then shared `agentSandbox` fields, then Agent Sandbox defaults.
@@ -201,6 +202,39 @@ Factory-generated prompts replace both section `query` and `filePrompt`; workflo
 controls such as the risk stage's `push=false` and `pr=false` take priority too.
 Explicit section false values, empty strings, and empty lists override shared
 values. Lists are resolved before repeatable `--file` and `--image` flags are expanded.
+
+### Save security findings without corrections
+
+Merge this into your existing local `software-factory.json`:
+
+```json
+{
+  "stages": {
+    "securityReview": {
+      "saveFindings": true
+    }
+  }
+}
+```
+
+`saveFindings` is a Factory-owned option for security review only. It accepts
+JSON `true` or `false`; explicit null, strings, numbers, arrays, and objects
+are rejected with an error naming `stages.securityReview.saveFindings`.
+Omitting it or setting it to `false` preserves automatic security corrections.
+Existing stage `agent` and `model` assignments keep their usual precedence.
+
+When enabled, security review performs one pass using the bundled security
+criteria, configured custom skill, task changes, and supporting documents.
+It reports findings and suggested fixes without editing task files, staging,
+committing, pushing, or opening a PR. These restrictions also apply to delegated
+reviewers and take precedence over requests in custom skills. Factory overrides
+both sandbox `push` and `pr` to `false` for this stage, selecting the sandbox's
+no-commit instructions. Other stages retain their configured behavior.
+
+The current invocation's `summary.log` includes the findings, recommendations,
+review verdict, checks, and verification gaps. Findings alone do not fail a
+successful execution or stop later enabled stages. Execution failures and
+interruptions retain normal recovery behavior. See [Reports](reports.md).
 
 ### Sandbox settings transport
 
@@ -217,17 +251,17 @@ Continue using Agent Sandbox's existing host authentication.
 settings and Agent Sandbox applies defaults and command requirements. A missing
 local task path may still cause a contextual Factory file-read error. The
 original local task always comes from `agentSandbox.run.filePrompt`, including
-continuation, standalone review, and recovery, unless `--jira` supplies it.
+continuation and recovery, unless `--jira` supplies it.
 
 ### `agentSandbox`: defaults and task
 
 The default workflow uses `run` settings for implementation and `resume`
-settings for later stages. `continue`, `review`, and `resume <path>` use
+settings for later stages. `continue` and `resume <path>` use
 `resume` settings.
 The [stage overrides](#stage-agents-and-models) take priority over agent and
 model defaults from this file.
 Soft Factory selects one branch for every stage: `run.branch` for the default
-workflow, or `resume.branch` for `review`, `continue`, and `resume <path>`.
+workflow, or `resume.branch` for `continue` and `resume <path>`.
 It overrides the branch in each Agent Sandbox invocation. Set both branches to the same value when
 you want to review or continue the task you just implemented.
 
@@ -263,7 +297,7 @@ Example for a local task:
 }
 ```
 
-Choose a new `run.branch` for each new task. For `review` or `continue`, use an
+Choose a new `run.branch` for each new task. For `continue`, use an
 existing sandbox branch in `resume.branch`; list available branches with
 `agent-sandbox worktree-list`. Even for `continue`, the local task is read from
 `run.filePrompt` unless you supply `--jira`.
@@ -302,7 +336,7 @@ Common settings in either section:
 | Option | Purpose |
 | --- | --- |
 | `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
-| `branch` | `run.branch` selects the default workflow's worktree; `resume.branch` selects the worktree for `review` and `continue`. All stages use that selected branch. |
+| `branch` | `run.branch` selects the default workflow's worktree; `resume.branch` selects the worktree for `continue`. All stages use that selected branch. |
 | `filePrompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
 | `baseImage` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |

@@ -15,15 +15,14 @@ func TestWorkflowBranch(t *testing.T) {
 		want     string
 		wantErr  bool
 	}{
-		{"implementation", workflowOptions{Implement: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "new-task", false},
-		{"review only", workflowOptions{}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
-		{"continuation", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
-		{"missing resume branch", workflowOptions{Implement: true, Continue: true}, `{"run":{"branch":"new-task"}}`, "", false},
-		{"missing run section", workflowOptions{Implement: true}, `{}`, "", false},
-		{"null branch", workflowOptions{Implement: true}, `{"run":{"branch":null}}`, "", false},
-		{"empty branch", workflowOptions{Implement: true}, `{"run":{"branch":""}}`, "", false},
-		{"decode failure", workflowOptions{Implement: true}, `{"run":{"branch":123}}`, "", true},
-		{"blank resume branch", workflowOptions{Implement: true, Continue: true}, `{"resume":{"branch":" "}}`, " ", false},
+		{"default workflow", workflowOptions{}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "new-task", false},
+		{"continuation", workflowOptions{Continue: true}, `{"run":{"branch":"new-task"},"resume":{"branch":"old-task"}}`, "old-task", false},
+		{"missing resume branch", workflowOptions{Continue: true}, `{"run":{"branch":"new-task"}}`, "", false},
+		{"missing run section", workflowOptions{}, `{}`, "", false},
+		{"null branch", workflowOptions{}, `{"run":{"branch":null}}`, "", false},
+		{"empty branch", workflowOptions{}, `{"run":{"branch":""}}`, "", false},
+		{"decode failure", workflowOptions{}, `{"run":{"branch":123}}`, "", true},
+		{"blank resume branch", workflowOptions{Continue: true}, `{"resume":{"branch":" "}}`, " ", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -54,11 +53,11 @@ func TestWorkflowBranchPresence(t *testing.T) {
 		if err := json.Unmarshal([]byte(`{"agentSandbox":`+tc.settings+`}`), &cfg); err != nil {
 			t.Fatal(err)
 		}
-		branch, set := workflowBranch(cfg, workflowOptions{Implement: true})
+		branch, set := workflowBranch(cfg, workflowOptions{})
 		if branch != "" || set != tc.wantSet {
 			t.Fatalf("branch presence for %s = %q, %t", tc.settings, branch, set)
 		}
-		branch, set = workflowBranch(cfg, workflowOptions{Implement: true, Branch: "explicit"})
+		branch, set = workflowBranch(cfg, workflowOptions{Branch: "explicit"})
 		if branch != "explicit" || !set {
 			t.Fatal("explicit branch override lost")
 		}

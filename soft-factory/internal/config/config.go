@@ -28,12 +28,19 @@ type StageConfig struct {
 	Model string `json:"model,omitempty"`
 }
 
+// SecurityReviewConfig keeps Factory's reporting option out of sandbox settings
+// and out of the other stages.
+type SecurityReviewConfig struct {
+	StageConfig
+	SaveFindings bool `json:"saveFindings,omitempty"`
+}
+
 type StagesConfig struct {
-	Implementation     StageConfig `json:"implementation"`
-	CodeReview         StageConfig `json:"codeReview"`
-	SecurityReview     StageConfig `json:"securityReview"`
-	RiskClassification StageConfig `json:"riskClassification"`
-	ReviewChanges      StageConfig `json:"reviewChanges"`
+	Implementation     StageConfig          `json:"implementation"`
+	CodeReview         StageConfig          `json:"codeReview"`
+	SecurityReview     SecurityReviewConfig `json:"securityReview"`
+	RiskClassification StageConfig          `json:"riskClassification"`
+	ReviewChanges      StageConfig          `json:"reviewChanges"`
 }
 
 // Stage is a public, case-sensitive pipeline stage identifier.

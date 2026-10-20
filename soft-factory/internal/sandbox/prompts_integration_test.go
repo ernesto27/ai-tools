@@ -77,6 +77,9 @@ func TestPromptSandboxHelper(t *testing.T) {
 	// Emulate agent-authored reports in the host worktree, never /workspace itself.
 	for _, path := range regexp.MustCompile(`/workspace/\.soft-factory-[A-Za-z0-9._-]+`).FindAllString(capture.Prompt, -1) {
 		content := "No code changes made.\n"
+		if strings.HasSuffix(path, "-review.txt") && os.Getenv("SOFT_FACTORY_SECURITY_REPORT") != "" {
+			content = os.Getenv("SOFT_FACTORY_SECURITY_REPORT")
+		}
 		if strings.HasPrefix(filepath.Base(path), ".soft-factory-risk-result-") && strings.HasSuffix(path, ".json") {
 			content = `{"classification":"LOW"}`
 		}

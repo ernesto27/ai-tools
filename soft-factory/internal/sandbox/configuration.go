@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	sandboxconfig "github.com/ernesto27/ai-tools/agent-sandbox/config"
+
+	"soft-factory/internal/config"
 )
 
 // sandboxArgs forwards configured settings unless Factory supplies an override.
@@ -83,5 +85,11 @@ func sandboxArgs(options ExecuteOptions) []string {
 	addString("filePrompt", "", section.FilePrompt)
 	addString("commitMessage", "", section.CommitMessage)
 	addList("image", nil, section.Image)
+	if options.Stage == config.StageSecurityReview && options.Config.Stages.SecurityReview.SaveFindings {
+		// In the pinned sandbox, FullPrompt requests commits when PR OR Push
+		// is true. With both false it explicitly forbids staging and commits;
+		// publishResult also skips publication. Override at the final boundary.
+		args = append(args, "--push=false", "--pr=false")
+	}
 	return args
 }

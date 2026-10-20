@@ -37,9 +37,7 @@ func main() {
 
 // workflowOptions holds the parsed command-line inputs for one workflow run.
 type workflowOptions struct {
-	IssueURL string
-	// Implement runs the implementation stage before the reviews.
-	Implement  bool
+	IssueURL   string
 	Continue   bool
 	ResumePath string
 	StartStage config.Stage
@@ -96,26 +94,24 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 
 	branch, branchSet := workflowBranch(cfg, opts)
 	var runLog *executionlog.Run
-	if opts.Implement {
-		command := executionlog.CommandRun
-		if opts.Continue {
-			command = executionlog.CommandContinue
-		}
-		var err error
+	command := executionlog.CommandRun
+	if opts.Continue {
+		command = executionlog.CommandContinue
+	}
+	planned := plannedStages(cfg)
+	if opts.ResumePath != "" {
+		runLog, err = executionlog.OpenRun(opts.ResumePath, branch, planned)
+	} else {
+		runLog, err = executionlog.NewRun(branch, command, planned)
+	}
+	if err != nil {
 		if opts.ResumePath != "" {
-			runLog, err = executionlog.OpenRun(opts.ResumePath, branch, plannedStages(cfg))
-		} else {
-			runLog, err = executionlog.NewRun(branch, command, plannedStages(cfg))
+			return fmt.Errorf("open recovery logs: %w", err)
 		}
-		if err != nil {
-			if opts.ResumePath != "" {
-				return fmt.Errorf("open recovery logs: %w", err)
-			}
-			fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
-		} else {
-			fmt.Printf("Execution logs: %s\n", runLog.Path())
-			defer func() { runLog.Finish(runErr) }()
-		}
+		fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
+	} else {
+		fmt.Printf("Execution logs: %s\n", runLog.Path())
+		defer func() { runLog.Finish(runErr) }()
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -145,7 +141,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		Config:       cfg,
 	}
 
-	if opts.Implement && shouldRun(config.StageImplementation) {
+	if shouldRun(config.StageImplementation) {
 		if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
 			return sandbox.Run(input)
 		}); err != nil {
@@ -165,6 +161,9 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		{config.StageSecurityReview, "\nStarting security review and corrections...", sandbox.SecurityReview},
 	}
 	for _, review := range reviews {
+		if review.stage == config.StageSecurityReview && cfg.Stages.SecurityReview.SaveFindings {
+			review.message = "\nStarting security review (save findings; no corrections)..."
+		}
 		if cfg.StageDisabled(review.stage) {
 			disabledReviews = append(disabledReviews, review.stage)
 		}
@@ -202,7 +201,7 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		// Risk classification normally removes this run's review reports.
 		sandbox.RemoveReviewReports(input, reports)
 	}
-	if !opts.Implement || !shouldRun(config.StageReviewChanges) {
+	if !shouldRun(config.StageReviewChanges) {
 		return nil
 	}
 	if err := input.Context.Err(); err != nil {
@@ -231,7 +230,7 @@ func workflowBranch(cfg config.Config, opts workflowOptions) (string, bool) {
 	}
 	settings := cfg.AgentSandbox
 	section := settings.Resume
-	if opts.Implement && !opts.Continue {
+	if !opts.Continue {
 		section = settings.Run
 	}
 	if section != nil && section.Branch != nil {

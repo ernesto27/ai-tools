@@ -12,7 +12,7 @@ func newContinueCmd(run func(workflowOptions) error) *cobra.Command {
 		Short: "Continue work in the agentSandbox.resume.branch in software-factory.json",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := optionsFrom(cmd, true)
+			opts, err := optionsFrom(cmd)
 			if err != nil {
 				return err
 			}

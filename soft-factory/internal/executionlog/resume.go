@@ -65,6 +65,13 @@ func (r *Run) ArchiveReview(stage config.Stage, source string) error {
 	if stage != config.StageCodeReview && stage != config.StageSecurityReview {
 		return fmt.Errorf("invalid review stage %q", stage)
 	}
+	info, err := os.Lstat(source)
+	if err != nil {
+		return fmt.Errorf("inspect review evidence: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("review evidence must be a regular file")
+	}
 	data, err := os.ReadFile(source)
 	if err != nil {
 		return fmt.Errorf("read review evidence: %w", err)

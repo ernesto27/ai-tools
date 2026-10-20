@@ -2,7 +2,12 @@ package sandbox
 
 const verificationInstructions = `
 
-Before finishing, attempt verification appropriate to the task and actual changes.
+At the start of the current session, note the existing project state, including any uncommitted and untracked files, so you can distinguish your changes from earlier work.
+Before committing or finishing, determine whether this session made net changes to project files (additions, edits, or deletions) compared with that starting state. Earlier commits, pre-existing uncommitted changes, staging or committing earlier work, verification artifacts, and routine generated build output do not count. Edits fully reverted during this session do not count.
+If this session made no net project changes, skip automatic verification and do not create or update .agent-sandbox-verification/ or any logs, reports, or screenshots. Leave evidence from earlier sessions untouched and report that verification was skipped because this session made no changes.
+Apply the remaining verification instructions only when this session made net project changes.
+
+Before finishing, attempt verification appropriate to this session's changes.
 Use project-specific tests, builds, functional checks, infrastructure validation or dry runs, documentation checks, or other relevant checks.
 For UI changes, use browser assertions and screenshots where possible. Non-UI tasks do not require screenshots, and a screenshot alone does not prove functional correctness.
 

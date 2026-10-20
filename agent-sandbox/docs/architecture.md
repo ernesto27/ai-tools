@@ -173,6 +173,17 @@ selects their derived images.
 Default and derived images install Poppler PDF tools at build time, without
 a runtime probe or rebuild fallback for missing PDF tools. Derived tags hash
 the Dockerfile template.
+The same Dockerfile installs distribution Chromium, fonts, and Puppeteer Core
+25.15.0 under `/opt/agent-sandbox-browser` (Node >=22.12.0). Base-image package
+repositories must provide Chromium and fonts. The `agent-sandbox-browser` helper
+takes a URL, PNG output path, and optional required selector; custom assertions
+can import `launch` from `/opt/agent-sandbox-browser/browser.cjs`. Each browser
+uses a temporary writable home, removed when the browser disconnects. Chromium's
+inner sandbox is disabled within the existing Docker isolation; no additional
+container privileges are requested. Browser tools are installed only at build
+time, without runtime probes or rebuild fallbacks for older images. Rebuild an
+existing default image to pick up the updated Dockerfile.
+
 Image preparation compares the selected agent's installed version with
 `npm view <package> version` on every run or resume and rebuilds on a mismatch,
 pinning its `BuildArg` and retaining the external base when applicable.
@@ -182,6 +193,32 @@ starting the container, drains output, and stops and waits on cancellation
 using a context derived with `context.WithoutCancel`. Deferred removal also
 covers attach/start failures and unexpected wait failures. Preserve these
 orderings so an agent cannot outlive the command and hold its worktree open.
+
+## Automatic verification evidence
+
+[verification.go](../internal/sandbox/verification.go) contains instructions
+appended by `Options.FullPrompt` for all agents and plain/TUI run/resume commands.
+The agent attempts task-appropriate checks, creates
+`/workspace/.agent-sandbox-verification/`, and saves a `summary.md` containing
+checks, commands, exit codes, results, and limitations; one `verification.log`
+when there is useful output; and only useful final UI screenshots. It creates a local
+`.gitignore` containing `*` to exclude all evidence, including that ignore file,
+from normal staging. The prompt forbids staging, committing, or uploading evidence
+and asks the agent to update evidence on resume rather than accumulating copies.
+Separate exit-code files, per-command or empty logs, duplicate screenshots, and
+intermediate screenshots are not requested. Temporary verification scripts and
+intermediate artifacts created by the current execution are removed after checks;
+project files and user-provided files are left untouched.
+For web UI changes, the prompt requests retained `desktop.png` and `mobile.png`
+at 1280x800 and 390x844 viewports in the requested theme. The agent reports saved
+screenshot paths, or explains unavailable capture in the summary.
+
+Verification storage, checking, and reporting are agent-driven. The host does not
+create directories, parse reports, or add publication checks. Failed or unavailable
+verification must not prevent completion or publication; existing agent-exit,
+cancellation, and clean-worktree behavior remains unchanged. Browser tools are
+one verification option; backend, infrastructure, documentation, and other tasks
+use relevant project checks and report missing prerequisites as limitations.
 
 ## Claude output
 

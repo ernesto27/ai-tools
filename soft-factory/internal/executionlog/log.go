@@ -556,7 +556,7 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		totalTokens = formatTokenCount(total)
 	}
 	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    	%s\n   Agent:     	%s\n   Model:     	%s\n   Duration:  	%s\n   Tokens usage:  	%s\n",
+		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n   Tokens usage:  %s\n",
 		r.summaryEntries+1,
 		stageHeading(stage),
 		status,

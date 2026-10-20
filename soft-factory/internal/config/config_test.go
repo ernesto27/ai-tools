@@ -3,10 +3,12 @@ package config
 import (
 	"encoding/json"
 	"os"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadGoogleDrive(t *testing.T) {
@@ -34,22 +36,15 @@ func TestLoadGoogleDrive(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile("software-factory.json", []byte(tc.data), 0600))
 			cfg, err := Load("software-factory.json")
 			if tc.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), "validate factory configuration:") || !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("expected configuration validation error containing %q, got %v", tc.wantErr, err)
-				}
+				require.ErrorContains(t, err, "validate factory configuration:")
+				require.ErrorContains(t, err, tc.wantErr)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(cfg.GoogleDrive, tc.want) {
-				t.Fatalf("GoogleDrive = %+v; want %+v", cfg.GoogleDrive, tc.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.GoogleDrive)
 		})
 	}
 }
@@ -61,16 +56,10 @@ func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
 				t.Chdir(t.TempDir())
 				// Marshal names to preserve backslashes in JSON.
 				data, err := json.Marshal(map[string]any{"agentSandbox": map[string]any{}, "customSkills": map[string]string{stage: name}})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile("software-factory.json", data, 0600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile("software-factory.json", data, 0600))
 				_, err = Load("software-factory.json")
-				if err == nil || !strings.Contains(err.Error(), "customSkills."+stage+" must be") {
-					t.Fatalf("expected validation error for %s = %q, got %v", stage, name, err)
-				}
+				require.ErrorContains(t, err, "customSkills."+stage+" must be")
 			})
 		}
 	}
@@ -116,29 +105,20 @@ func TestLoadDisabledStages(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("software-factory.json", []byte(tc.data), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile("software-factory.json", []byte(tc.data), 0600))
 			cfg, err := Load("software-factory.json")
 			if tc.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
-					t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
-				}
-				if !strings.Contains(tc.wantErr, "parse") && !strings.Contains(err.Error(), "validate factory configuration: disabledStages") {
-					t.Fatalf("error %q does not identify disabledStages validation", err)
+				require.ErrorContains(t, err, tc.wantErr)
+				if !strings.Contains(tc.wantErr, "parse") {
+					require.ErrorContains(t, err, "validate factory configuration: disabledStages")
 				}
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(cfg.DisabledStages, tc.want) {
-				t.Fatalf("DisabledStages = %#v; want %#v", cfg.DisabledStages, tc.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.DisabledStages)
 			for _, stage := range Stages {
-				if got, want := cfg.StageDisabled(stage), slices.Contains(tc.want, stage); got != want {
-					t.Errorf("StageDisabled(%q) = %v; want %v", stage, got, want)
-				}
+				got, want := cfg.StageDisabled(stage), slices.Contains(tc.want, stage)
+				assert.Equal(t, want, got, "stage %s", stage)
 			}
 		})
 	}
@@ -147,12 +127,10 @@ func TestLoadDisabledStages(t *testing.T) {
 func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
 	t.Chdir(t.TempDir())
 	data := `{"agentSandbox":{},"customSkills":{"codeReview":"../escape"},"disabledStages":["codeReview"]}`
-	if err := os.WriteFile("software-factory.json", []byte(data), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load("software-factory.json"); err == nil || !strings.Contains(err.Error(), "customSkills.codeReview must be") {
-		t.Fatalf("expected custom skill validation error for disabled stage, got %v", err)
-	}
+	require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+
+	_, err := Load("software-factory.json")
+	require.ErrorContains(t, err, "customSkills.codeReview must be")
 }
 
 func TestUnifiedSandboxConfiguration(t *testing.T) {
@@ -172,25 +150,30 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("software-factory.json", []byte(tt.input), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile("software-factory.json", []byte(tt.input), 0600))
 			cfg, err := Load("software-factory.json")
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("load error = %v", err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-			if tt.name == "absent" && !strings.Contains(err.Error(), "agentSandbox is required") {
-				t.Fatalf("missing property error = %v", err)
+			if tt.name == "absent" {
+				require.ErrorContains(t, err, "agentSandbox is required")
 			}
 			if tt.name == "shared and section pointers" {
-				if cfg.AgentSandbox.Agent != "invalid-agent" || cfg.AgentSandbox.Model != "invalid-model" || cfg.AgentSandbox.Resume.Push == nil || *cfg.AgentSandbox.Resume.Push || cfg.AgentSandbox.Resume.Branch == nil || *cfg.AgentSandbox.Resume.Branch != "" || cfg.AgentSandbox.Resume.File == nil || len(*cfg.AgentSandbox.Resume.File) != 0 || cfg.Stages.Implementation.Agent != "stage-agent" {
-					t.Fatalf("lost unified settings: section pointers or Factory fields")
-				}
+				require.Equal(t, "invalid-agent", cfg.AgentSandbox.Agent)
+				require.Equal(t, "invalid-model", cfg.AgentSandbox.Model)
+				require.NotNil(t, cfg.AgentSandbox.Resume.Push)
+				require.False(t, *cfg.AgentSandbox.Resume.Push)
+				require.NotNil(t, cfg.AgentSandbox.Resume.Branch)
+				require.Empty(t, *cfg.AgentSandbox.Resume.Branch)
+				require.NotNil(t, cfg.AgentSandbox.Resume.File)
+				require.Len(t, *cfg.AgentSandbox.Resume.File, 0)
+				require.Equal(t, "stage-agent", cfg.Stages.Implementation.Agent)
 			}
 			if tt.name == "null" {
-				if cfg.AgentSandbox.Run != nil || cfg.AgentSandbox.Agent != "" {
-					t.Fatal("null sandbox settings should be empty")
-				}
+				require.Nil(t, cfg.AgentSandbox.Run)
+				require.Empty(t, cfg.AgentSandbox.Agent)
 			}
 		})
 	}
@@ -198,10 +181,8 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 
 func TestLegacyOnlyDoesNotSupplyFactoryConfig(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.WriteFile("agent-sandbox.json", []byte(`{}`), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load("software-factory.json"); err == nil {
-		t.Fatal("legacy-only project unexpectedly loaded")
-	}
+	require.NoError(t, os.WriteFile("agent-sandbox.json", []byte(`{}`), 0600))
+
+	_, err := Load("software-factory.json")
+	require.Error(t, err)
 }

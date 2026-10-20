@@ -3,14 +3,14 @@ package sandbox
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
@@ -19,9 +19,7 @@ import (
 func decodeConfig(t *testing.T, sandbox string) config.Config {
 	t.Helper()
 	var cfg config.Config
-	if err := json.Unmarshal([]byte(`{"agentSandbox":`+sandbox+`}`), &cfg); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal([]byte(`{"agentSandbox":`+sandbox+`}`), &cfg))
 	return cfg
 }
 
@@ -50,20 +48,14 @@ func TestSandboxArgumentTransport(t *testing.T) {
 			t.Setenv("SOFT_FACTORY_ARGS_ONLY", "1")
 			cfg := decodeConfig(t, tt.settings)
 			// Use execute to assert the actual argv boundary and unchanged cwd.
-			if _, err := execute(ExecuteOptions{Config: cfg, Args: tt.invocation, Branch: tt.branch, BranchSet: tt.branchSet}); err != nil {
-				t.Fatal(err)
-			}
+			_, err := execute(ExecuteOptions{Config: cfg, Args: tt.invocation, Branch: tt.branch, BranchSet: tt.branchSet})
+			require.NoError(t, err)
+
 			got := readPromptCapture(t, capturePath)
-			if !reflect.DeepEqual(got.Args, tt.want) {
-				t.Fatalf("args = %q, want %q", got.Args, tt.want)
-			}
+			require.Equal(t, tt.want, got.Args)
 			cwd, _ := os.Getwd()
-			if got.SecretInEnvironment {
-				t.Fatal("embedded secret forwarded through environment")
-			}
-			if got.Directory != cwd {
-				t.Fatalf("cwd = %q, want %q", got.Directory, cwd)
-			}
+			require.False(t, got.SecretInEnvironment)
+			require.Equal(t, cwd, got.Directory)
 			assertNoConfigArtifacts(t)
 		})
 	}
@@ -72,13 +64,9 @@ func TestSandboxArgumentTransport(t *testing.T) {
 func assertNoConfigArtifacts(t *testing.T) {
 	t.Helper()
 	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, entry := range entries {
-		if strings.Contains(entry.Name(), "agent-sandbox.json") {
-			t.Fatalf("unexpected configuration artifact: %s", entry.Name())
-		}
+		require.NotContains(t, entry.Name(), "agent-sandbox.json")
 	}
 }
 
@@ -86,40 +74,27 @@ func TestUnifiedTaskAndSelection(t *testing.T) {
 	capture := preparePromptSandbox(t)
 	cfg := decodeConfig(t, `{"agent":"shared","model":"shared-model","run":{"filePrompt":"task.txt","apiKey":"secret-run"},"resume":{"agent":"resume-agent","model":"resume-model","filePrompt":"missing.txt","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`)
 	// Changing the config on disk cannot affect the already-loaded workflow.
-	if err := os.WriteFile("software-factory.json", []byte(`{"agentSandbox":{"agent":"wrong"}}`), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile("software-factory.json", []byte(`{"agentSandbox":{"agent":"wrong"}}`), 0600))
 	log, err := executionlog.NewRun("main", executionlog.CommandContinue, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	log.StartStage(config.StageImplementation)
 	cfg.Stages.Implementation.Model = "stage-model"
-	if err := Run(TaskContext{Config: cfg, Continue: true, Branch: "main", Log: log}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, Run(TaskContext{Config: cfg, Continue: true, Branch: "main", Log: log}))
 	log.FinishStage(nil)
 	log.Finish(nil)
 	got := readPromptCapture(t, capture)
-	if !strings.HasPrefix(got.Prompt, "file task {{literal}} 100%") {
-		t.Fatalf("original run task missing: %q", got.Prompt)
-	}
+	require.True(t, strings.HasPrefix(got.Prompt, "file task {{literal}} 100%"))
 	selection, agent, model, _ := selectionDetails(cfg, "resume", config.StageImplementation, cfg.Stages.Implementation)
-	if selection.Agent != "resume-agent" || selection.Model != "stage-model" || !strings.Contains(agent, "software-factory.json: agentSandbox.resume.agent") || !strings.Contains(model, "software-factory.json: stages.implementation.model") {
-		t.Fatalf("selection = %+v, %s, %s", selection, agent, model)
-	}
+	require.Equal(t, "resume-agent", selection.Agent)
+	require.Equal(t, "stage-model", selection.Model)
+	require.Contains(t, agent, "software-factory.json: agentSandbox.resume.agent")
+	require.Contains(t, model, "software-factory.json: stages.implementation.model")
 	files, err := filepath.Glob(filepath.Join(log.Path(), "*.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, path := range files {
 		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(string(data), "secret-") {
-			t.Fatal("secret disclosed in logs")
-		}
+		require.NoError(t, err)
+		require.NotContains(t, string(data), "secret-")
 	}
 	assertNoConfigArtifacts(t)
 }
@@ -140,30 +115,25 @@ func TestExecutionFailureAndCancellation(t *testing.T) {
 				t.Setenv("PATH", t.TempDir())
 			}
 			err := Run(input)
-			if err == nil {
-				t.Fatal("expected error")
-			}
-			if mode == "cancel" && !errors.Is(err, context.Canceled) {
-				t.Fatalf("error = %v", err)
+			require.Error(t, err)
+			if mode == "cancel" {
+				require.ErrorIs(t, err, context.Canceled)
 			}
 			if mode == "child failure" {
 				var exitErr *exec.ExitError
-				if !errors.As(err, &exitErr) || exitErr.ExitCode() != 17 {
-					t.Fatalf("downstream failure lost: %v", err)
-				}
+				require.ErrorAs(t, err, &exitErr)
+				require.Equal(t, 17, exitErr.ExitCode())
 				got := readPromptCapture(t, capture)
 				for i, arg := range got.Args {
 					if arg == "-f" {
-						if _, err := os.Stat(got.Args[i+1]); !os.IsNotExist(err) {
-							t.Fatal("prompt remains")
-						}
+						_, err := os.Stat(got.Args[i+1])
+						require.ErrorIs(t, err, os.ErrNotExist)
 					}
 				}
 			}
 			prompts, globErr := filepath.Glob(filepath.Join(os.Getenv("TMPDIR"), "factory-prompt-*.txt"))
-			if globErr != nil || len(prompts) != 0 {
-				t.Fatalf("temporary prompts remain: %q, %v", prompts, globErr)
-			}
+			require.NoError(t, globErr)
+			require.Len(t, prompts, 0)
 
 			assertNoConfigArtifacts(t)
 		})
@@ -174,13 +144,11 @@ func TestMissingUnifiedTaskPath(t *testing.T) {
 	for _, settings := range []string{`null`, `{}`, `{"run":{"filePrompt":"missing task.txt"}}`} {
 		t.Run(settings, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			if err := os.WriteFile("agent-sandbox.json", []byte(`{"run":{"filePrompt":"legacy task.txt"}}`), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile("agent-sandbox.json", []byte(`{"run":{"filePrompt":"legacy task.txt"}}`), 0600))
 			_, err := buildTaskPrompt(TaskContext{Config: decodeConfig(t, settings)})
-			if err == nil || !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), "software-factory.json: agentSandbox.run.filePrompt") || strings.Contains(err.Error(), "legacy task.txt") {
-				t.Fatalf("task error = %v", err)
-			}
+			require.ErrorIs(t, err, os.ErrNotExist)
+			require.ErrorContains(t, err, "software-factory.json: agentSandbox.run.filePrompt")
+			require.NotContains(t, err.Error(), "legacy task.txt")
 		})
 	}
 }
@@ -199,10 +167,10 @@ waiting:
 	for {
 		select {
 		case err := <-result:
-			t.Fatalf("child stopped before cancellation: %v", err)
+			require.FailNow(t, "child stopped before cancellation", "%v", err)
 		case <-deadline:
 			cancel()
-			t.Fatal("child never reached capture fixture")
+			require.FailNow(t, "child never reached capture fixture")
 		case <-ticker.C:
 			if _, err := os.Stat(capture); err == nil {
 				break waiting
@@ -212,18 +180,15 @@ waiting:
 	cancel()
 	select {
 	case err := <-result:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("cancellation = %v", err)
-		}
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(5 * time.Second):
-		t.Fatal("child did not stop on interruption")
+		require.FailNow(t, "child did not stop on interruption")
 	}
 	got := readPromptCapture(t, capture)
 	for i, arg := range got.Args {
 		if arg == "-f" {
-			if _, err := os.Stat(got.Args[i+1]); !os.IsNotExist(err) {
-				t.Fatal("prompt remains after cancellation")
-			}
+			_, err := os.Stat(got.Args[i+1])
+			require.ErrorIs(t, err, os.ErrNotExist)
 		}
 	}
 	assertNoConfigArtifacts(t)

@@ -1,11 +1,13 @@
 package executionlog
 
 import (
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"soft-factory/internal/config"
 )
@@ -13,38 +15,24 @@ import (
 func TestStageStatusAppendAndReopen(t *testing.T) {
 	path := t.TempDir()
 	saved, err := NewStageStatus(path, true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { saved.Close() })
-	if err := saved.append(config.StageImplementation, StatusSucceeded); err != nil {
-		t.Fatal(err)
-	}
-	if err := saved.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, saved.append(config.StageImplementation, StatusSucceeded))
+	require.NoError(t, saved.Close())
 	saved, err = NewStageStatus(path, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	stage, status, err := saved.Last()
-	if err != nil || stage != config.StageImplementation || status != StatusSucceeded {
-		t.Fatalf("Last = %q, %q, %v", stage, status, err)
-	}
-	if err := saved.append(config.StageCodeReview, statusFailed); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, config.StageImplementation, stage)
+	require.Equal(t, StatusSucceeded, status)
+	require.NoError(t, saved.append(config.StageCodeReview, statusFailed))
 	stage, status, err = saved.Last()
-	if err != nil || stage != config.StageCodeReview || status != statusFailed {
-		t.Fatalf("Last after append = %q, %q, %v", stage, status, err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, config.StageCodeReview, stage)
+	require.Equal(t, statusFailed, status)
 	data, err := os.ReadFile(filepath.Join(path, StageStatusFilename))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) != "implementation,SUCCEEDED\ncodeReview,FAILED\n" {
-		t.Fatalf("status contents = %q", data)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "implementation,SUCCEEDED\ncodeReview,FAILED\n", string(data))
 }
 
 func TestStageStatusLast(t *testing.T) {
@@ -66,30 +54,23 @@ func TestStageStatusLast(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := t.TempDir()
-			if err := os.WriteFile(filepath.Join(path, StageStatusFilename), []byte(tc.content), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(path, StageStatusFilename), []byte(tc.content), 0600))
 			saved, err := NewStageStatus(path, false)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			t.Cleanup(func() { saved.Close() })
 			stage, status, err := saved.Last()
 			if tc.empty {
-				if !errors.Is(err, io.EOF) {
-					t.Fatalf("Last error = %v; want EOF", err)
-				}
+				require.ErrorIs(t, err, io.EOF)
 				return
 			}
 			if tc.invalid {
-				if err == nil || errors.Is(err, io.EOF) {
-					t.Fatalf("Last error = %v; want malformed-entry error", err)
-				}
+				require.Error(t, err)
+				require.NotErrorIs(t, err, io.EOF)
 				return
 			}
-			if err != nil || stage != tc.stage || status != tc.status {
-				t.Fatalf("Last = %q, %q, %v; want %q, %q", stage, status, err, tc.stage, tc.status)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tc.stage, stage)
+			require.Equal(t, tc.status, status)
 		})
 	}
 }
@@ -98,36 +79,28 @@ func TestNewStageStatusDoesNotCreateWhenDisabled(t *testing.T) {
 	path := t.TempDir()
 	if saved, err := NewStageStatus(path, false); err == nil {
 		saved.Close()
-		t.Fatal("opening a missing status file succeeded")
-	} else if !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("open error = %v; want not-exist error", err)
+		require.FailNow(t, "opening a missing status file succeeded")
+	} else {
+		require.ErrorIs(t, err, os.ErrNotExist)
 	}
-	if _, err := os.Stat(filepath.Join(path, StageStatusFilename)); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("missing status file was created: %v", err)
-	}
+
+	_, err := os.Stat(filepath.Join(path, StageStatusFilename))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestRunPath(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.Mkdir("run", 0700); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir("run", 0700))
 	want, err := filepath.Abs("run")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, path := range []string{"run", want} {
 		got, err := RunPath(path)
-		if err != nil || got != want {
-			t.Fatalf("RunPath(%q) = %q, %v; want %q", path, got, err, want)
-		}
+		require.NoError(t, err)
+		require.Equal(t, want, got)
 	}
-	if err := os.WriteFile("file", nil, 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile("file", nil, 0600))
 	for _, path := range []string{"", " ", "missing", "file"} {
-		if _, err := RunPath(path); err == nil {
-			t.Errorf("RunPath(%q) should fail", path)
-		}
+		_, err := RunPath(path)
+		assert.Error(t, err)
 	}
 }

@@ -1,6 +1,10 @@
 package googledrive
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestDocumentIDFromURL(t *testing.T) {
 	const id = "1LeptkP2vylqYTNJT0OPl2gx8qxEpoi3N9IxNVwX4Dno"
@@ -26,14 +30,12 @@ func TestDocumentIDFromURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := DocumentIDFromURL(tt.url)
 			if tt.want == "" {
-				if err == nil || got != "" {
-					t.Fatalf("got (%q, %v), want empty ID and error", got, err)
-				}
+				require.Error(t, err)
+				require.Empty(t, got)
 				return
 			}
-			if err != nil || got != tt.want {
-				t.Fatalf("got (%q, %v), want (%q, nil)", got, err, tt.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

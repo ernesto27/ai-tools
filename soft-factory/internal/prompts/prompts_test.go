@@ -3,8 +3,9 @@ package prompts
 import (
 	"os"
 	"strconv"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRenderMatchesOriginalPromptText(t *testing.T) {
@@ -27,16 +28,10 @@ func TestRenderMatchesOriginalPromptText(t *testing.T) {
 	for name, fields := range cases {
 		t.Run(name, func(t *testing.T) {
 			want, err := os.ReadFile("testdata/" + name + ".golden")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			got, err := Render(name, fields)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != string(want) {
-				t.Fatalf("prompt differs from baseline:\ngot: %q\nwant: %q", got, want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, string(want), got)
 		})
 	}
 }
@@ -52,9 +47,8 @@ func TestRenderErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := Render(tc.name, tc.data)
-			if err == nil || !strings.Contains(err.Error(), "render bundled prompt") || got != "" {
-				t.Fatalf("got %q, %v", got, err)
-			}
+			require.ErrorContains(t, err, "render bundled prompt")
+			require.Empty(t, got)
 		})
 	}
 }
@@ -62,35 +56,21 @@ func TestRenderErrors(t *testing.T) {
 func TestRenderPreservesQuotedPathsAndLiteralInput(t *testing.T) {
 	path := "/workspace/with spaces/quote\"\\line\n.txt"
 	got, err := Render("review-report.txt", map[string]any{"ReportPath": path})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(got, strconv.Quote(path)) {
-		t.Fatalf("quoted path missing from %q", got)
-	}
+	require.NoError(t, err)
+	require.Contains(t, got, strconv.Quote(path))
 	got, err = Render("task.txt", map[string]any{"Task": "{{.Secret}} <code> 100%"})
-	if err != nil || got != "# Task\n\n{{.Secret}} <code> 100%" {
-		t.Fatalf("got %q, %v", got, err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "# Task\n\n{{.Secret}} <code> 100%", got)
 }
 
 func TestRenderIgnoresLocalPromptFiles(t *testing.T) {
 	want, err := Render("task.txt", map[string]any{"Task": "original"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Chdir(t.TempDir())
-	if err := os.MkdirAll("internal/prompts", 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile("internal/prompts/task.txt", []byte("override"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile("task.txt", []byte("override"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll("internal/prompts", 0700))
+	require.NoError(t, os.WriteFile("internal/prompts/task.txt", []byte("override"), 0600))
+	require.NoError(t, os.WriteFile("task.txt", []byte("override"), 0600))
 	got, err := Render("task.txt", map[string]any{"Task": "original"})
-	if err != nil || got != want {
-		t.Fatalf("got %q, %v; want %q", got, err, want)
-	}
+	require.NoError(t, err)
+	require.Equal(t, want, got)
 }

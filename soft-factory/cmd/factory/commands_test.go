@@ -5,6 +5,9 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootCmdRouting(t *testing.T) {
@@ -42,14 +45,14 @@ func TestRootCmdRouting(t *testing.T) {
 			cmd.SetErr(io.Discard)
 
 			err := cmd.Execute()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-			if ran != tt.wantRun {
-				t.Fatalf("workflow ran = %v, want %v", ran, tt.wantRun)
-			}
-			if ran && got != tt.want {
-				t.Errorf("options = %+v, want %+v", got, tt.want)
+			require.Equal(t, tt.wantRun, ran)
+			if ran {
+				assert.Equal(t, tt.want, got)
 			}
 		})
 	}
@@ -60,18 +63,15 @@ func TestHelpOmitsConfigFlags(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var output bytes.Buffer
 			cmd := newRootCmd(func(workflowOptions) error {
-				t.Fatal("help invoked the workflow")
+				require.FailNow(t, "help invoked the workflow")
 				return nil
 			})
 			cmd.SetArgs(args)
 			cmd.SetOut(&output)
 			cmd.SetErr(io.Discard)
-			if err := cmd.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			if strings.Contains(output.String(), "--config") || strings.Contains(output.String(), "-c,") {
-				t.Fatalf("help advertises removed config flags: %s", output.String())
-			}
+			require.NoError(t, cmd.Execute())
+			require.NotContains(t, output.String(), "--config")
+			require.NotContains(t, output.String(), "-c,")
 		})
 	}
 }
@@ -91,15 +91,11 @@ func TestVersionFlags(t *testing.T) {
 			cmd.SetOut(&output)
 			cmd.SetErr(io.Discard)
 
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("Execute() error = %v", err)
-			}
-			if ran {
-				t.Error("version flag ran the workflow")
-			}
-			if got, want := output.String(), releaseTag+"\n"; got != want {
-				t.Errorf("version output = %q, want %q", got, want)
-			}
+			require.NoError(t, cmd.Execute())
+			assert.False(t, ran)
+
+			got, want := output.String(), releaseTag+"\n"
+			assert.Equal(t, want, got)
 		})
 	}
 }

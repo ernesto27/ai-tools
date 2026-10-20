@@ -2,8 +2,10 @@ package doctor
 
 import (
 	"os/exec"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckAllDependencies(t *testing.T) {
@@ -18,17 +20,14 @@ func TestCheckAllDependencies(t *testing.T) {
 			}
 			return "/bin/" + name, nil
 		})
-		if !reflect.DeepEqual(calls, names) {
-			t.Fatalf("mask %d: calls = %v", mask, calls)
-		}
+		require.Equal(t, names, calls)
 		for i, result := range results {
 			wantPath := "/bin/" + names[i]
 			if mask&(1<<i) != 0 {
 				wantPath = ""
 			}
-			if result.Name != names[i] || result.Path != wantPath {
-				t.Errorf("mask %d: result = %+v, want %s %q", mask, result, names[i], wantPath)
-			}
+			assert.Equal(t, names[i], result.Name, "mask %d", mask)
+			assert.Equal(t, wantPath, result.Path, "mask %d", mask)
 		}
 	}
 }

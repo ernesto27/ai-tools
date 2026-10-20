@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSecuritySaveFindingsConfiguration(t *testing.T) {
@@ -23,22 +25,18 @@ func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 			}
 			data := fmt.Sprintf(`{"agentSandbox":{"agent":"shared"},"disabledStages":["securityReview"],"stages":{"securityReview":{"agent":"codex","model":"security-model"%s},"codeReview":{"model":"code-model"}}}`, property)
 			path := filepath.Join(t.TempDir(), "config.json")
-			if err := os.WriteFile(path, []byte(data), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(path, []byte(data), 0600))
 			cfg, err := Load(path)
 			if tc.invalid {
-				if err == nil {
-					t.Fatal("expected native JSON type error")
-				}
+				require.Error(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if cfg.Stages.SecurityReview.SaveFindings != tc.want || cfg.Stages.SecurityReview.Agent != "codex" || cfg.Stages.SecurityReview.Model != "security-model" || cfg.Stages.CodeReview.Model != "code-model" || !cfg.StageDisabled(StageSecurityReview) {
-				t.Fatalf("configuration not preserved: %+v", cfg)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, cfg.Stages.SecurityReview.SaveFindings)
+			require.Equal(t, "codex", cfg.Stages.SecurityReview.Agent)
+			require.Equal(t, "security-model", cfg.Stages.SecurityReview.Model)
+			require.Equal(t, "code-model", cfg.Stages.CodeReview.Model)
+			require.True(t, cfg.StageDisabled(StageSecurityReview))
 		})
 	}
 }

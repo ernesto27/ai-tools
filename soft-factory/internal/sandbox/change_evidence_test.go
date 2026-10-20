@@ -5,8 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"soft-factory/internal/executionlog"
 )
@@ -18,71 +20,43 @@ func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
 	git := func(dir string, args ...string) {
 		t.Helper()
 		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, output)
-		}
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "%s", output)
 	}
-	if err := os.Mkdir(repo, 0700); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir(repo, 0700))
 	git(repo, "init", "-b", "main")
 	git(repo, "config", "user.name", "Test")
 	git(repo, "config", "user.email", "test@example.com")
 	tracked := filepath.Join(repo, "tracked.txt")
-	if err := os.WriteFile(tracked, []byte("base\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(tracked, []byte("base\n"), 0600))
 	git(repo, "add", "tracked.txt")
 	git(repo, "commit", "-m", "initial")
 	git(repo, "worktree", "add", "-b", "feature", worktree)
 	tracked = filepath.Join(worktree, "tracked.txt")
-	if err := os.WriteFile(tracked, []byte("base\ncommitted\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(tracked, []byte("base\ncommitted\n"), 0600))
 	git(worktree, "add", "tracked.txt")
 	git(worktree, "commit", "-m", "feature change")
-	if err := os.WriteFile(tracked, []byte("base\ncommitted\nstaged\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(tracked, []byte("base\ncommitted\nstaged\n"), 0600))
 	git(worktree, "add", "tracked.txt")
-	if err := os.WriteFile(tracked, []byte("base\ncommitted\nstaged\nunstaged\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(worktree, "new file.txt"), []byte("untracked\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(repo, "agent-sandbox.json"), []byte(`{"resume":{"branch":"feature"}}`), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(tracked, []byte("base\ncommitted\nstaged\nunstaged\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(worktree, "new file.txt"), []byte("untracked\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "agent-sandbox.json"), []byte(`{"resume":{"branch":"feature"}}`), 0600))
 	t.Chdir(repo)
 	snapshot, err := changeEvidence(context.Background(), "feature")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if snapshot.Worktree != worktree {
-		t.Fatalf("worktree = %q, want %q", snapshot.Worktree, worktree)
-	}
+	require.NoError(t, err)
+	require.Equal(t, worktree, snapshot.Worktree)
 	// An explicit continuation branch must override a different configured branch.
-	if err := os.WriteFile(filepath.Join(repo, "agent-sandbox.json"), []byte(`{"resume":{"branch":"main"}}`), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "agent-sandbox.json"), []byte(`{"resume":{"branch":"main"}}`), 0600))
 	snapshot, err = changeEvidence(context.Background(), "feature")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if snapshot.Worktree != worktree {
-		t.Fatalf("override worktree = %q, want %q", snapshot.Worktree, worktree)
-	}
+	require.NoError(t, err)
+	require.Equal(t, worktree, snapshot.Worktree)
 	reportPath, err := executionlog.StageReportPath(context.Background(), "feature", "review.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := filepath.Join(worktree, "review.md"); reportPath != want {
-		t.Fatalf("report path = %q, want %q", reportPath, want)
-	}
+	require.NoError(t, err)
+
+	want := filepath.Join(worktree, "review.md")
+	require.Equal(t, want, reportPath)
+
 	for _, want := range []string{"Comparison: merge base of HEAD and main", "+committed", "+staged", "+unstaged", `"new file.txt"`} {
-		if !strings.Contains(snapshot.Text, want) {
-			t.Errorf("evidence missing %q", want)
-		}
+		assert.Contains(t, snapshot.Text, want)
 	}
 }

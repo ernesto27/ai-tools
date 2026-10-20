@@ -122,6 +122,8 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 		{"codex", `{"type":"usage","agent":"codex","usage":{"total_tokens":43834}}` + "\nFooter\n"},
 		{"codex", `{"type":"usage","agent":"codex","usage":{"total_tokens":12}}` + "\nFooter\n"},
 		{"claude", `{"type":"usage","agent":"claude","usage":{"total_tokens":73447}}` + "\nFooter\n"},
+		{"claude", `{"type":"usage","agent":"claude","usage":{"total_tokens":291343}}` + "\n" +
+			`{"type":"usage","agent":"claude","usage":{"total_tokens":135422}}` + "\nFooter\n"},
 		{"claude", "Interrupted without usage\n"},
 	} {
 		run.StartStage(config.StageImplementation)
@@ -135,7 +137,7 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 	}
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 	require.NoError(t, err)
-	for _, want := range []string{"44K", "12", "73K", "unavailable"} {
+	for _, want := range []string{"44K", "12", "73K", "427K", "unavailable"} {
 		require.Contains(t, string(data), "   Tokens usage:  "+want+"\n   Changes:")
 	}
 }

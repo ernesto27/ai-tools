@@ -2,7 +2,7 @@
 package executionlog
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -725,45 +725,33 @@ func readTotalTokens(path string) (int64, error) {
 	}
 	defer file.Close()
 
-	info, err := file.Stat()
-	if err != nil {
-		return 0, fmt.Errorf("stat stage log: %w", err)
-	}
-
-	var pending []byte
-	for end := info.Size(); end > 0; {
-		start := max(int64(0), end-4096)
-		chunk := make([]byte, end-start)
-		if _, err := file.ReadAt(chunk, start); err != nil {
+	reader := bufio.NewReader(file)
+	var total int64
+	found := false
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
 			return 0, fmt.Errorf("read stage log: %w", err)
 		}
 
-		data := append(chunk, pending...)
-		lines := bytes.Split(data, []byte{'\n'})
-
-		first := 0
-		if start > 0 {
-			pending = lines[0]
-			first = 1
+		var event struct {
+			Type  string `json:"type"`
+			Usage struct {
+				TotalTokens *int64 `json:"total_tokens"`
+			} `json:"usage"`
 		}
-
-		for i := len(lines) - 1; i >= first; i-- {
-			var event struct {
-				Type  string `json:"type"`
-				Usage struct {
-					TotalTokens *int64 `json:"total_tokens"`
-				} `json:"usage"`
-			}
-			if json.Unmarshal(bytes.TrimSpace(lines[i]), &event) != nil {
-				continue
-			}
-			if event.Type == "usage" &&
-				event.Usage.TotalTokens != nil {
-				return *event.Usage.TotalTokens, nil
-			}
+		if json.Unmarshal(line, &event) == nil &&
+			event.Type == "usage" && event.Usage.TotalTokens != nil {
+			total += *event.Usage.TotalTokens
+			found = true
 		}
-		end = start
+		if errors.Is(err, io.EOF) {
+			break
+		}
 	}
 
-	return 0, fmt.Errorf("usage event not found")
+	if !found {
+		return 0, fmt.Errorf("usage event not found")
+	}
+	return total, nil
 }

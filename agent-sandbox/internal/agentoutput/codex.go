@@ -16,6 +16,7 @@ type codexMessage struct {
 	Item    codexItem       `json:"item"`
 	Message string          `json:"message"`
 	Error   json.RawMessage `json:"error"`
+	Usage   *TokenUsage     `json:"usage"`
 }
 
 type codexItem struct {
@@ -49,8 +50,15 @@ func (*CodexDecoder) Decode(line []byte) ([]Event, error) {
 		return nil, errors.New("missing event type")
 	}
 	switch message.Type {
-	case codexThreadStarted, codexTurnStarted, codexTurnCompleted:
+	case codexThreadStarted, codexTurnStarted:
 		return nil, nil
+	case codexTurnCompleted:
+		if message.Usage == nil {
+			return nil, nil
+		}
+		// Cached tokens are already included in input tokens.
+		message.Usage.TotalTokens = message.Usage.InputTokens + message.Usage.OutputTokens
+		return []Event{{Kind: KindUsage, Usage: message.Usage}}, nil
 	case codexTurnFailed, codexError:
 		text := errorMessage(message.Error)
 		if text == "" {

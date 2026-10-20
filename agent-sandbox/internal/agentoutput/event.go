@@ -20,6 +20,14 @@ type Event struct {
 	ExitCode *int
 	Output   string
 	Detail   string
+	Usage    *TokenUsage
+}
+
+type TokenUsage struct {
+	InputTokens       int64 `json:"input_tokens"`
+	CachedInputTokens int64 `json:"cached_input_tokens"`
+	OutputTokens      int64 `json:"output_tokens"`
+	TotalTokens       int64 `json:"total_tokens"`
 }
 
 // Scope keeps a subagent's tool IDs separate from the main conversation.

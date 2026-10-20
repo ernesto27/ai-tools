@@ -13,6 +13,7 @@ const (
 type Kind string
 
 const (
+	KindUsage    Kind = "usage"
 	KindCommand  Kind = "command"
 	KindTool     Kind = "tool"
 	KindFile     Kind = "file"

@@ -20,7 +20,24 @@ func auditText(text string) string {
 
 func TestAgentOutputFormatter(t *testing.T) {
 	const separator = "---------------------------------------------\n"
+	const usageInput = `{"type":"turn.completed","usage":{"input_tokens":24763,"cached_input_tokens":24448,"output_tokens":122}}`
+	const usageOutput = `{"type":"usage","agent":"codex","usage":{"input_tokens":24763,"cached_input_tokens":24448,"output_tokens":122,"total_tokens":24885}}` + "\n"
+	const claudeUsageInput = `{"type":"result","usage":{"input_tokens":300,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":100}}`
+	const claudeUsageOutput = `{"type":"usage","agent":"claude","usage":{"input_tokens":1500,"cached_input_tokens":1000,"output_tokens":100,"total_tokens":1600}}` + "\n"
 	for _, tc := range []struct{ name, agent, input, want string }{
+		{"claude usage", agentoutput.AgentClaude, claudeUsageInput + "\n", claudeUsageOutput},
+		{"claude usage without newline", agentoutput.AgentClaude, claudeUsageInput, claudeUsageOutput},
+		{"claude multiple results", agentoutput.AgentClaude, claudeUsageInput + "\n" + claudeUsageInput + "\n", claudeUsageOutput + claudeUsageOutput},
+		{"claude zero usage", agentoutput.AgentClaude, `{"type":"result","usage":{}}` + "\n", `{"type":"usage","agent":"claude","usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0,"total_tokens":0}}` + "\n"},
+		{"claude null usage", agentoutput.AgentClaude, `{"type":"result","usage":null}` + "\n", ""},
+		{"claude text and usage", agentoutput.AgentClaude, `{"type":"result","result":"done","usage":{"input_tokens":300,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":100}}` + "\n", "TIME    AGENT\n            done\n\n" + claudeUsageOutput},
+		{"claude error and usage", agentoutput.AgentClaude, `{"type":"result","is_error":true,"errors":["stopped"],"usage":{"input_tokens":300,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":100}}` + "\n", "TIME  ! FAILED\n            stopped\n\n" + claudeUsageOutput},
+		{"codex usage", agentoutput.AgentCodex, usageInput + "\n", usageOutput},
+		{"codex usage without newline", agentoutput.AgentCodex, usageInput, usageOutput},
+		{"codex multiple turns", agentoutput.AgentCodex, usageInput + "\n" + usageInput + "\n", usageOutput + usageOutput},
+		{"codex zero usage", agentoutput.AgentCodex, `{"type":"turn.completed","usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0}}` + "\n", `{"type":"usage","agent":"codex","usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0,"total_tokens":0}}` + "\n"},
+		{"codex missing usage", agentoutput.AgentCodex, `{"type":"turn.completed"}` + "\n", ""},
+		{"codex null usage", agentoutput.AgentCodex, `{"type":"turn.completed","usage":null}` + "\n", ""},
 		{"claude message", agentoutput.AgentClaude, `{"type":"result","result":"done"}` + "\n", "TIME    AGENT\n            done\n\n"},
 		{"codex message", agentoutput.AgentCodex, `{"type":"item.completed","item":{"type":"agent_message","text":"done"}}` + "\n", "TIME    AGENT\n            done\n\n"},
 		{"initialization", agentoutput.AgentClaude, `{"type":"system","subtype":"init","tools":["Bash","Read"],"model":"sonnet"}` + "\n", ""},

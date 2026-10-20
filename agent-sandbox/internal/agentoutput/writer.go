@@ -2,6 +2,7 @@ package agentoutput
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -87,6 +88,24 @@ func (w *Writer) consume(line []byte) {
 }
 
 func (w *Writer) render(now time.Time, e Event) {
+	if e.Kind == KindUsage {
+		if e.Usage == nil {
+			return
+		}
+		record := struct {
+			Type  Kind        `json:"type"`
+			Agent string      `json:"agent"`
+			Usage *TokenUsage `json:"usage"`
+		}{Type: KindUsage, Agent: w.decoder.Name(), Usage: e.Usage}
+		data, err := json.Marshal(record)
+		if err != nil {
+			w.err = err
+			return
+		}
+		// Usage stays on one unprefixed line so callers can parse it from stdout.
+		w.write(string(data) + "\n")
+		return
+	}
 	if e.Phase == PhaseStarted {
 		if e.ID != "" {
 			if _, exists := w.started[e.key()]; !exists {

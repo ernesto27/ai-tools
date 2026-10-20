@@ -34,10 +34,18 @@ type claudeMessage struct {
 	Attempt         int               `json:"attempt"`
 	MaxRetries      int               `json:"max_retries"`
 	RetryDelayMS    int               `json:"retry_delay_ms"`
+	Usage           *claudeUsage      `json:"usage"`
 	MCPServerErrors []struct {
 		Name    string `json:"name"`
 		Message string `json:"message"`
 	} `json:"mcp_server_errors"`
+}
+
+type claudeUsage struct {
+	InputTokens              int64 `json:"input_tokens"`
+	CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
+	OutputTokens             int64 `json:"output_tokens"`
 }
 
 type claudeBlock struct {
@@ -71,6 +79,7 @@ func (d *ClaudeDecoder) Decode(line []byte) ([]Event, error) {
 	case claudeSystem:
 		return decodeClaudeSystem(message), nil
 	case claudeResult:
+		var events []Event
 		if message.IsError || strings.HasPrefix(message.Subtype, claudeErrorPrefix) {
 			text := strings.Join(message.Errors, "\n")
 			if text == "" {
@@ -79,13 +88,21 @@ func (d *ClaudeDecoder) Decode(line []byte) ([]Event, error) {
 			if text == "" {
 				text = message.Subtype
 			}
-			return []Event{{Kind: KindFailure, Scope: scope, Subject: text}}, nil
-		}
-		if message.Result != "" && strings.Join(strings.Fields(message.Result), " ") != strings.Join(strings.Fields(d.lastText[scope]), " ") {
+			events = append(events, Event{Kind: KindFailure, Scope: scope, Subject: text})
+		} else if message.Result != "" && strings.Join(strings.Fields(message.Result), " ") != strings.Join(strings.Fields(d.lastText[scope]), " ") {
 			d.lastText[scope] = message.Result
-			return []Event{{Kind: KindAgent, Scope: scope, Subject: message.Result}}, nil
+			events = append(events, Event{Kind: KindAgent, Scope: scope, Subject: message.Result})
 		}
-		return nil, nil
+		if usage := message.Usage; usage != nil {
+			// Claude reports cache reads and writes separately from uncached input.
+			// Include both so normalized input has the same meaning for every agent.
+			input := usage.InputTokens + usage.CacheReadInputTokens + usage.CacheCreationInputTokens
+			events = append(events, Event{Kind: KindUsage, Scope: scope, Usage: &TokenUsage{
+				InputTokens: input, CachedInputTokens: usage.CacheReadInputTokens,
+				OutputTokens: usage.OutputTokens, TotalTokens: input + usage.OutputTokens,
+			}})
+		}
+		return events, nil
 	default:
 		return []Event{{Kind: KindNotice, Subject: "Unsupported " + AgentClaude + " message: " + string(message.Type)}}, nil
 	}

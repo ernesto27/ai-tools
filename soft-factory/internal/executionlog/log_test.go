@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,10 +73,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
@@ -96,6 +97,64 @@ func TestSummaryLifecycle(t *testing.T) {
 		t.Fatal("record after Finish: expected an error")
 	}
 	checkContents(want)
+}
+
+func TestFormatTokenCount(t *testing.T) {
+	for _, tc := range []struct {
+		total int64
+		want  string
+	}{
+		{0, "0"},
+		{999, "999"},
+		{1000, "1K"},
+		{43834, "44K"},
+		{474763, "475K"},
+		{999000, "999K"},
+		{1_000_000, "1M"},
+		{1_400_000, "1M"},
+		{1_600_000, "2M"},
+		{475_000_000, "475M"},
+	} {
+		if got := formatTokenCount(tc.total); got != tc.want {
+			t.Errorf("formatTokenCount(%d) = %q, want %q", tc.total, got, tc.want)
+		}
+	}
+}
+
+func TestSummaryStageTokenUsage(t *testing.T) {
+	prepareLogTestDirectory(t)
+	run, err := NewRun("feature", CommandRun, config.Stages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer run.Finish(nil)
+	for _, tc := range []struct {
+		agent, output string
+	}{
+		{"codex", `{"type":"usage","agent":"codex","usage":{"total_tokens":43834}}` + "\nFooter\n"},
+		{"codex", `{"type":"usage","agent":"codex","usage":{"total_tokens":12}}` + "\nFooter\n"},
+		{"claude", `{"type":"usage","agent":"claude","usage":{"total_tokens":73447}}` + "\nFooter\n"},
+		{"claude", "Interrupted without usage\n"},
+	} {
+		run.StartStage(config.StageImplementation)
+		run.Selection(tc.agent, "test-model")
+		if _, err := io.WriteString(run.Stream("stdout"), tc.output); err != nil {
+			t.Fatal(err)
+		}
+		run.FinishStage(nil)
+		if err := run.RecordStageResult(config.StageImplementation, time.Second, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"44K", "12", "73K", "unavailable"} {
+		if !strings.Contains(string(data), "   Tokens usage:  "+want+"\n   Changes:") {
+			t.Fatalf("missing or incorrectly formatted token usage %q: %s", want, data)
+		}
+	}
 }
 
 func TestSummarySelectionLifecycle(t *testing.T) {

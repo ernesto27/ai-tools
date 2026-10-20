@@ -1,6 +1,7 @@
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
 [] - add assert test lib
+[] - show price of token usage, depend of model agent
 [] - review only analysize code changes, not readme or docs
 [] - config file should not be required, now return an error
 [] - do not commit review-changes.md

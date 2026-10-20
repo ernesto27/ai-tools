@@ -2,8 +2,10 @@
 package executionlog
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +60,7 @@ type Run struct {
 	retainSecurityReport bool
 	stageAgent           string
 	stageModel           string
+	stageLogPath         string
 	path                 string
 	header               string
 	err                  error
@@ -232,6 +235,7 @@ func (r *Run) StartStage(stage config.Stage) {
 	if r.attempts[stage] > 1 && !r.resuming {
 		filename = fmt.Sprintf("%02d-%s-%d.log", index, stage, r.attempts[stage])
 	}
+	r.stageLogPath = filepath.Join(r.path, filename)
 	var file *os.File
 	if r.err == nil {
 		var err error
@@ -239,7 +243,7 @@ func (r *Run) StartStage(stage config.Stage) {
 		if r.resuming {
 			flags = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 		}
-		file, err = os.OpenFile(filepath.Join(r.path, filename), flags, 0600)
+		file, err = os.OpenFile(r.stageLogPath, flags, 0600)
 		if err != nil {
 			r.failLocked(fmt.Errorf("create stage log %q: %w", filename, err))
 		}
@@ -544,12 +548,23 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		return err
 	}
 
+	totalTokens := "unavailable"
+	total, err := readTotalTokens(r.stageLogPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: read token usage: %v\n", err)
+	} else {
+		totalTokens = formatTokenCount(total)
+	}
 	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n",
+		"%d. %s\n   Status:    	%s\n   Agent:     	%s\n   Model:     	%s\n   Duration:  	%s\n   Tokens usage:  	%s\n",
 		r.summaryEntries+1,
 		stageHeading(stage),
-		status, r.stageAgent, r.stageModel, formatDuration(elapsed),
+		status,
+		r.stageAgent,
+		r.stageModel, formatDuration(elapsed),
+		totalTokens,
 	)
+
 	var line string
 	var cleanup func()
 	switch stage {
@@ -691,4 +706,64 @@ func stageList(stages []config.Stage) string {
 		names[index] = string(stage)
 	}
 	return strings.Join(names, ", ")
+}
+
+func formatTokenCount(total int64) string {
+	if total >= 1_000_000 {
+		return fmt.Sprintf("%.0fM", float64(total)/1_000_000)
+	}
+	if total < 1000 {
+		return fmt.Sprintf("%d", total)
+	}
+	return fmt.Sprintf("%.0fK", float64(total)/1000)
+}
+
+func readTotalTokens(path string) (int64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, fmt.Errorf("open stage log: %w", err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("stat stage log: %w", err)
+	}
+
+	var pending []byte
+	for end := info.Size(); end > 0; {
+		start := max(int64(0), end-4096)
+		chunk := make([]byte, end-start)
+		if _, err := file.ReadAt(chunk, start); err != nil {
+			return 0, fmt.Errorf("read stage log: %w", err)
+		}
+
+		data := append(chunk, pending...)
+		lines := bytes.Split(data, []byte{'\n'})
+
+		first := 0
+		if start > 0 {
+			pending = lines[0]
+			first = 1
+		}
+
+		for i := len(lines) - 1; i >= first; i-- {
+			var event struct {
+				Type  string `json:"type"`
+				Usage struct {
+					TotalTokens *int64 `json:"total_tokens"`
+				} `json:"usage"`
+			}
+			if json.Unmarshal(bytes.TrimSpace(lines[i]), &event) != nil {
+				continue
+			}
+			if event.Type == "usage" &&
+				event.Usage.TotalTokens != nil {
+				return *event.Usage.TotalTokens, nil
+			}
+		}
+		end = start
+	}
+
+	return 0, fmt.Errorf("usage event not found")
 }

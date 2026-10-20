@@ -3,25 +3,23 @@ package executionlog
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestStageChangesPromptNilLog(t *testing.T) {
 	var run *Run
 	got, filename, err := run.StageChangesPrompt("task\n")
-	if err != nil || got != "task\n" || filename != "" {
-		t.Fatalf("got %q, %q, %v", got, filename, err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "task\n", got)
+	require.Empty(t, filename)
 }
 
 func TestStageChangesPromptReportPath(t *testing.T) {
 	got, filename, err := (&Run{}).StageChangesPrompt("task")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(filename, ".soft-factory-stage-changes-") || !strings.HasSuffix(filename, ".txt") {
-		t.Fatalf("unexpected report filename %q", filename)
-	}
-	if !strings.HasPrefix(got, "task\n\n## Stage change summary\n\n") || !strings.Contains(got, `"/workspace/`+filename+`"`) {
-		t.Fatalf("unexpected prompt %q", got)
-	}
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(filename, ".soft-factory-stage-changes-"))
+	require.True(t, strings.HasSuffix(filename, ".txt"))
+	require.True(t, strings.HasPrefix(got, "task\n\n## Stage change summary\n\n"))
+	require.Contains(t, got, `"/workspace/`+filename+`"`)
 }

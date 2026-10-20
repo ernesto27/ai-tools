@@ -1,8 +1,10 @@
 package sandbox
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"soft-factory/internal/config"
 )
@@ -44,18 +46,12 @@ func TestRiskReviewEvidence(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := riskReviewEvidence(tc.reports, tc.disabled)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			for _, want := range tc.want {
-				if !strings.Contains(got, want) {
-					t.Errorf("evidence missing %q:\n%s", want, got)
-				}
+				assert.Contains(t, got, want)
 			}
 			for _, reject := range tc.reject {
-				if strings.Contains(got, reject) {
-					t.Errorf("evidence contains %q:\n%s", reject, got)
-				}
+				assert.NotContains(t, got, reject)
 			}
 		})
 	}

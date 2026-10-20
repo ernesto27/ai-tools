@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadRiskResult(t *testing.T) {
@@ -45,20 +48,17 @@ func TestReadRiskResult(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "result.json")
-			if err := os.WriteFile(path, []byte(tc.json), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(path, []byte(tc.json), 0600))
 			want := tc.want
 			if want == "" {
 				want = "Classification unavailable."
 			}
 			got, collected := readRiskResult(path)
-			if got != want || !collected {
-				t.Fatalf("readRiskResult = (%q, %v); want (%q, true)", got, collected, want)
-			}
-			if _, err := os.Stat(path); err != nil {
-				t.Fatalf("result removed before summary save: %v", err)
-			}
+			require.Equal(t, want, got)
+			require.True(t, collected)
+
+			_, err := os.Stat(path)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -66,43 +66,32 @@ func TestReadRiskResult(t *testing.T) {
 func TestReadRiskResultRejectsNonRegularPaths(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "valid.json")
-	if err := os.WriteFile(target, []byte(`{"classification":"LOW"}`), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(target, []byte(`{"classification":"LOW"}`), 0600))
 	link := filepath.Join(dir, "link.json")
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Symlink(target, link))
 	for _, path := range []string{"", filepath.Join(dir, "missing.json"), dir, link} {
 		got, collected := readRiskResult(path)
-		if got != "Classification unavailable." || collected {
-			t.Errorf("readRiskResult(%q) = (%q, %v)", path, got, collected)
-		}
+		assert.Equal(t, "Classification unavailable.", got)
+		assert.False(t, collected)
 	}
 }
 
 func TestRiskResultPrompt(t *testing.T) {
 	var disabled *Run
 	prompt, filename, err := disabled.RiskResultPrompt("Assess risk.")
-	if err != nil || prompt != "Assess risk." || filename != "" {
-		t.Fatalf("nil logger = (%q, %q, %v)", prompt, filename, err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "Assess risk.", prompt)
+	require.Empty(t, filename)
 	run := &Run{}
 	seen := make(map[string]bool)
 	for range 2 {
 		prompt, filename, err := run.RiskResultPrompt("Assess risk.")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.HasPrefix(filename, ".soft-factory-risk-result-") || !strings.HasSuffix(filename, ".json") {
-			t.Fatalf("unexpected filename: %q", filename)
-		}
-		if seen[filename] {
-			t.Fatalf("attempt reused result filename: %q", filename)
-		}
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(filename, ".soft-factory-risk-result-"))
+		require.True(t, strings.HasSuffix(filename, ".json"))
+		require.False(t, seen[filename])
 		seen[filename] = true
-		if !strings.HasPrefix(prompt, "Assess risk.") || !strings.Contains(prompt, ContainerReportPath(filename)) {
-			t.Fatalf("prompt missing original task or result path: %s", prompt)
-		}
+		require.True(t, strings.HasPrefix(prompt, "Assess risk."))
+		require.Contains(t, prompt, ContainerReportPath(filename))
 	}
 }

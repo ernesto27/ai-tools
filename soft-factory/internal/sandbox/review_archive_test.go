@@ -7,48 +7,37 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"soft-factory/internal/executionlog"
 )
 
 func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if output, err := exec.Command("git", "init", "-b", "main").CombinedOutput(); err != nil {
-		t.Fatalf("initialize test repository: %v\n%s", err, output)
-	}
+
+	output, err := exec.Command("git", "init", "-b", "main").CombinedOutput()
+	require.NoError(t, err, "%s", output)
+
 	run, err := executionlog.NewRun("feature/logs", executionlog.CommandContinue, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer run.Finish(nil)
 	source := "agent-report.md"
 	destination := filepath.Join(run.Path(), "05-reviewChanges.md")
-	if filepath.Dir(run.Path()) != filepath.Join("logs", "feature-logs") || !strings.HasPrefix(filepath.Base(run.Path()), "continue-") {
-		t.Fatalf("unexpected walkthrough directory: %s", run.Path())
-	}
+	require.Equal(t, filepath.Join("logs", "feature-logs"), filepath.Dir(run.Path()))
+	require.True(t, strings.HasPrefix(filepath.Base(run.Path()), "continue-"))
 	content := "# Changes\n\n### File: `./a.go`\nThe branch has no changed files.\n" + strings.Repeat("extra output\n", 200)
-	if err := os.WriteFile(source, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := archiveReviewReport(source, destination); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(source, []byte(content), 0644))
+	require.NoError(t, archiveReviewReport(source, destination))
 	got, err := os.ReadFile(destination)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != content {
-		t.Fatalf("archived report content changed")
-	}
+	require.NoError(t, err)
+	require.Equal(t, content, string(got))
 	info, err := os.Stat(destination)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0600 {
-		t.Fatalf("archived report permissions = %04o, want 0600", info.Mode().Perm())
-	}
-	if _, err := os.Stat(source); err != nil {
-		t.Fatalf("archive removed source before caller cleanup: %v", err)
-	}
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
+
+	_, err = os.Stat(source)
+	require.NoError(t, err)
 }
 
 func TestArchiveReviewReportRejectsInvalidSource(t *testing.T) {
@@ -57,19 +46,13 @@ func TestArchiveReviewReportRejectsInvalidSource(t *testing.T) {
 	for _, source := range []string{filepath.Join(dir, "missing.md"), filepath.Join(dir, "empty.md"), filepath.Join(dir, "link.md")} {
 		switch filepath.Base(source) {
 		case "empty.md":
-			if err := os.WriteFile(source, nil, 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(source, nil, 0600))
 		case "link.md":
-			if err := os.Symlink("empty.md", source); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.Symlink("empty.md", source))
 		}
-		if err := archiveReviewReport(source, destination); err == nil {
-			t.Errorf("expected invalid source %q to fail", source)
-		}
-		if _, err := os.Stat(destination); !os.IsNotExist(err) {
-			t.Errorf("archive created destination for invalid source %q: %v", source, err)
-		}
+		assert.Error(t, archiveReviewReport(source, destination))
+
+		_, err := os.Stat(destination)
+		assert.ErrorIs(t, err, os.ErrNotExist)
 	}
 }

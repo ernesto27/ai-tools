@@ -12,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"soft-factory/internal/config"
 )
 
@@ -36,10 +39,7 @@ func TestFormatDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatDuration(tt.elapsed)
-			if got != tt.want {
-				t.Errorf("formatDuration(%v) = %q; want %q",
-					tt.elapsed, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -47,21 +47,15 @@ func TestFormatDuration(t *testing.T) {
 func TestSummaryLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandRun, config.Stages)
-	if err != nil {
-		t.Fatalf("NewRun: %v", err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { run.Finish(nil) })
 
 	summaryPath := filepath.Join(run.Path(), "summary.log")
 	checkContents := func(want string) {
 		t.Helper()
 		data, err := os.ReadFile(summaryPath)
-		if err != nil {
-			t.Fatalf("read summary: %v", err)
-		}
-		if string(data) != want {
-			t.Fatalf("summary = %q; want %q", data, want)
-		}
+		require.NoError(t, err)
+		require.Equal(t, want, string(data))
 	}
 
 	want := "SOFTWARE FACTORY — RUN SUMMARY\n==================================================\n\n"
@@ -73,15 +67,13 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    \tSUCCEEDED\n   Agent:     \t\n   Model:     \t\n   Duration:  \t1 min 1 sec\n   Tokens usage:  \tunavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    \tSUCCEEDED\n   Agent:     \t\n   Model:     \t\n   Duration:  \t2 min 15 sec\n   Tokens usage:  \tunavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    \tFAILED\n   Agent:     \t\n   Model:     \t\n   Duration:  \t18 sec\n   Tokens usage:  \tunavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    \tINTERRUPTED\n   Agent:     \t\n   Model:     \t\n   Duration:  \t1 sec\n   Tokens usage:  \tunavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
-		if err := run.RecordStageResult(entry.stage, entry.elapsed, entry.err); err != nil {
-			t.Fatalf("record %s: %v", entry.stage, err)
-		}
+		require.NoError(t, run.RecordStageResult(entry.stage, entry.elapsed, entry.err))
 		want += entry.line
 		checkContents(want)
 	}
@@ -90,12 +82,11 @@ func TestSummaryLifecycle(t *testing.T) {
 	run.Finish(nil)
 	run.Finish(nil) // Finishing twice must be safe.
 	want += "==================================================\n"
-	if _, err := file.WriteString("unexpected\n"); !errors.Is(err, os.ErrClosed) {
-		t.Fatalf("write after Finish = %v; want closed file error", err)
-	}
-	if err := run.RecordStageResult("securityReview", time.Second, nil); err == nil {
-		t.Fatal("record after Finish: expected an error")
-	}
+
+	_, err = file.WriteString("unexpected\n")
+	require.ErrorIs(t, err, os.ErrClosed)
+
+	require.Error(t, run.RecordStageResult("securityReview", time.Second, nil))
 	checkContents(want)
 }
 
@@ -115,18 +106,15 @@ func TestFormatTokenCount(t *testing.T) {
 		{1_600_000, "2M"},
 		{475_000_000, "475M"},
 	} {
-		if got := formatTokenCount(tc.total); got != tc.want {
-			t.Errorf("formatTokenCount(%d) = %q, want %q", tc.total, got, tc.want)
-		}
+		got := formatTokenCount(tc.total)
+		assert.Equal(t, tc.want, got, "total %d", tc.total)
 	}
 }
 
 func TestSummaryStageTokenUsage(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandRun, config.Stages)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer run.Finish(nil)
 	for _, tc := range []struct {
 		agent, output string
@@ -138,31 +126,24 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 	} {
 		run.StartStage(config.StageImplementation)
 		run.Selection(tc.agent, "test-model")
-		if _, err := io.WriteString(run.Stream("stdout"), tc.output); err != nil {
-			t.Fatal(err)
-		}
+
+		_, err := io.WriteString(run.Stream("stdout"), tc.output)
+		require.NoError(t, err)
+
 		run.FinishStage(nil)
-		if err := run.RecordStageResult(config.StageImplementation, time.Second, nil); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, run.RecordStageResult(config.StageImplementation, time.Second, nil))
 	}
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, want := range []string{"44K", "12", "73K", "unavailable"} {
-		if !strings.Contains(string(data), "   Tokens usage:  "+want+"\n   Changes:") {
-			t.Fatalf("missing or incorrectly formatted token usage %q: %s", want, data)
-		}
+		require.Contains(t, string(data), "   Tokens usage:  \t"+want+"\n   Changes:")
 	}
 }
 
 func TestSummarySelectionLifecycle(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandContinue, config.Stages)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer run.Finish(nil)
 	for i, tt := range []struct {
 		stage        config.Stage
@@ -182,29 +163,21 @@ func TestSummarySelectionLifecycle(t *testing.T) {
 			run.Selection(tt.agent, tt.model)
 		}
 		run.FinishStage(tt.err)
-		if err := run.RecordStageResult(tt.stage, time.Second, tt.err); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, run.RecordStageResult(tt.stage, time.Second, tt.err))
 		data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-		if err != nil {
-			t.Fatal(err)
-		}
-		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
+		require.NoError(t, err)
+		entry := fmt.Sprintf("%d. %s\n   Status:    \t%s\n   Agent:     \t%s\n   Model:     \t%s\n   Duration:  \t1 sec\n",
 			i+1, stageHeading(tt.stage), outcome(tt.err), tt.agent, tt.model)
-		if !strings.Contains(string(data), entry) || strings.Contains(string(data), "earlier-") || strings.Contains(string(data), "details-") {
-			t.Fatalf("unexpected summary: %s", data)
-		}
+		require.Contains(t, string(data), entry)
+		require.NotContains(t, string(data), "earlier-")
+		require.NotContains(t, string(data), "details-")
 	}
-	if err := run.RecordSkippedStage("Skipping disabled stage: codeReview"); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, run.RecordSkippedStage("Skipping disabled stage: codeReview"))
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Count(string(data), "   Agent:") != 4 || strings.Count(string(data), "   Model:") != 4 || !strings.HasSuffix(string(data), "Skipping disabled stage: codeReview\n\n") {
-		t.Fatalf("skipped stage added result fields: %s", data)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 4, strings.Count(string(data), "   Agent:"))
+	require.Equal(t, 4, strings.Count(string(data), "   Model:"))
+	require.True(t, strings.HasSuffix(string(data), "Skipping disabled stage: codeReview\n\n"))
 }
 
 func TestStageChangeReports(t *testing.T) {
@@ -222,30 +195,20 @@ func TestStageChangeReports(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
 			run, err := NewRun("feature", CommandRun, config.Stages)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			t.Cleanup(func() { run.Finish(nil) })
 			report := filepath.Join(run.Path(), "changes.txt")
 			if !tc.missing {
-				if err := os.WriteFile(report, []byte(tc.content), 0600); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.WriteFile(report, []byte(tc.content), 0600))
 			}
 			run.SetChangeSummaryPath(report)
-			if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, run.RecordStageResult("implementation", time.Second, nil))
 			data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(data), "   Changes:   "+tc.want+"\n") {
-				t.Fatalf("unexpected summary: %s", data)
-			}
-			if _, err := os.Stat(report); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("report remains after recording: %v", err)
-			}
+			require.NoError(t, err)
+			require.Contains(t, string(data), "   Changes:   "+tc.want+"\n")
+
+			_, err = os.Stat(report)
+			require.ErrorIs(t, err, os.ErrNotExist)
 		})
 	}
 }
@@ -253,59 +216,37 @@ func TestStageChangeReports(t *testing.T) {
 func TestStageChangeReportRetainedOnSummaryWriteFailure(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandRun, config.Stages)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { run.Finish(nil) })
 	report := filepath.Join(run.Path(), "changes.txt")
-	if err := os.WriteFile(report, []byte("Added tracking."), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(report, []byte("Added tracking."), 0600))
 	run.SetChangeSummaryPath(report)
-	if err := run.summary.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := run.RecordStageResult("implementation", time.Second, nil); err == nil {
-		t.Fatal("expected summary write error")
-	}
-	if _, err := os.Stat(report); err != nil {
-		t.Fatalf("report lost on write failure: %v", err)
-	}
+	require.NoError(t, run.summary.Close())
+	require.Error(t, run.RecordStageResult("implementation", time.Second, nil))
+
+	_, err = os.Stat(report)
+	require.NoError(t, err)
 }
 
 func TestStageChangeReportResetAndSymlinkRejected(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("feature", CommandRun, config.Stages)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { run.Finish(nil) })
 	run.StartStage("implementation")
 	report := filepath.Join(run.Path(), "changes.txt")
-	if err := os.WriteFile(report, []byte("Earlier stage changes."), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(report, []byte("Earlier stage changes."), 0600))
 	run.SetChangeSummaryPath(report)
 	run.FinishStage(nil)
 	run.StartStage("codeReview")
-	if run.changeSummaryPath != "" {
-		t.Fatal("new stage retained earlier report path")
-	}
+	require.Empty(t, run.changeSummaryPath)
 	link := filepath.Join(run.Path(), "report-link.txt")
-	if err := os.Symlink(report, link); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Symlink(report, link))
 	run.SetChangeSummaryPath(link)
-	if err := run.RecordStageResult("codeReview", time.Second, nil); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, run.RecordStageResult("codeReview", time.Second, nil))
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(data), "Earlier stage changes") {
-		t.Fatal("summary followed report symlink")
-	}
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "Earlier stage changes")
 }
 
 func TestHeaderListsOnlyPlannedStages(t *testing.T) {
@@ -320,19 +261,13 @@ func TestHeaderListsOnlyPlannedStages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			prepareLogTestDirectory(t)
 			run, err := NewRun("feature", CommandRun, tc.planned)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			run.StartStage("implementation")
 			run.FinishStage(nil)
 			run.Finish(nil)
 			data, err := os.ReadFile(filepath.Join(run.Path(), "01-implementation.log"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(data), "\nPlanned stages: "+tc.want+"\n") {
-				t.Fatalf("header does not list planned stages %q:\n%s", tc.want, data)
-			}
+			require.NoError(t, err)
+			require.Contains(t, string(data), "\nPlanned stages: "+tc.want+"\n")
 		})
 	}
 }
@@ -340,9 +275,9 @@ func TestHeaderListsOnlyPlannedStages(t *testing.T) {
 func prepareLogTestDirectory(t *testing.T) {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	if output, err := exec.Command("git", "init", "-b", "main").CombinedOutput(); err != nil {
-		t.Fatalf("initialize test repository: %v\n%s", err, output)
-	}
+
+	output, err := exec.Command("git", "init", "-b", "main").CombinedOutput()
+	require.NoError(t, err, "%s", output)
 }
 
 func TestInvocationDirectoryAllocation(t *testing.T) {
@@ -351,70 +286,50 @@ func TestInvocationDirectoryAllocation(t *testing.T) {
 			t.Chdir(t.TempDir())
 			// Earlier flat logs must remain untouched.
 			legacy := filepath.Join("logs", "feature-logs-2026-10-08_19-38-48.007046183")
-			if err := os.MkdirAll(legacy, 0700); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.MkdirAll(legacy, 0700))
 			legacyFile := filepath.Join(legacy, summaryFile)
-			if err := os.WriteFile(legacyFile, []byte("earlier summary"), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(legacyFile, []byte("earlier summary"), 0600))
 			// A non-UTC input also produces the existing UTC timestamp format.
 			started := time.Date(2026, 10, 8, 21, 38, 48, 7046183, time.FixedZone("UTC+2", 2*60*60))
 			parent := filepath.Join("logs", "feature-logs")
 			name := firstCommand + "-2026-10-08_19-38-48.007046183"
 			for i := 1; i <= 3; i++ {
 				path, err := createRunDirectory("feature/logs", firstCommand, started)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				want := filepath.Join(parent, name)
 				if i > 1 {
 					want += fmt.Sprintf("-%d", i)
 				}
-				if path != want || filepath.IsAbs(path) {
-					t.Fatalf("path = %q, want relative %q", path, want)
-				}
-				if err := os.WriteFile(filepath.Join(path, summaryFile), []byte(path), 0600); err != nil {
-					t.Fatal(err)
-				}
+				require.Equal(t, want, path)
+				require.False(t, filepath.IsAbs(path))
+				require.NoError(t, os.WriteFile(filepath.Join(path, summaryFile), []byte(path), 0600))
 			}
 			otherCommand := CommandContinue
 			if firstCommand == CommandContinue {
 				otherCommand = CommandRun
 			}
 			otherPath, err := createRunDirectory("feature/logs", otherCommand, started)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if otherPath != filepath.Join(parent, otherCommand+"-2026-10-08_19-38-48.007046183") {
-				t.Fatalf("other invocation path = %q", otherPath)
-			}
+			require.NoError(t, err)
+			require.Equal(t, filepath.Join(parent, otherCommand+"-2026-10-08_19-38-48.007046183"), otherPath)
 			children, err := os.ReadDir(parent)
-			if err != nil || len(children) != 4 {
-				t.Fatalf("children = %v, error = %v; want four", children, err)
-			}
+			require.NoError(t, err)
+			require.Len(t, children, 4)
 			for _, child := range children {
 				path := filepath.Join(parent, child.Name())
 				if path == otherPath {
 					continue
 				}
 				data, err := os.ReadFile(filepath.Join(path, summaryFile))
-				if err != nil || string(data) != path {
-					t.Fatalf("earlier summary at %s = %q, error = %v", path, data, err)
-				}
+				require.NoError(t, err)
+				require.Equal(t, path, string(data))
 			}
 			data, err := os.ReadFile(legacyFile)
-			if err != nil || string(data) != "earlier summary" {
-				t.Fatalf("legacy summary = %q, error = %v", data, err)
-			}
+			require.NoError(t, err)
+			require.Equal(t, "earlier summary", string(data))
 			for _, path := range []string{"logs", parent, otherPath} {
 				info, err := os.Stat(path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if info.Mode().Perm() != 0700 {
-					t.Errorf("%s permissions = %04o, want 0700", path, info.Mode().Perm())
-				}
+				require.NoError(t, err)
+				assert.Equal(t, os.FileMode(0700), info.Mode().Perm(), "path %s", path)
 			}
 		})
 	}
@@ -424,78 +339,58 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 	prepareLogTestDirectory(t)
 	// Compare summary permissions to the prior os.Create behavior, including umask.
 	reference, err := os.Create(filepath.Join(t.TempDir(), summaryFile))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	referenceInfo, statErr := reference.Stat()
-	if err := errors.Join(statErr, reference.Close()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, errors.Join(statErr, reference.Close()))
 	parent := filepath.Join("logs", "Feature-logs._-9-")
 	paths := make(map[string]int)
 	for i, command := range []string{CommandRun, CommandContinue, CommandContinue, CommandRun} {
 		run, err := NewRun("Feature/logs._-9é", command, []config.Stage{config.StageImplementation})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		t.Cleanup(func() { run.Finish(nil) })
-		if filepath.Dir(run.Path()) != parent || !strings.HasPrefix(filepath.Base(run.Path()), command+"-") {
-			t.Fatalf("unexpected invocation path: %s", run.Path())
-		}
-		if _, exists := paths[run.Path()]; exists {
-			t.Fatalf("reused invocation path: %s", run.Path())
-		}
+		require.Equal(t, parent, filepath.Dir(run.Path()))
+		require.True(t, strings.HasPrefix(filepath.Base(run.Path()), command+"-"))
+
+		_, exists := paths[run.Path()]
+		require.False(t, exists)
+
 		paths[run.Path()] = i
 		run.StartStage("implementation")
 		fmt.Fprintf(run.Stream("stdout"), "invocation %d\n", i)
 		run.FinishStage(nil)
-		if err := run.RecordStageResult("implementation", time.Second, nil); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, run.RecordStageResult("implementation", time.Second, nil))
 		run.Finish(nil)
 	}
 	children, err := os.ReadDir(parent)
-	if err != nil || len(children) != 4 {
-		t.Fatalf("children = %v, error = %v; want four", children, err)
-	}
+	require.NoError(t, err)
+	require.Len(t, children, 4)
 	for path, invocation := range paths {
 		entries, err := os.ReadDir(path)
-		if err != nil || len(entries) != 3 {
-			t.Fatalf("artifacts in %s = %v, error = %v", path, entries, err)
-		}
+		require.NoError(t, err)
+		require.Len(t, entries, 3)
 		data, err := os.ReadFile(filepath.Join(path, "01-implementation.log"))
-		if err != nil || strings.Count(string(data), "invocation ") != 1 || !strings.Contains(string(data), fmt.Sprintf("invocation %d\n", invocation)) {
-			t.Fatalf("stage log at %s = %q, error = %v", path, data, err)
-		}
+		require.NoError(t, err)
+		require.Equal(t, 1, strings.Count(string(data), "invocation "))
+		require.Contains(t, string(data), fmt.Sprintf("invocation %d\n", invocation))
 		for _, entry := range entries {
 			info, err := entry.Info()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			want := os.FileMode(0600)
 			if entry.Name() == summaryFile {
 				// The summary retains os.Create's existing permissions.
 				want = referenceInfo.Mode().Perm()
 			}
-			if info.Mode().Perm() != want {
-				t.Errorf("%s permissions = %04o, want %04o", entry.Name(), info.Mode().Perm(), want)
-			}
+			assert.Equal(t, want, info.Mode().Perm(), "entry %s", entry.Name())
 		}
 	}
 }
 
 func TestBranchDirectoryCreationFailure(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.Mkdir("logs", 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join("logs", "feature"), []byte("existing file"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.Mkdir("logs", 0700))
+	require.NoError(t, os.WriteFile(filepath.Join("logs", "feature"), []byte("existing file"), 0600))
 	_, err := createRunDirectory("feature", CommandContinue, time.Now())
-	if err == nil || !strings.Contains(err.Error(), "create branch log directory") {
-		t.Fatalf("expected contextual branch directory error, got %v", err)
-	}
+	require.ErrorContains(t, err, "create branch log directory")
 }
 
 func TestBranchDirectoryRejectsDotComponents(t *testing.T) {
@@ -504,13 +399,11 @@ func TestBranchDirectoryRejectsDotComponents(t *testing.T) {
 			workingDirectory := t.TempDir()
 			t.Chdir(workingDirectory)
 			path, err := createRunDirectory(branch, CommandContinue, time.Now())
-			if err == nil || !strings.Contains(err.Error(), "invalid branch directory") || path != "" {
-				t.Fatalf("expected contextual rejection, got path %q, error %v", path, err)
-			}
+			require.ErrorContains(t, err, "invalid branch directory")
+			require.Empty(t, path)
 			entries, err := os.ReadDir(workingDirectory)
-			if err != nil || len(entries) != 0 {
-				t.Fatalf("invalid branch created entries: %v, error %v", entries, err)
-			}
+			require.NoError(t, err)
+			require.Len(t, entries, 0)
 		})
 	}
 }
@@ -521,29 +414,24 @@ func TestBranchDirectoryRejectsSymlinks(t *testing.T) {
 			workingDirectory := t.TempDir()
 			t.Chdir(workingDirectory)
 			for _, directory := range []string{"logs", "outside", filepath.Join("logs", "other-branch")} {
-				if err := os.MkdirAll(directory, 0700); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.MkdirAll(directory, 0700))
 			}
-			if err := os.Symlink(target, filepath.Join("logs", "feature")); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.Symlink(target, filepath.Join("logs", "feature")))
 			path, err := createRunDirectory("feature", CommandContinue, time.Now())
-			if err == nil || !strings.Contains(err.Error(), "create branch log directory") || path != "" {
-				t.Fatalf("expected contextual symlink rejection, got path %q, error %v", path, err)
-			}
+			require.ErrorContains(t, err, "create branch log directory")
+			require.Empty(t, path)
 			for _, directory := range []string{"outside", filepath.Join("logs", "other-branch")} {
 				entries, err := os.ReadDir(directory)
-				if err != nil || len(entries) != 0 {
-					t.Fatalf("symlink target %s gained entries: %v, error %v", directory, entries, err)
-				}
+				require.NoError(t, err)
+				require.Len(t, entries, 0)
 			}
-			if _, err := os.Stat("missing"); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("dangling symlink target was created: %v", err)
-			}
-			if targetAfter, err := os.Readlink(filepath.Join("logs", "feature")); err != nil || targetAfter != target {
-				t.Fatalf("branch symlink changed: target %q, error %v", targetAfter, err)
-			}
+
+			_, err = os.Stat("missing")
+			require.ErrorIs(t, err, os.ErrNotExist)
+
+			targetAfter, err := os.Readlink(filepath.Join("logs", "feature"))
+			require.NoError(t, err)
+			require.Equal(t, target, targetAfter)
 		})
 	}
 }

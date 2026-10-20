@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
 )
@@ -19,27 +22,18 @@ func TestResumeStartingStage(t *testing.T) {
 	} {
 		t.Run(tc.status, func(t *testing.T) {
 			path := t.TempDir()
-			if err := os.WriteFile(filepath.Join(path, executionlog.StageStatusFilename), []byte("codeReview,"+tc.status+"\n"), 0600); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(path, executionlog.StageStatusFilename), []byte("codeReview,"+tc.status+"\n"), 0600))
 			called := false
 			cmd := newRootCmd(func(opts workflowOptions) error {
 				called = true
-				if opts.StartStage != tc.want {
-					t.Errorf("stage = %q; want %q", opts.StartStage, tc.want)
-				}
-				if opts.ResumePath != path || !opts.Continue {
-					t.Errorf("unexpected options: %+v", opts)
-				}
+				assert.Equal(t, tc.want, opts.StartStage)
+				assert.Equal(t, path, opts.ResumePath)
+				assert.True(t, opts.Continue)
 				return nil
 			})
 			cmd.SetArgs([]string{"resume", path})
-			if err := cmd.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			if !called {
-				t.Fatal("workflow was not called")
-			}
+			require.NoError(t, cmd.Execute())
+			require.True(t, called)
 		})
 	}
 }

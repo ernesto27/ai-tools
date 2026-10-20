@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"soft-factory/internal/config"
 )
 
@@ -28,16 +30,16 @@ func TestWorkflowBranch(t *testing.T) {
 			t.Chdir(t.TempDir())
 			var cfg config.Config
 			err := json.Unmarshal([]byte(`{"agentSandbox":`+tt.settings+`}`), &cfg)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("decode error = %v", err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 			if err != nil {
 				return
 			}
 			got, _ := workflowBranch(cfg, tt.opts)
-			if got != tt.want {
-				t.Fatalf("branch = %q, want %q", got, tt.want)
-			}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -50,16 +52,12 @@ func TestWorkflowBranchPresence(t *testing.T) {
 		{`null`, false}, {`{}`, false}, {`{"branch":""}`, false}, {`{"run":{"branch":""}}`, true},
 	} {
 		var cfg config.Config
-		if err := json.Unmarshal([]byte(`{"agentSandbox":`+tc.settings+`}`), &cfg); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, json.Unmarshal([]byte(`{"agentSandbox":`+tc.settings+`}`), &cfg))
 		branch, set := workflowBranch(cfg, workflowOptions{})
-		if branch != "" || set != tc.wantSet {
-			t.Fatalf("branch presence for %s = %q, %t", tc.settings, branch, set)
-		}
+		require.Empty(t, branch)
+		require.Equal(t, tc.wantSet, set)
 		branch, set = workflowBranch(cfg, workflowOptions{Branch: "explicit"})
-		if branch != "explicit" || !set {
-			t.Fatal("explicit branch override lost")
-		}
+		require.Equal(t, "explicit", branch)
+		require.True(t, set)
 	}
 }

@@ -6,6 +6,7 @@ require (
 	github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261016150234-8042bb4d5f95
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.2
+	github.com/stretchr/testify v1.12.1
 	golang.org/x/oauth2 v0.32.0
 	google.golang.org/api v0.247.0
 )
@@ -41,6 +42,7 @@ require (
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect

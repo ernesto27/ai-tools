@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
@@ -61,10 +62,17 @@ func publishResumedPR(ctx context.Context, opts Options, record worktreeRecord,
 	if err != nil {
 		return fmt.Errorf("reading PR description after successful push: %w", err)
 	}
+	attachments, err := verificationFiles(filepath.Join(record.Path, verificationDir))
+	if err != nil {
+		return fmt.Errorf("collecting verification files after successful push: %w", err)
+	}
 	body := appendPRChecklist(existing, content.Body)
-	if err := client.UpdateBody(ctx, opts.prURL, body); err != nil {
+	if err := client.UpdateBody(ctx, opts.prURL, body, attachments...); err != nil {
 		return fmt.Errorf("updating PR description after successful push: %w", err)
 	}
 	fmt.Fprintf(out, "PR description updated: %s\n", opts.prURL)
+	if err := clearVerificationFiles(record.Path); err != nil {
+		fmt.Fprintf(out, "Warning: PR updated, but verification cleanup failed: %v\n", err)
+	}
 	return nil
 }

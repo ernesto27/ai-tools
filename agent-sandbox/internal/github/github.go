@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -117,13 +119,18 @@ func (c *Client) FindOpen(ctx context.Context, head, base string) (*PullRequest,
 
 // Create supplies every interactive input explicitly and omits --draft. The
 // description is stdin data, so quotes, newlines and shell syntax stay literal.
-func (c *Client) Create(ctx context.Context, head, base, title, body string, reviewers []string) (string, error) {
+func (c *Client) Create(ctx context.Context, head, base, title, body string, reviewers []string, attachments ...string) (string, error) {
 	args := []string{"pr", "create",
 		"--repo", c.Repository, "--head", head, "--base", base,
 		"--title", title, "--body-file", "-"}
 	for _, reviewer := range reviewers {
 		args = append(args, "--reviewer", reviewer)
 	}
+	body, attachmentArgs, err := prepareAttachments(body, attachments)
+	if err != nil {
+		return "", err
+	}
+	args = append(args, attachmentArgs...)
 	output, err := c.command(ctx, strings.NewReader(body), args...)
 	if err != nil {
 		return "", err
@@ -133,6 +140,32 @@ func (c *Client) Create(ctx context.Context, head, base, title, body string, rev
 		return "", fmt.Errorf("GitHub CLI returned no pull request URL")
 	}
 	return prURL, nil
+}
+
+func prepareAttachments(body string, paths []string) (string, []string, error) {
+	var args []string
+	for _, path := range paths {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+			".mp4", ".mov", ".webm":
+			args = append(args, "--attach", path)
+		case ".txt", ".log", ".md", ".json":
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return "", nil, fmt.Errorf("reading attachment %s: %w", path, err)
+			}
+			// Escape file contents so they render literally inside HTML.
+			body += "\n\n<details>\n<summary>" +
+				html.EscapeString(filepath.Base(path)) +
+				"</summary>\n\n<pre>" +
+				html.EscapeString(string(content)) +
+				"</pre>\n</details>"
+		default:
+			// Optional evidence may contain temporary scripts or unsupported reports.
+			continue
+		}
+	}
+	return body, args, nil
 }
 
 // MissingReviewers checks recovery without mutating a PR that may have been
@@ -191,9 +224,15 @@ func (c *Client) ReadOpenBody(ctx context.Context, prURL, head, base string) (st
 }
 
 // UpdateBody supplies body data through stdin so shell syntax stays literal.
-func (c *Client) UpdateBody(ctx context.Context, prURL, body string) error {
-	_, err := c.command(ctx, strings.NewReader(body), "pr", "edit", prURL,
-		"--repo", c.Repository, "--body-file", "-")
+func (c *Client) UpdateBody(ctx context.Context, prURL, body string, attachments ...string) error {
+	body, attachmentArgs, err := prepareAttachments(body, attachments)
+	if err != nil {
+		return err
+	}
+	args := []string{"pr", "edit", prURL,
+		"--repo", c.Repository, "--body-file", "-"}
+	args = append(args, attachmentArgs...)
+	_, err = c.command(ctx, strings.NewReader(body), args...)
 	return err
 }
 

@@ -2,8 +2,11 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"path/filepath"
 	"strings"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
@@ -109,9 +112,20 @@ func publishPullRequest(ctx context.Context, opts Options, record worktreeRecord
 		printExistingPR(out, pr)
 		return nil
 	}
-	prURL, createErr := githubClient.Create(ctx, opts.Branch, record.BaseBranch, content.Title, content.Body, opts.Reviewers)
+
+	attachments, err := verificationFiles(
+		filepath.Join(record.Path, verificationDir),
+	)
+	if err != nil {
+		return fmt.Errorf("collecting verification files: %w", err)
+	}
+
+	prURL, createErr := githubClient.Create(ctx, opts.Branch, record.BaseBranch, content.Title, content.Body, opts.Reviewers, attachments...)
 	if createErr == nil {
 		fmt.Fprintf(out, "Pull request ready for review: %s\n", prURL)
+		if err := clearVerificationFiles(record.Path); err != nil {
+			fmt.Fprintf(out, "Warning: PR created, but verification cleanup failed: %v\n", err)
+		}
 		return nil
 	}
 	if ctx.Err() != nil {
@@ -159,4 +173,34 @@ func printExistingPR(out io.Writer, pr *github.PullRequest) {
 		state = " (draft)"
 	}
 	fmt.Fprintf(out, "Existing pull request%s: %s\n", state, strings.TrimSpace(pr.URL))
+}
+
+func verificationFiles(folder string) ([]string, error) {
+	root, err := filepath.Abs(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			// Verification is optional, so a missing evidence folder must not block publication.
+			if path == root && errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		// Keep the hidden evidence root, but exclude dotfiles and hidden subdirectories.
+		if path != root && strings.HasPrefix(entry.Name(), ".") {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Type().IsRegular() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
 }

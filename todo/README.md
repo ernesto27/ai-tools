@@ -1,42 +1,39 @@
 # Taskline
 
-A local-first todo TUI built with Rust, Ratatui, Crossterm, and SQLite. All interaction happens in your terminal; no web server or browser is needed.
+A local-first command-line todo app built with Rust and SQLite. Each command prints its result and exits. It works in scripts and pipes without an interactive terminal.
 
 ## Setup
 
-Install a current stable Rust toolchain and a C compiler (for bundled SQLite). Run in an interactive terminal:
+Install a current stable Rust toolchain and a C compiler (for bundled SQLite):
 
 ```sh
 cd todo
-cargo run --release
+cargo build --release
+./target/release/taskline --help
 ```
 
-The database is created automatically at `taskline.sqlite3` in the working directory. Existing Taskline SQLite databases work without migration and retain titles, notes, categories, priorities, completion state, and timestamps. No sample tasks are inserted.
+The database is created automatically at `taskline.sqlite3` in the working directory when a task command runs. Set `DATABASE_PATH=/path/to/tasks.sqlite3` to choose another file. Existing Taskline databases retain all tasks and metadata without migration. Help does not open a database; no sample tasks are inserted.
 
-Choose a different database with:
+## Commands
 
 ```sh
-DATABASE_PATH=/path/to/tasks.sqlite3 cargo run --release
+# Alternatively, use cargo run -- <command> [arguments].
+./target/release/taskline add "Write documentation" --category Work --priority High --notes "Include examples"
+./target/release/taskline list
+./target/release/taskline list active
+./target/release/taskline show 1
+./target/release/taskline edit 1 --title "Review documentation" --notes ""
+./target/release/taskline complete 1
+./target/release/taskline list completed
+./target/release/taskline reopen 1
+./target/release/taskline delete 1
 ```
 
-The old `--tui` switch is unnecessary. Server configuration and JSON API endpoints have been removed.
+`list` accepts `all` (the default), `active`, or `completed` and prints tab-separated ID, status, category, priority, and title. `show` prints all fields, including notes and creation time. Control characters in stored text are displayed as spaces to keep terminal output safe and each record on one line.
 
-## Keyboard controls
+`add` accepts a quoted title and optional `--notes`, `--category`, and `--priority`. Categories are `Personal` (default), `Work`, and `Learning`; priorities are `Low`, `Medium` (default), and `High`. `edit` accepts the same options plus `--title`, requires at least one option, and preserves omitted fields and completion state. Pass `--notes ""` to clear notes.
 
-| Key | Action |
-| --- | --- |
-| ↑/↓ or k/j | Select and scroll tasks |
-| n | Create a task |
-| e | Edit the selected task |
-| Space | Complete or reopen the selected task |
-| d | Request deletion; y confirms, n or Esc cancels |
-| f | Cycle All, Active, Completed filters |
-| q or Esc | Quit from the task list |
-| Ctrl-C | Quit from any screen |
-
-The editor starts with existing values when editing. Type to append text and use Backspace to remove characters, including Unicode. Tab and Shift-Tab move between title, notes, category, and priority. Left/Right cycle categories (Personal, Work, Learning) and priorities (Low, Medium, High). Enter saves; Esc discards edits. Completion is preserved when editing.
-
-Titles are trimmed and must contain 1–200 characters; notes allow up to 2,000 characters. Validation and database errors appear in the help area, keeping edits available for retry. Existing multiline notes are preserved; the editor accepts single-line typing. The list scrolls with selection, shows task details, and keeps keyboard help visible. Use a terminal of at least 80 columns and 24 rows for comfortable editing. Terminal mode is restored on normal exit, errors, and panics.
+Titles are trimmed and must contain 1–200 characters. Notes allow up to 2,000 characters. IDs must be positive integers. Invalid arguments and database errors print to stderr and exit with status 1; successful commands exit with status 0. Deletion is immediate, with no confirmation prompt. No arguments, `help`, `-h`, and `--help` display usage. There is no TUI or web server.
 
 ## Verify
 
@@ -47,4 +44,4 @@ cargo clippy --all-targets -- -D warnings
 cargo build --release
 ```
 
-Tests exercise keyboard-driven creation, editing, validation, cancellation, completion/reopening, deletion, filters, empty lists, rendering/help, small terminals, and SQLite persistence across reopening.
+Integration tests invoke the CLI without a terminal and check persistence, task lifecycle, filters, partial edits, argument validation, and error exit codes.

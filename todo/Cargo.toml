@@ -5,5 +5,3 @@ edition = "2021"
 
 [dependencies]
 rusqlite = { version = "0.37", features = ["bundled"] }
-crossterm = "0.29"
-ratatui = { version = "0.30", default-features = false, features = ["crossterm_0_29", "layout-cache"] }

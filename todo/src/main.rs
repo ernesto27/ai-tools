@@ -1,7 +1,9 @@
+mod cli;
 mod store;
-mod tui;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = std::env::var("DATABASE_PATH").unwrap_or("taskline.sqlite3".into());
-    tui::run(store::open(&path)?)
+fn main() {
+    if let Err(error) = cli::run(std::env::args().skip(1).collect()) {
+        eprintln!("error: {error}");
+        std::process::exit(1);
+    }
 }

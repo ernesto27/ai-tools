@@ -1,48 +1,50 @@
 # Taskline
 
-A local-first task app with a terminal-inspired web interface, an Axum JSON API, SQLite persistence, and an interactive Rust terminal interface. Create, edit, complete, reopen, delete, and filter tasks in either interface. The web app also includes notes, lists, priorities, search, sorting, and keyboard shortcuts.
+A local-first todo TUI built with Rust, Ratatui, Crossterm, and SQLite. All interaction happens in your terminal; no web server or browser is needed.
 
-## Run
+## Setup
 
-Requires a Rust toolchain and a C compiler (for bundled SQLite). From this directory:
-
-```sh
-cargo run
-```
-
-Open http://127.0.0.1:3000. No Node build or database setup is required. The database is automatically created at `taskline.sqlite3` in the working directory. It starts empty; no sample tasks are inserted. Fonts use Google Fonts with system fallbacks.
+Install a current stable Rust toolchain and a C compiler (for bundled SQLite). Run in an interactive terminal:
 
 ```sh
-cargo run -- --tui
+cd todo
+cargo run --release
 ```
 
-The TUI shares the same database when started from the same directory. Use arrows to select, `n` to create, `e` to rename, Space to complete/reopen, `d` to delete with confirmation, `f` to cycle status filters, and `q` to quit. Web notes, lists, and priorities are preserved when editing in the TUI.
+The database is created automatically at `taskline.sqlite3` in the working directory. Existing Taskline SQLite databases work without migration and retain titles, notes, categories, priorities, completion state, and timestamps. No sample tasks are inserted.
 
-Override `DATABASE_PATH` to select a database file and `BIND_ADDR` to select the server address. Default binding is loopback; this single-user app has no authentication. Keep it local or protect it with an authenticated reverse proxy.
+Choose a different database with:
 
-Web shortcuts: `n` creates a task, `/` focuses search, `?` opens help, Escape closes dialogs. Tasks are only shown as saved after the server confirms the database write. Errors leave edits available to retry.
-
-## JSON API
-
-- `GET /api/tasks?status=all|active|completed`
-- `POST /api/tasks` creates a task (201).
-- `PUT /api/tasks/{id}` replaces editable fields (200).
-- `DELETE /api/tasks/{id}` deletes a task (204).
-
-Create/update body:
-
-```json
-{"title":"Read a chapter","notes":"Start small","category":"Learning","priority":"Low","completed":false}
+```sh
+DATABASE_PATH=/path/to/tasks.sqlite3 cargo run --release
 ```
 
-Only `title` is required. Defaults: empty notes, Personal list, Medium priority, active status. Lists: Work, Personal, Learning. Priorities: Low, Medium, High. Titles are trimmed and limited to 200 characters; notes to 2,000. Invalid fields/status return 400, missing tasks 404. Malformed JSON is rejected by Axum. Query parameters are validated and SQL values are bound parameters.
+The old `--tui` switch is unnecessary. Server configuration and JSON API endpoints have been removed.
+
+## Keyboard controls
+
+| Key | Action |
+| --- | --- |
+| ↑/↓ or k/j | Select and scroll tasks |
+| n | Create a task |
+| e | Edit the selected task |
+| Space | Complete or reopen the selected task |
+| d | Request deletion; y confirms, n or Esc cancels |
+| f | Cycle All, Active, Completed filters |
+| q or Esc | Quit from the task list |
+| Ctrl-C | Quit from any screen |
+
+The editor starts with existing values when editing. Type to append text and use Backspace to remove characters, including Unicode. Tab and Shift-Tab move between title, notes, category, and priority. Left/Right cycle categories (Personal, Work, Learning) and priorities (Low, Medium, High). Enter saves; Esc discards edits. Completion is preserved when editing.
+
+Titles are trimmed and must contain 1–200 characters; notes allow up to 2,000 characters. Validation and database errors appear in the help area, keeping edits available for retry. Existing multiline notes are preserved; the editor accepts single-line typing. The list scrolls with selection, shows task details, and keeps keyboard help visible. Use a terminal of at least 80 columns and 24 rows for comfortable editing. Terminal mode is restored on normal exit, errors, and panics.
 
 ## Verify
 
 ```sh
 cargo fmt --check
 cargo test
+cargo clippy --all-targets -- -D warnings
 cargo build --release
 ```
 
-Tests exercise the API lifecycle, filtering, input rejection, missing tasks, and persistence across database reopening. Static frontend assets are embedded in the binary; rebuild after changing them.
+Tests exercise keyboard-driven creation, editing, validation, cancellation, completion/reopening, deletion, filters, empty lists, rendering/help, small terminals, and SQLite persistence across reopening.

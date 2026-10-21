@@ -1,7 +1,6 @@
 use rusqlite::{params, Connection};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct Task {
     pub id: i64,
     pub title: String,
@@ -11,23 +10,13 @@ pub struct Task {
     pub completed: bool,
     pub created_at: String,
 }
-#[derive(Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Input {
     pub title: String,
-    #[serde(default)]
     pub notes: String,
-    #[serde(default = "default_category")]
     pub category: String,
-    #[serde(default = "default_priority")]
     pub priority: String,
-    #[serde(default)]
     pub completed: bool,
-}
-fn default_category() -> String {
-    "Personal".into()
-}
-fn default_priority() -> String {
-    "Medium".into()
 }
 impl Input {
     pub fn validate(&mut self) -> Result<(), String> {

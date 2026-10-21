@@ -433,6 +433,9 @@ func execute(options ExecuteOptions) (string, error) {
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	runErr := cmd.Run()
+	if err := options.Log.ArchiveVerification(ctx, options.Branch, options.Stage); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: archive %s verification: %v\n", options.Stage, err)
+	}
 	if options.Log != nil && options.ChangeSummaryFile != "" {
 		options.Log.RegisterStageChanges(ctx, options.Branch, options.ChangeSummaryFile)
 	}

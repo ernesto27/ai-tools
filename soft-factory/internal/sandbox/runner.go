@@ -195,10 +195,10 @@ func ReviewChanges(input TaskContext) error {
 
 	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
 
-	args = appendStageArgs(args, input.Config.Stages.ReviewChanges)
+	args = appendStageArgs(args, input.Config.Stages.ReviewChanges.StageConfig)
 	// The walkthrough keeps subprocess output live-only, so record its
 	// configured selection before executing without a stream logger.
-	selection, agent, model, provider := selectionDetails(input.Config, args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges)
+	selection, agent, model, provider := selectionDetails(input.Config, args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges.StageConfig)
 	input.Log.Selection(selection.Agent, selection.Model)
 	input.Log.Details(agent, model, provider)
 
@@ -206,7 +206,7 @@ func ReviewChanges(input TaskContext) error {
 		Config:      input.Config,
 		BranchSet:   input.BranchSet,
 		Stage:       config.StageReviewChanges,
-		StageConfig: input.Config.Stages.ReviewChanges,
+		StageConfig: input.Config.Stages.ReviewChanges.StageConfig,
 		Args:        args,
 		Branch:      input.Branch,
 		Prompt:      prompt,
@@ -251,7 +251,7 @@ func review(input TaskContext, stage config.Stage, skillPath, additionalSkill st
 
 	switch stage {
 	case config.StageCodeReview:
-		settings = input.Config.Stages.CodeReview
+		settings = input.Config.Stages.CodeReview.StageConfig
 	case config.StageSecurityReview:
 		settings = input.Config.Stages.SecurityReview.StageConfig
 	}
@@ -672,13 +672,13 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 	defer os.Remove(path)
 
 	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
-	args = appendStageArgs(args, input.Config.Stages.RiskClassification)
+	args = appendStageArgs(args, input.Config.Stages.RiskClassification.StageConfig)
 
 	options := ExecuteOptions{
 		Config:         input.Config,
 		BranchSet:      input.BranchSet,
 		Stage:          config.StageRiskClassification,
-		StageConfig:    input.Config.Stages.RiskClassification,
+		StageConfig:    input.Config.Stages.RiskClassification.StageConfig,
 		Args:           args,
 		Branch:         input.Branch,
 		Prompt:         prompt,

@@ -55,11 +55,11 @@ func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
 			t.Run(stage+"/"+name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
 				// Marshal names to preserve backslashes in JSON.
-				data, err := json.Marshal(map[string]any{"agentSandbox": map[string]any{}, "customSkills": map[string]string{stage: name}})
+				data, err := json.Marshal(map[string]any{"agentSandbox": map[string]any{}, "stages": map[string]any{stage: map[string]string{"customSkills": name}}})
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile("software-factory.json", data, 0600))
 				_, err = Load("software-factory.json")
-				require.ErrorContains(t, err, "customSkills."+stage+" must be")
+				require.ErrorContains(t, err, "stages."+stage+".customSkills must be")
 			})
 		}
 	}
@@ -126,11 +126,11 @@ func TestLoadDisabledStages(t *testing.T) {
 
 func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
 	t.Chdir(t.TempDir())
-	data := `{"agentSandbox":{},"customSkills":{"codeReview":"../escape"},"disabledStages":["codeReview"]}`
+	data := `{"agentSandbox":{},"stages":{"codeReview":{"customSkills":"../escape"}},"disabledStages":["codeReview"]}`
 	require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
 
 	_, err := Load("software-factory.json")
-	require.ErrorContains(t, err, "customSkills.codeReview must be")
+	require.ErrorContains(t, err, "stages.codeReview.customSkills must be")
 }
 
 func TestUnifiedSandboxConfiguration(t *testing.T) {
@@ -138,7 +138,7 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 		name, input string
 		wantErr     bool
 	}{
-		{"shared and section pointers", `{"documents":["support.md"],"customSkills":{"codeReview":"project"},"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent","model":"stage-model"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
+		{"shared and section pointers", `{"documents":["support.md"],"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent","model":"stage-model"},"codeReview":{"customSkills":"project"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
 		{"absent", `{"documents":[]}`, true},
 		{"null", `{"agentSandbox":null}`, false},
 		{"empty", `{"agentSandbox":{}}`, false},
@@ -170,6 +170,7 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 				require.NotNil(t, cfg.AgentSandbox.Resume.File)
 				require.Len(t, *cfg.AgentSandbox.Resume.File, 0)
 				require.Equal(t, "stage-agent", cfg.Stages.Implementation.Agent)
+				require.Equal(t, "project", cfg.Stages.CodeReview.CustomSkills)
 			}
 			if tt.name == "null" {
 				require.Nil(t, cfg.AgentSandbox.Run)
@@ -185,4 +186,80 @@ func TestLegacyOnlyDoesNotSupplyFactoryConfig(t *testing.T) {
 
 	_, err := Load("software-factory.json")
 	require.Error(t, err)
+}
+
+func TestNestedCustomSkillsConfiguration(t *testing.T) {
+	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+		for _, tc := range []struct {
+			name, value, want string
+			invalid           bool
+		}{
+			{"omitted", "", "", false},
+			{"empty", `""`, "", false},
+			{"null", "null", "", false},
+			{"name", `"project"`, "project", false},
+			{"array", `["project"]`, "", true},
+			{"object", `{}`, "", true},
+			{"number", `1`, "", true},
+			{"boolean", `true`, "", true},
+		} {
+			t.Run(stage+"/"+tc.name, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				property := ""
+				if tc.value != "" {
+					property = `,"customSkills":` + tc.value
+				}
+				data := `{"agentSandbox":{},"stages":{"` + stage + `":{"agent":"codex","model":"stage-model"` + property + `}}}`
+				require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+				cfg, err := Load("software-factory.json")
+				if tc.invalid {
+					require.ErrorContains(t, err, "parse factory configuration")
+					return
+				}
+				require.NoError(t, err)
+				var selection StageConfig
+				var skill string
+				switch stage {
+				case "codeReview":
+					selection, skill = cfg.Stages.CodeReview.StageConfig, cfg.Stages.CodeReview.CustomSkills
+				case "securityReview":
+					selection, skill = cfg.Stages.SecurityReview.StageConfig, cfg.Stages.SecurityReview.CustomSkills
+				case "riskClassification":
+					selection, skill = cfg.Stages.RiskClassification.StageConfig, cfg.Stages.RiskClassification.CustomSkills
+				case "reviewChanges":
+					selection, skill = cfg.Stages.ReviewChanges.StageConfig, cfg.Stages.ReviewChanges.CustomSkills
+				}
+				require.Equal(t, tc.want, skill)
+				require.Equal(t, StageConfig{Agent: "codex", Model: "stage-model"}, selection)
+			})
+		}
+	}
+}
+
+func TestTopLevelCustomSkillsIgnored(t *testing.T) {
+	for _, legacy := range []string{`{"codeReview":"../invalid"}`, `"ignored"`, `[]`, `1`, `true`, `null`} {
+		t.Run(legacy, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			for _, nested := range []string{"", "project"} {
+				data := `{"agentSandbox":{},"customSkills":` + legacy + `,"stages":{"codeReview":{"customSkills":"` + nested + `"}}}`
+				require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+				cfg, err := Load("software-factory.json")
+				require.NoError(t, err)
+				require.Equal(t, nested, cfg.Stages.CodeReview.CustomSkills)
+			}
+		})
+	}
+}
+
+func TestImplementationCustomSkillsIgnored(t *testing.T) {
+	for _, value := range []string{`"../invalid"`, `[]`, `{}`, `1`, `true`, `null`} {
+		t.Run(value, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			data := `{"agentSandbox":{},"stages":{"implementation":{"agent":"codex","model":"stage-model","customSkills":` + value + `}}}`
+			require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+			cfg, err := Load("software-factory.json")
+			require.NoError(t, err)
+			require.Equal(t, StageConfig{Agent: "codex", Model: "stage-model"}, cfg.Stages.Implementation)
+		})
+	}
 }

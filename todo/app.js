@@ -1,6 +1,22 @@
 (() => {
   'use strict';
 
+  const themeToggle = document.querySelector('#theme-toggle');
+  function applyTheme(theme) {
+    const dark = theme === 'dark';
+    document.documentElement.dataset.theme = theme;
+    themeToggle.setAttribute('aria-pressed', String(dark));
+    document.querySelector('.theme-icon').textContent = dark ? '☼' : '☾';
+    document.querySelector('#theme-label').textContent = dark ? 'Light mode' : 'Dark mode';
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#202521' : '#f1ecdb';
+  }
+  applyTheme(document.documentElement.dataset.theme);
+  themeToggle.addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(theme);
+    try { localStorage.setItem('daylist.theme.v1', theme); } catch { /* Theme still works in memory. */ }
+  });
+
   const STORAGE_KEY = 'daylist.tasks.v1';
   const form = document.querySelector('#task-form');
   const input = document.querySelector('#task-input');

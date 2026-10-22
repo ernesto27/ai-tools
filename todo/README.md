@@ -15,3 +15,7 @@ although localStorage behavior for local files varies between browsers.
 Use the same browser and address to return to your saved tasks. Clearing
 browser site data removes saved tasks. If storage is blocked or full, the
 app displays a warning and keeps working for the current page session.
+
+The retro interface opens in dark mode. Use the header theme button to switch
+to light mode; your preference is saved on this device. The pixel font is
+served locally and licensed under the SIL Open Font License (see `fonts/OFL.txt`).

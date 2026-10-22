@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/agentoutput"
 )
 
 type ClaudeDecoder struct {
@@ -97,7 +99,7 @@ func (d *ClaudeDecoder) Decode(line []byte) ([]Event, error) {
 			// Claude reports cache reads and writes separately from uncached input.
 			// Include both so normalized input has the same meaning for every agent.
 			input := usage.InputTokens + usage.CacheReadInputTokens + usage.CacheCreationInputTokens
-			events = append(events, Event{Kind: KindUsage, Scope: scope, Usage: &TokenUsage{
+			events = append(events, Event{Kind: KindUsage, Scope: scope, Usage: &agentoutput.TokenUsage{
 				InputTokens: input, CachedInputTokens: usage.CacheReadInputTokens,
 				OutputTokens: usage.OutputTokens, TotalTokens: input + usage.OutputTokens,
 			}})

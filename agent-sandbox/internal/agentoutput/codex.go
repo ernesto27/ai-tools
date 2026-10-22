@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/agentoutput"
 )
 
 type CodexDecoder struct{}
@@ -12,11 +14,11 @@ func NewCodexDecoder() *CodexDecoder { return &CodexDecoder{} }
 func (*CodexDecoder) Name() string   { return AgentCodex }
 
 type codexMessage struct {
-	Type    codexEventType  `json:"type"`
-	Item    codexItem       `json:"item"`
-	Message string          `json:"message"`
-	Error   json.RawMessage `json:"error"`
-	Usage   *TokenUsage     `json:"usage"`
+	Type    codexEventType          `json:"type"`
+	Item    codexItem               `json:"item"`
+	Message string                  `json:"message"`
+	Error   json.RawMessage         `json:"error"`
+	Usage   *agentoutput.TokenUsage `json:"usage"`
 }
 
 type codexItem struct {

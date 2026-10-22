@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/ernesto27/ai-tools/agent-sandbox/agentoutput"
 )
 
 // Writer belongs to one execution. Docker's stdout pump serializes writes.
@@ -93,9 +94,9 @@ func (w *Writer) render(now time.Time, e Event) {
 			return
 		}
 		record := struct {
-			Type  Kind        `json:"type"`
-			Agent string      `json:"agent"`
-			Usage *TokenUsage `json:"usage"`
+			Type  Kind                    `json:"type"`
+			Agent string                  `json:"agent"`
+			Usage *agentoutput.TokenUsage `json:"usage"`
 		}{Type: KindUsage, Agent: w.decoder.Name(), Usage: e.Usage}
 		data, err := json.Marshal(record)
 		if err != nil {

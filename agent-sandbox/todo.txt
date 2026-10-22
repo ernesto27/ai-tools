@@ -1,3 +1,4 @@
+[] - verification option flag to disable (screnshot , files in PR description)
 [] - Extend error categories and actionable recovery hints to Docker/image builds, authentication, agent failures, network requests, Git push/PR publication, and update failures.
 [x] - improve error messages in general
 [x] - container sandbox should commit changes

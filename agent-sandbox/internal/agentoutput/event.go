@@ -1,7 +1,11 @@
 // Package agentoutput decodes agent stdout into a shared terminal audit feed.
 package agentoutput
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/agentoutput"
+)
 
 // Decoder translates one complete JSONL record into presentation-independent
 // events. Each execution owns a decoder because tool correlation is stateful.
@@ -20,14 +24,7 @@ type Event struct {
 	ExitCode *int
 	Output   string
 	Detail   string
-	Usage    *TokenUsage
-}
-
-type TokenUsage struct {
-	InputTokens       int64 `json:"input_tokens"`
-	CachedInputTokens int64 `json:"cached_input_tokens"`
-	OutputTokens      int64 `json:"output_tokens"`
-	TotalTokens       int64 `json:"total_tokens"`
+	Usage    *agentoutput.TokenUsage
 }
 
 // Scope keeps a subagent's tool IDs separate from the main conversation.

@@ -42,6 +42,9 @@ cmd/agent-sandbox -> config
 - [config](../config/config.go) exposes the public `Config` and `Section` JSON
   types and a `DefaultModel` accessor backed by `internal/agent`. The CLI owns
   file loading, validation, reviewer normalization, and flag merging.
+- [agentoutput](../agentoutput/usage.go) exposes the public `TokenUsage` JSON
+  type for structured usage events. Internal agent output decoders and writers
+  use the same type, so external consumers can share its fields and JSON names.
 - [internal/openrouter](../internal/openrouter/openrouter.go) fetches the public
   model catalog without authentication, filtering by model creator with
   `model_authors` and sorting by `newest`. It decodes model metadata and formats

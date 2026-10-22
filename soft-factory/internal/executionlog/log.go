@@ -21,6 +21,9 @@ import (
 
 	"soft-factory/internal/config"
 	"soft-factory/internal/prompts"
+	"soft-factory/internal/tokencost"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/agentoutput"
 )
 
 const (
@@ -72,6 +75,7 @@ type Run struct {
 	ready                bool
 	stageStatus          *StageStatus
 	resuming             bool
+	tokenCost            *tokencost.TokenCost
 }
 
 // NewRun initializes a private invocation directory under the branch's log folder.
@@ -122,6 +126,14 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 		stageStatus.Close()
 		return nil, fmt.Errorf("write summary header: %w", writeErr)
 	}
+
+	tokenCostInstance, err := tokencost.NewTokenCost()
+	if err != nil {
+		file.Close()
+		stageStatus.Close()
+		return nil, fmt.Errorf("initialize token cost calculator: %w", err)
+	}
+
 	return &Run{
 			path:        path,
 			header:      header,
@@ -130,6 +142,7 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 			newline:     true,
 			ready:       true,
 			stageStatus: stageStatus,
+			tokenCost:   tokenCostInstance,
 		},
 		nil
 }
@@ -549,20 +562,23 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 	}
 
 	totalTokens := "unavailable"
-	total, err := readTotalTokens(r.stageLogPath)
+	tokenCostText := "unavailable"
+	total, tokenCostUsage, err := r.readTotalTokens()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: read token usage: %v\n", err)
 	} else {
 		totalTokens = formatTokenCount(total)
+		tokenCostText = fmt.Sprintf("$%.4f USD", tokenCostUsage)
 	}
 	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n   Tokens usage:  %s\n",
+		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n   Tokens usage:  %s\n   Tokens cost:  %s\n",
 		r.summaryEntries+1,
 		stageHeading(stage),
 		status,
 		r.stageAgent,
 		r.stageModel, formatDuration(elapsed),
 		totalTokens,
+		tokenCostText,
 	)
 
 	var line string
@@ -718,32 +734,37 @@ func formatTokenCount(total int64) string {
 	return fmt.Sprintf("%.0fK", float64(total)/1000)
 }
 
-func readTotalTokens(path string) (int64, error) {
-	file, err := os.Open(path)
+func (r *Run) readTotalTokens() (int64, float64, error) {
+	file, err := os.Open(r.stageLogPath)
 	if err != nil {
-		return 0, fmt.Errorf("open stage log: %w", err)
+		return 0, 0, fmt.Errorf("open stage log: %w", err)
 	}
 	defer file.Close()
 
 	reader := bufio.NewReader(file)
 	var total int64
 	found := false
+	var totalCost float64
+
 	for {
 		line, err := reader.ReadBytes('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, fmt.Errorf("read stage log: %w", err)
+			return 0, 0, fmt.Errorf("read stage log: %w", err)
 		}
 
 		var event struct {
-			Type  string `json:"type"`
-			Usage struct {
-				TotalTokens *int64 `json:"total_tokens"`
-			} `json:"usage"`
+			Type  string                  `json:"type"`
+			Usage *agentoutput.TokenUsage `json:"usage"`
 		}
 		if json.Unmarshal(line, &event) == nil &&
-			event.Type == "usage" && event.Usage.TotalTokens != nil {
-			total += *event.Usage.TotalTokens
+			event.Type == "usage" && event.Usage != nil {
+			total += event.Usage.TotalTokens
 			found = true
+			c, err := r.tokenCost.GetCostUsage(r.stageAgent, r.stageModel, *event.Usage)
+			if err != nil {
+				return 0, 0, err
+			}
+			totalCost += c
 		}
 		if errors.Is(err, io.EOF) {
 			break
@@ -751,7 +772,7 @@ func readTotalTokens(path string) (int64, error) {
 	}
 
 	if !found {
-		return 0, fmt.Errorf("usage event not found")
+		return 0, 0, fmt.Errorf("usage event not found")
 	}
-	return total, nil
+	return total, totalCost, nil
 }

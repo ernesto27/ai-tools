@@ -3,7 +3,7 @@ module soft-factory
 go 1.26.0
 
 require (
-	github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261016150234-8042bb4d5f95
+	github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261022200215-23e36cea5735
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1

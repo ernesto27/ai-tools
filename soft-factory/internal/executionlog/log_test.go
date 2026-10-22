@@ -67,10 +67,10 @@ func TestSummaryLifecycle(t *testing.T) {
 		err     error
 		line    string
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Tokens usage:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
+		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
+		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
 	}
 	for _, entry := range entries {
 		require.NoError(t, run.RecordStageResult(entry.stage, entry.elapsed, entry.err))
@@ -127,7 +127,11 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 		{"claude", "Interrupted without usage\n"},
 	} {
 		run.StartStage(config.StageImplementation)
-		run.Selection(tc.agent, "test-model")
+		model := "gpt-6.1-sol"
+		if tc.agent == "claude" {
+			model = "claude-opus-5.5"
+		}
+		run.Selection(tc.agent, model)
 
 		_, err := io.WriteString(run.Stream("stdout"), tc.output)
 		require.NoError(t, err)
@@ -138,7 +142,7 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 	require.NoError(t, err)
 	for _, want := range []string{"44K", "12", "73K", "427K", "unavailable"} {
-		require.Contains(t, string(data), "   Tokens usage:  "+want+"\n   Changes:")
+		require.Contains(t, string(data), "   Tokens usage:  "+want+"\n   Tokens cost:  ")
 	}
 }
 

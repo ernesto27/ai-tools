@@ -54,6 +54,29 @@ func TestResumeAppendsInSameFolder(t *testing.T) {
 	require.Len(t, folders, 1)
 }
 
+func TestResumedRunRecordsCodexCost(t *testing.T) {
+	prepareLogTestDirectory(t)
+	run, err := NewRun("resume-cost", CommandRun, []config.Stage{config.StageCodeReview})
+	require.NoError(t, err)
+	path := run.Path()
+	run.Finish(nil)
+
+	resumed, err := OpenRun(path, "resume-cost", []config.Stage{config.StageCodeReview})
+	require.NoError(t, err)
+	t.Cleanup(func() { resumed.Finish(nil) })
+	resumed.StartStage(config.StageCodeReview)
+	resumed.Selection("codex", "gpt-6.1-sol")
+	usage := `{"type":"usage","agent":"codex","usage":{"input_tokens":400000,"cached_input_tokens":300000,"output_tokens":10000,"total_tokens":410000}}` + "\n"
+	_, err = resumed.Stream("stdout").Write([]byte(usage))
+	require.NoError(t, err)
+	resumed.FinishStage(nil)
+	require.NoError(t, resumed.RecordStageResult(config.StageCodeReview, time.Second, nil))
+
+	summary, err := os.ReadFile(filepath.Join(path, summaryFile))
+	require.NoError(t, err)
+	require.Contains(t, string(summary), "   Tokens usage:  410K\n   Tokens cost:  $0.3300 USD\n")
+}
+
 func TestReviewArchiveUsesStageIdentifier(t *testing.T) {
 	prepareLogTestDirectory(t)
 	run, err := NewRun("test1", CommandRun, config.Stages)

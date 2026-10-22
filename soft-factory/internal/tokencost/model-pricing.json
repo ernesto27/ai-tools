@@ -1,0 +1,2684 @@
+{
+  "source": "https://openrouter.ai/api/v1/models",
+  "fetched_at": "2026-10-22T16:51:42Z",
+  "currency": "USD",
+  "price_unit": "per_million_tokens",
+  "source_pricing_unit": "USD per token; non-token charges retain their original units",
+  "models": [
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-fable-5",
+      "price": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5,
+        "cache_write_1h": 20
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "input_cache_write_1h": "0.00002"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-fable-5.1",
+      "price": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 0.25,
+        "cache_write": 12.5,
+        "cache_write_1h": 20
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.0000125",
+        "input_cache_write_1h": "0.00002"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-fable-5.1:batch",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.125,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-fable-5:batch",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-haiku-4.5",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 1.25,
+        "cache_write_1h": 2
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "input_cache_write_1h": "0.000002"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-haiku-4.5:batch",
+      "price": {
+        "input": 0.5,
+        "output": 2.5,
+        "cache_read": 0.049999999999999996,
+        "cache_write": 0.625,
+        "cache_write_1h": 1
+      },
+      "source_pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.000000625",
+        "input_cache_write_1h": "0.000001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-haiku-5.5",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.5,
+        "cache_read": 0.01,
+        "cache_write": 0.125,
+        "cache_write_1h": 0.19999999999999998
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "input_cache_write_1h": "0.0000002",
+        "overrides": [
+          {
+            "min_prompt_tokens": 100000,
+            "prompt": "0.0000005",
+            "completion": "0.0000025",
+            "input_cache_read": "0.00000005",
+            "input_cache_write": "0.000000625",
+            "input_cache_write_1h": "0.000001"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-haiku-5.5:batch",
+      "price": {
+        "input": 0.049999999999999996,
+        "output": 0.25,
+        "cache_read": 0.005,
+        "cache_write": 0.0625,
+        "cache_write_1h": 0.09999999999999999
+      },
+      "source_pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005",
+        "input_cache_write": "0.0000000625",
+        "input_cache_write_1h": "0.0000001",
+        "overrides": [
+          {
+            "min_prompt_tokens": 100000,
+            "prompt": "0.00000025",
+            "completion": "0.00000125",
+            "input_cache_read": "0.000000025",
+            "input_cache_write": "0.0000003125",
+            "input_cache_write_1h": "0.0000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.1",
+      "price": {
+        "input": 15,
+        "output": 75,
+        "cache_read": 1.5,
+        "cache_write": 18.75,
+        "cache_write_1h": 30
+      },
+      "source_pricing": {
+        "prompt": "0.000015",
+        "completion": "0.000075",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000015",
+        "input_cache_write": "0.00001875",
+        "input_cache_write_1h": "0.00003"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.1:batch",
+      "price": {
+        "input": 7.5,
+        "output": 37.5,
+        "cache_read": 0.75,
+        "cache_write": 9.375,
+        "cache_write_1h": 15
+      },
+      "source_pricing": {
+        "prompt": "0.0000075",
+        "completion": "0.0000375",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000075",
+        "input_cache_write": "0.000009375",
+        "input_cache_write_1h": "0.000015"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.5",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.5:batch",
+      "price": {
+        "input": 2.5,
+        "output": 12.5,
+        "cache_read": 0.25,
+        "cache_write": 3.125,
+        "cache_write_1h": 5
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.0000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.000003125",
+        "input_cache_write_1h": "0.000005"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.6",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.6:batch",
+      "price": {
+        "input": 2.5,
+        "output": 12.5,
+        "cache_read": 0.25,
+        "cache_write": 3.125,
+        "cache_write_1h": 5
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.0000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.000003125",
+        "input_cache_write_1h": "0.000005"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.7",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.7:batch",
+      "price": {
+        "input": 2.5,
+        "output": 12.5,
+        "cache_read": 0.25,
+        "cache_write": 3.125,
+        "cache_write_1h": 5
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.0000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.000003125",
+        "input_cache_write_1h": "0.000005"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.8",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-4.8:batch",
+      "price": {
+        "input": 2.5,
+        "output": 12.5,
+        "cache_read": 0.25,
+        "cache_write": 3.125,
+        "cache_write_1h": 5
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.0000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.000003125",
+        "input_cache_write_1h": "0.000005"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-5",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": 10
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-5.5",
+      "price": {
+        "input": 4,
+        "output": 20,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 5,
+        "cache_write_1h": 8
+      },
+      "source_pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000005",
+        "input_cache_write_1h": "0.000008"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-5.5:batch",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 2.5,
+        "cache_write_1h": 4
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025",
+        "input_cache_write_1h": "0.000004"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-opus-5:batch",
+      "price": {
+        "input": 2.5,
+        "output": 12.5,
+        "cache_read": 0.25,
+        "cache_write": 3.125,
+        "cache_write_1h": 5
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.0000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.000003125",
+        "input_cache_write_1h": "0.000005"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-4.5",
+      "price": {
+        "input": 3,
+        "output": 15,
+        "cache_read": 0.3,
+        "cache_write": 3.75,
+        "cache_write_1h": 6
+      },
+      "source_pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000003",
+        "input_cache_write": "0.00000375",
+        "input_cache_write_1h": "0.000006",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000006",
+            "completion": "0.0000225",
+            "input_cache_read": "0.0000006",
+            "input_cache_write": "0.0000075",
+            "input_cache_write_1h": "0.000012"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-4.5:batch",
+      "price": {
+        "input": 1.5,
+        "output": 7.5,
+        "cache_read": 0.15,
+        "cache_write": 1.875,
+        "cache_write_1h": 3
+      },
+      "source_pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000015",
+        "input_cache_write": "0.000001875",
+        "input_cache_write_1h": "0.000003",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000003",
+            "completion": "0.00001125",
+            "input_cache_read": "0.0000003",
+            "input_cache_write": "0.00000375",
+            "input_cache_write_1h": "0.000006"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-4.6",
+      "price": {
+        "input": 3,
+        "output": 15,
+        "cache_read": 0.3,
+        "cache_write": 3.75,
+        "cache_write_1h": 6
+      },
+      "source_pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000003",
+        "input_cache_write": "0.00000375",
+        "input_cache_write_1h": "0.000006"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-4.6:batch",
+      "price": {
+        "input": 1.5,
+        "output": 7.5,
+        "cache_read": 0.15,
+        "cache_write": 1.875,
+        "cache_write_1h": 3
+      },
+      "source_pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000015",
+        "input_cache_write": "0.000001875",
+        "input_cache_write_1h": "0.000003"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-5",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": 4
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "input_cache_write_1h": "0.000004"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-5.5",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 2.5,
+        "cache_write_1h": 4
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025",
+        "input_cache_write_1h": "0.000004"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-5.5:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.049999999999999996,
+        "cache_write": 1.25,
+        "cache_write_1h": 2
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125",
+        "input_cache_write_1h": "0.000002"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "anthropic/claude-sonnet-5:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 1.25,
+        "cache_write_1h": 2
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "input_cache_write_1h": "0.000002"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-3.5-turbo",
+      "price": {
+        "input": 0.5,
+        "output": 1.5,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000015"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-3.5-turbo-0613",
+      "price": {
+        "input": 1,
+        "output": 2,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000002"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-3.5-turbo-16k",
+      "price": {
+        "input": 3,
+        "output": 4,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000004"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-3.5-turbo-instruct",
+      "price": {
+        "input": 1.5,
+        "output": 2,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000002"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-3.5-turbo:batch",
+      "price": {
+        "input": 0.25,
+        "output": 0.75,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.00000075",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4",
+      "price": {
+        "input": 30,
+        "output": 60,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00006"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4-turbo",
+      "price": {
+        "input": 10,
+        "output": 30,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00003"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4-turbo:batch",
+      "price": {
+        "input": 5,
+        "output": 15,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000015",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1",
+      "price": {
+        "input": 2,
+        "output": 8,
+        "cache_read": 0.5,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000008",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1-mini",
+      "price": {
+        "input": 0.39999999999999997,
+        "output": 1.5999999999999999,
+        "cache_read": 0.09999999999999999,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000004",
+        "completion": "0.0000016",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1-mini:batch",
+      "price": {
+        "input": 0.19999999999999998,
+        "output": 0.7999999999999999,
+        "cache_read": 0.049999999999999996,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.0000008",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000005"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1-nano",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.39999999999999997,
+        "cache_read": 0.024999999999999998,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000004",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1-nano:batch",
+      "price": {
+        "input": 0.049999999999999996,
+        "output": 0.19999999999999998,
+        "cache_read": 0.012499999999999999,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.0000002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4.1:batch",
+      "price": {
+        "input": 1,
+        "output": 4,
+        "cache_read": 0.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000004",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o",
+      "price": {
+        "input": 2.5,
+        "output": 10,
+        "cache_read": 1.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "input_cache_read": "0.00000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-2024-05-13",
+      "price": {
+        "input": 5,
+        "output": 15,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000015"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-2024-08-06",
+      "price": {
+        "input": 2.5,
+        "output": 10,
+        "cache_read": 1.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "input_cache_read": "0.00000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-2024-11-20",
+      "price": {
+        "input": 2.5,
+        "output": 10,
+        "cache_read": 1.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "input_cache_read": "0.00000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-mini",
+      "price": {
+        "input": 0.15,
+        "output": 0.6,
+        "cache_read": 0.075,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "input_cache_read": "0.000000075"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-mini-2024-07-18",
+      "price": {
+        "input": 0.15,
+        "output": 0.6,
+        "cache_read": 0.075,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "input_cache_read": "0.000000075"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o-mini:batch",
+      "price": {
+        "input": 0.075,
+        "output": 0.3,
+        "cache_read": 0.0375,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000075",
+        "completion": "0.0000003",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000375"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-4o:batch",
+      "price": {
+        "input": 1.25,
+        "output": 5,
+        "cache_read": 0.625,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000625"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cache_read": 0.125,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-image",
+      "price": {
+        "input": 10,
+        "output": 10,
+        "cache_read": 1.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00001",
+        "image_output": "0.00004",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-image-mini",
+      "price": {
+        "input": 2.5,
+        "output": 2,
+        "cache_read": 0.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.000002",
+        "image_output": "0.000008",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-mini",
+      "price": {
+        "input": 0.25,
+        "output": 2,
+        "cache_read": 0.024999999999999998,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.000002",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-mini:batch",
+      "price": {
+        "input": 0.125,
+        "output": 1,
+        "cache_read": 0.012499999999999999,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000125",
+        "completion": "0.000001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-nano",
+      "price": {
+        "input": 0.049999999999999996,
+        "output": 0.39999999999999997,
+        "cache_read": 0.005,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.0000004",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-nano:batch",
+      "price": {
+        "input": 0.024999999999999998,
+        "output": 0.19999999999999998,
+        "cache_read": 0.0025,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000025",
+        "completion": "0.0000002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-pro",
+      "price": {
+        "input": 15,
+        "output": 120,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000015",
+        "completion": "0.00012",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5-pro:batch",
+      "price": {
+        "input": 7.5,
+        "output": 60,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000075",
+        "completion": "0.00006",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.1",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cache_read": 0.125,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.1-codex",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cache_read": 0.13,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000013"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.1-codex-max",
+      "price": {
+        "input": 1.25,
+        "output": 10,
+        "cache_read": 0.125,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.1-codex-mini",
+      "price": {
+        "input": 0.25,
+        "output": 2,
+        "cache_read": 0.03,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.000002",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000003"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.1:batch",
+      "price": {
+        "input": 0.625,
+        "output": 5,
+        "cache_read": 0.0625,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000625",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000625"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2",
+      "price": {
+        "input": 1.75,
+        "output": 14,
+        "cache_read": 0.175,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000175"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2-chat",
+      "price": {
+        "input": 1.75,
+        "output": 14,
+        "cache_read": 0.175,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000175"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2-codex",
+      "price": {
+        "input": 1.75,
+        "output": 14,
+        "cache_read": 0.175,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000175"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2-pro",
+      "price": {
+        "input": 21,
+        "output": 168,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000021",
+        "completion": "0.000168",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2-pro:batch",
+      "price": {
+        "input": 10.5,
+        "output": 84,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000105",
+        "completion": "0.000084",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.2:batch",
+      "price": {
+        "input": 0.875,
+        "output": 7,
+        "cache_read": 0.0875,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000875",
+        "completion": "0.000007",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000875"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.3-codex",
+      "price": {
+        "input": 1.75,
+        "output": 14,
+        "cache_read": 0.175,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000175"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4",
+      "price": {
+        "input": 2.5,
+        "output": 15,
+        "cache_read": 0.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.000015",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000005",
+            "completion": "0.0000225",
+            "input_cache_read": "0.0000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-image-2",
+      "price": {
+        "input": 8,
+        "output": 15,
+        "cache_read": 2,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000008",
+        "completion": "0.000015",
+        "image_output": "0.00003",
+        "web_search": "0.01",
+        "input_cache_read": "0.000002"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-mini",
+      "price": {
+        "input": 0.75,
+        "output": 4.5,
+        "cache_read": 0.075,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.0000045",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000075"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-mini:batch",
+      "price": {
+        "input": 0.375,
+        "output": 2.25,
+        "cache_read": 0.0375,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000375",
+        "completion": "0.00000225",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000375"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-nano",
+      "price": {
+        "input": 0.19999999999999998,
+        "output": 1.25,
+        "cache_read": 0.02,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.00000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000002"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-nano:batch",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.625,
+        "cache_read": 0.01,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.000000625",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-pro",
+      "price": {
+        "input": 30,
+        "output": 180,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00018",
+        "web_search": "0.01",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00006",
+            "completion": "0.00027"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4-pro:batch",
+      "price": {
+        "input": 15,
+        "output": 90,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000015",
+        "completion": "0.00009",
+        "web_search": "0.01",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00003",
+            "completion": "0.000135"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.4:batch",
+      "price": {
+        "input": 1.25,
+        "output": 7.5,
+        "cache_read": 0.125,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.0000075",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000025",
+            "completion": "0.00001125",
+            "input_cache_read": "0.00000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.5",
+      "price": {
+        "input": 5,
+        "output": 30,
+        "cache_read": 0.5,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.00003",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001",
+            "completion": "0.000045",
+            "input_cache_read": "0.000001"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.5-pro",
+      "price": {
+        "input": 30,
+        "output": 180,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00018",
+        "web_search": "0.01",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00006",
+            "completion": "0.00027"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.5-pro:batch",
+      "price": {
+        "input": 15,
+        "output": 90,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000015",
+        "completion": "0.00009",
+        "web_search": "0.01",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00003",
+            "completion": "0.000135"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.5:batch",
+      "price": {
+        "input": 2.5,
+        "output": 15,
+        "cache_read": 0.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.000015",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000005",
+            "completion": "0.0000225",
+            "input_cache_read": "0.0000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-luna",
+      "price": {
+        "input": 0.19999999999999998,
+        "output": 1.2,
+        "cache_read": 0.02,
+        "cache_write": 0.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.0000012",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000002",
+        "input_cache_write": "0.00000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000004",
+            "completion": "0.0000018",
+            "input_cache_read": "0.00000004",
+            "input_cache_write": "0.0000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-luna-pro",
+      "price": {
+        "input": 0.19999999999999998,
+        "output": 1.2,
+        "cache_read": 0.02,
+        "cache_write": 0.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.0000012",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000002",
+        "input_cache_write": "0.00000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000004",
+            "completion": "0.0000018",
+            "input_cache_read": "0.00000004",
+            "input_cache_write": "0.0000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-luna-pro:batch",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.6,
+        "cache_read": 0.01,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000006",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.0000009",
+            "input_cache_read": "0.00000002"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-luna:batch",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.6,
+        "cache_read": 0.01,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000006",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.0000009",
+            "input_cache_read": "0.00000002"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-sol",
+      "price": {
+        "input": 4,
+        "output": 20,
+        "cache_read": 0.39999999999999997,
+        "cache_write": 5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000004",
+        "input_cache_write": "0.000005",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000008",
+            "completion": "0.00003",
+            "input_cache_read": "0.0000008",
+            "input_cache_write": "0.00001"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-sol-pro",
+      "price": {
+        "input": 4,
+        "output": 20,
+        "cache_read": 0.39999999999999997,
+        "cache_write": 5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000004",
+        "input_cache_write": "0.000005",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000008",
+            "completion": "0.00003",
+            "input_cache_read": "0.0000008",
+            "input_cache_write": "0.00001"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-sol-pro:batch",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-sol:batch",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-terra",
+      "price": {
+        "input": 2,
+        "output": 12,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000018",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-terra-pro",
+      "price": {
+        "input": 2,
+        "output": 12,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000018",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-terra-pro:batch",
+      "price": {
+        "input": 1,
+        "output": 6,
+        "cache_read": 0.09999999999999999,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000006",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.000009",
+            "input_cache_read": "0.0000002"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5.6-terra:batch",
+      "price": {
+        "input": 1,
+        "output": 6,
+        "cache_read": 0.09999999999999999,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000006",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.000009",
+            "input_cache_read": "0.0000002"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-5:batch",
+      "price": {
+        "input": 0.625,
+        "output": 5,
+        "cache_read": 0.0625,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000625",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000000625"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-astra",
+      "price": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00002",
+            "completion": "0.000075",
+            "input_cache_read": "0.000002",
+            "input_cache_write": "0.000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-astra-pro",
+      "price": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00002",
+            "completion": "0.000075",
+            "input_cache_read": "0.000002",
+            "input_cache_write": "0.000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-astra-pro:batch",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001",
+            "completion": "0.0000375",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-astra:batch",
+      "price": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001",
+            "completion": "0.0000375",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-luna",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.5,
+        "cache_read": 0.01,
+        "cache_write": 0.125,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-luna-pro",
+      "price": {
+        "input": 0.09999999999999999,
+        "output": 0.5,
+        "cache_read": 0.01,
+        "cache_write": 0.125,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-luna-pro:batch",
+      "price": {
+        "input": 0.049999999999999996,
+        "output": 0.25,
+        "cache_read": 0.005,
+        "cache_write": 0.0625,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005",
+        "input_cache_write": "0.0000000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000001",
+            "completion": "0.000000375",
+            "input_cache_read": "0.00000001",
+            "input_cache_write": "0.000000125"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-luna:batch",
+      "price": {
+        "input": 0.049999999999999996,
+        "output": 0.25,
+        "cache_read": 0.005,
+        "cache_write": 0.0625,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005",
+        "input_cache_write": "0.0000000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000001",
+            "completion": "0.000000375",
+            "input_cache_read": "0.00000001",
+            "input_cache_write": "0.000000125"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-sol",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-sol-pro",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.19999999999999998,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-sol-pro:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 1.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6-sol:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 1.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6.1-sol",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6.1-sol-pro",
+      "price": {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.09999999999999999,
+        "cache_write": 2.5,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6.1-sol-pro:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.049999999999999996,
+        "cache_write": 1.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-6.1-sol:batch",
+      "price": {
+        "input": 1,
+        "output": 5,
+        "cache_read": 0.049999999999999996,
+        "cache_write": 1.25,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000001",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-audio",
+      "price": {
+        "input": 2.5,
+        "output": 10,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "audio": "0.000032",
+        "audio_output": "0.000064"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-audio-mini",
+      "price": {
+        "input": 0.6,
+        "output": 2.4,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000006",
+        "completion": "0.0000024",
+        "audio": "0.0000006",
+        "audio_output": "0.0000024"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-chat-latest",
+      "price": {
+        "input": 5,
+        "output": 30,
+        "cache_read": 0.5,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000005",
+        "completion": "0.00003",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-oss-120b",
+      "price": {
+        "input": 0.15,
+        "output": 0.6,
+        "cache_read": 0.075,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "input_cache_read": "0.000000075"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-oss-120b:batch",
+      "price": {
+        "input": 0.0296,
+        "output": 0.136,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000000296",
+        "completion": "0.000000136"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-oss-20b",
+      "price": {
+        "input": 0.018,
+        "output": 0.09,
+        "cache_read": 0.009,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000018",
+        "completion": "0.00000009",
+        "input_cache_read": "0.000000009"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-oss-20b:batch",
+      "price": {
+        "input": 0.024,
+        "output": 0.112,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000024",
+        "completion": "0.000000112"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/gpt-oss-safeguard-20b",
+      "price": {
+        "input": 0.075,
+        "output": 0.3,
+        "cache_read": 0.0375,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000000075",
+        "completion": "0.0000003",
+        "input_cache_read": "0.0000000375"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o1",
+      "price": {
+        "input": 15,
+        "output": 60,
+        "cache_read": 7.5,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000015",
+        "completion": "0.00006",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000075"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o1-pro",
+      "price": {
+        "input": 150,
+        "output": 600,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00015",
+        "completion": "0.0006",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3",
+      "price": {
+        "input": 2,
+        "output": 8,
+        "cache_read": 0.5,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000008",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3-mini",
+      "price": {
+        "input": 1.1,
+        "output": 4.4,
+        "cache_read": 0.55,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000055"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3-mini-high",
+      "price": {
+        "input": 1.1,
+        "output": 4.4,
+        "cache_read": 0.55,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000055"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3-mini:batch",
+      "price": {
+        "input": 0.55,
+        "output": 2.2,
+        "cache_read": 0.275,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000055",
+        "completion": "0.0000022",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000275"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3-pro",
+      "price": {
+        "input": 20,
+        "output": 80,
+        "cache_read": null,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00002",
+        "completion": "0.00008",
+        "web_search": "0.01"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o3:batch",
+      "price": {
+        "input": 1,
+        "output": 4,
+        "cache_read": 0.25,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000004",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o4-mini",
+      "price": {
+        "input": 1.1,
+        "output": 4.4,
+        "cache_read": 0.275,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000275"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o4-mini-high",
+      "price": {
+        "input": 1.1,
+        "output": 4.4,
+        "cache_read": 0.275,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000275"
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "openai/o4-mini:batch",
+      "price": {
+        "input": 0.55,
+        "output": 2.2,
+        "cache_read": 0.1375,
+        "cache_write": null,
+        "cache_write_1h": null
+      },
+      "source_pricing": {
+        "prompt": "0.00000055",
+        "completion": "0.0000022",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001375"
+      }
+    }
+  ]
+}

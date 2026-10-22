@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"soft-factory/internal/config"
+	"soft-factory/internal/tokencost"
 )
 
 // OpenRun reopens the supplied log directory without creating a new invocation.
@@ -15,6 +16,10 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 	path, err := RunPath(path)
 	if err != nil {
 		return nil, err
+	}
+	tokenCostInstance, err := tokencost.NewTokenCost()
+	if err != nil {
+		return nil, fmt.Errorf("initialize token cost calculator: %w", err)
 	}
 	data, err := os.ReadFile(filepath.Join(path, summaryFile))
 	if err != nil {
@@ -57,6 +62,7 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 		newline:        true,
 		ready:          true,
 		resuming:       true,
+		tokenCost:      tokenCostInstance,
 	}, nil
 }
 

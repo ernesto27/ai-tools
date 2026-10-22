@@ -23,6 +23,10 @@ github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261013144117-6eb321df3276 h
 github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261013144117-6eb321df3276/go.mod h1:psse0ZMbE7P/QcZUn3qi/dH+c/uRRCROkFLKemYrYHE=
 github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261016150234-8042bb4d5f95 h1:7CtJtj+LLcCFas6WEVR/rN9/VZALNUc6zflcOpkk4/E=
 github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261016150234-8042bb4d5f95/go.mod h1:psse0ZMbE7P/QcZUn3qi/dH+c/uRRCROkFLKemYrYHE=
+github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261022171839-9e49c82d44d9 h1:LzRla4IRfASLcAgyZMZM/DpqLA3t1WUdAygUTu8sWwE=
+github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261022171839-9e49c82d44d9/go.mod h1:03cJC59GRyWtmvo5IrOJZ/z0qsf9Ghh4Mr9oEi6Qt/U=
+github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261022200215-23e36cea5735 h1:BVsjiNToFmhCSgaY+KbNUVYfja0RpQp8oUAUoTsTBFc=
+github.com/ernesto27/ai-tools/agent-sandbox v0.0.0-20261022200215-23e36cea5735/go.mod h1:03cJC59GRyWtmvo5IrOJZ/z0qsf9Ghh4Mr9oEi6Qt/U=
 github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeORc=
 github.com/felixge/httpsnoop v1.1.0/go.mod h1:Zqxgdd+1Rkcz8euOqdr7lqgCRJztwr5hp9vDSi5UZCE=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=

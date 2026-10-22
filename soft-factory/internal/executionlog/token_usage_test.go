@@ -5,9 +5,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"soft-factory/internal/tokencost"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadTotalTokens(t *testing.T) {
+	calculator, err := tokencost.NewTokenCost()
+	require.NoError(t, err)
 	for _, tc := range []struct {
 		name    string
 		log     string
@@ -37,6 +43,13 @@ func TestReadTotalTokens(t *testing.T) {
 			want: 12,
 		},
 		{name: "zero usage is available", log: `{"type":"usage","usage":{"total_tokens":0}}`},
+		{
+			name: "full shared token usage counts total once",
+			log:  `{"type":"usage","agent":"codex","usage":{"input_tokens":1000,"cached_input_tokens":500,"output_tokens":100,"total_tokens":1100}}`,
+			want: 1100,
+		},
+		{name: "null usage", log: `{"type":"usage","usage":null}`, wantErr: true},
+		{name: "absent usage object", log: `{"type":"usage"}`, wantErr: true},
 		{name: "empty log", wantErr: true},
 		{name: "missing usage", log: "Interrupted without usage\n", wantErr: true},
 	} {
@@ -45,7 +58,8 @@ func TestReadTotalTokens(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.log), 0600); err != nil {
 				t.Fatal(err)
 			}
-			got, err := readTotalTokens(path)
+			run := &Run{stageLogPath: path, tokenCost: calculator, stageAgent: "codex", stageModel: "gpt-6.1-sol"}
+			got, _, err := run.readTotalTokens()
 			if tc.wantErr {
 				if err == nil || !strings.Contains(err.Error(), "usage event not found") {
 					t.Fatalf("readTotalTokens() error = %v, want usage event not found", err)

@@ -232,25 +232,42 @@ cancellation, and clean-worktree behavior remains unchanged. Browser tools are
 one verification option; backend, infrastructure, documentation, and other tasks
 use relevant project checks and report missing prerequisites as limitations.
 
-## Claude output
+## Agent output and usage
 
 [Claude arguments](../internal/agent/claude.go) request print mode with
 `--output-format stream-json --verbose --include-partial-messages` for both
-credential modes and all four execution commands. CLI presentation in
-[agent_output.go](../cmd/agent-sandbox/agent_output.go) supplies a stdout formatter
-through `Runtime.FormatStdout` and `RunOptions.FormatStdout`. Docker's non-TTY
-pump wraps only agent stdout and flushes the formatter after draining the
-attachment; stderr and image/version probes retain their existing routing.
-The formatter buffers an incomplete line, then uses Go's `json.Indent` to display
-each event with two-space indentation without removing fields or changing their
-order, numbers, or string escapes. Non-JSON lines pass through unchanged. A
-trailing event without a newline is flushed at EOF. Partial and completed events
-are both retained. The TUI displays the formatted event text through its existing
+credential modes and all four execution commands. [Codex arguments](../internal/agent/codex.go)
+request the non-interactive JSONL stream. CLI presentation in
+[agent_output.go](../cmd/agent-sandbox/agent_output.go) selects each agent's
+[decoder](../internal/agentoutput/) and supplies a stdout formatter through
+`Runtime.FormatStdout` and `RunOptions.FormatStdout`. Docker's non-TTY pump
+wraps only agent stdout and flushes the formatter after draining the attachment;
+stderr and image/version probes retain their existing routing.
+
+The [writer](../internal/agentoutput/writer.go) buffers incomplete lines and
+renders normalized agent events as a terminal transcript. Unsupported or invalid
+events receive diagnostic output. A trailing event without a newline is flushed
+at EOF. Usage events are emitted as single unprefixed JSON lines with `type`,
+`agent`, and a `usage` object using the public
+[TokenUsage](../agentoutput/usage.go) type. Sandbox preparation, transcript, and
+publication messages still accompany agent output, so command output is not a
+pure JSONL stream. The TUI receives this formatted output through its existing
 terminal decoder and records it in the transcript.
-Sandbox preparation and publication messages still accompany agent output, so
-the entire command output is not a pure JSONL stream. Stdin and terminal ownership
-retain their existing behavior. Exit status and publication depend on the
-container result, not on JSON event contents.
+
+The Claude decoder normalizes input as ordinary input plus cache reads and
+cache creation. It maps top-level result `total_cost_usd` into the optional
+`usage.total_cost_usd` field, without computing costs or altering the reported
+scope. Claude cache writes are included in input but are not separately exposed.
+The Codex decoder preserves input, cached input, and output, plus optional
+`usage.cache_write_input_tokens`. Codex reads and writes are already included
+in input. Both decoders calculate total as input plus output, and expose only
+the additional field belonging to their agent. Optional pointers preserve zero
+and omit missing or null values. Missing or null usage suppresses the usage
+event, including Claude results with cost alone. Each event remains separate;
+there is no accumulation across turns or resumed sessions.
+
+Stdin and terminal ownership retain their existing behavior. Exit status and
+publication depend on the container result, not JSON event contents.
 
 ## Exit status
 

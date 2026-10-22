@@ -14,11 +14,18 @@ func NewCodexDecoder() *CodexDecoder { return &CodexDecoder{} }
 func (*CodexDecoder) Name() string   { return AgentCodex }
 
 type codexMessage struct {
-	Type    codexEventType          `json:"type"`
-	Item    codexItem               `json:"item"`
-	Message string                  `json:"message"`
-	Error   json.RawMessage         `json:"error"`
-	Usage   *agentoutput.TokenUsage `json:"usage"`
+	Type    codexEventType  `json:"type"`
+	Item    codexItem       `json:"item"`
+	Message string          `json:"message"`
+	Error   json.RawMessage `json:"error"`
+	Usage   *codexUsage     `json:"usage"`
+}
+
+type codexUsage struct {
+	InputTokens           int64  `json:"input_tokens"`
+	CachedInputTokens     int64  `json:"cached_input_tokens"`
+	OutputTokens          int64  `json:"output_tokens"`
+	CacheWriteInputTokens *int64 `json:"cache_write_input_tokens"`
 }
 
 type codexItem struct {
@@ -58,9 +65,13 @@ func (*CodexDecoder) Decode(line []byte) ([]Event, error) {
 		if message.Usage == nil {
 			return nil, nil
 		}
-		// Cached tokens are already included in input tokens.
-		message.Usage.TotalTokens = message.Usage.InputTokens + message.Usage.OutputTokens
-		return []Event{{Kind: KindUsage, Usage: message.Usage}}, nil
+		// Cache reads and writes are already included in input tokens.
+		usage := message.Usage
+		return []Event{{Kind: KindUsage, Usage: &agentoutput.TokenUsage{
+			InputTokens: usage.InputTokens, CachedInputTokens: usage.CachedInputTokens,
+			OutputTokens: usage.OutputTokens, TotalTokens: usage.InputTokens + usage.OutputTokens,
+			CacheWriteInputTokens: usage.CacheWriteInputTokens,
+		}}}, nil
 	case codexTurnFailed, codexError:
 		text := errorMessage(message.Error)
 		if text == "" {

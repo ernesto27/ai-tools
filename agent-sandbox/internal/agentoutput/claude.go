@@ -37,6 +37,7 @@ type claudeMessage struct {
 	MaxRetries      int               `json:"max_retries"`
 	RetryDelayMS    int               `json:"retry_delay_ms"`
 	Usage           *claudeUsage      `json:"usage"`
+	TotalCostUSD    *float64          `json:"total_cost_usd"`
 	MCPServerErrors []struct {
 		Name    string `json:"name"`
 		Message string `json:"message"`
@@ -102,6 +103,7 @@ func (d *ClaudeDecoder) Decode(line []byte) ([]Event, error) {
 			events = append(events, Event{Kind: KindUsage, Scope: scope, Usage: &agentoutput.TokenUsage{
 				InputTokens: input, CachedInputTokens: usage.CacheReadInputTokens,
 				OutputTokens: usage.OutputTokens, TotalTokens: input + usage.OutputTokens,
+				TotalCostUSD: message.TotalCostUSD,
 			}})
 		}
 		return events, nil

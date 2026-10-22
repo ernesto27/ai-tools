@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f7f8f4">
+    <meta name="description" content="A little space to plan your day. Add tasks, find your focus, and enjoy checking things off.">
+    <title>Daylist — A little more done</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232c6654'/%3E%3Cpath d='m11 21 6 6 12-14' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Daylist home">
+        <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-9"/></svg></span>
+        daylist<span class="brand-dot">.</span>
+      </a>
+      <span class="storage-status" id="storage-status"><span class="status-dot" aria-hidden="true"></span>Saved on this device</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v16M2 10h16M4.3 4.3l11.4 11.4M4.3 15.7 15.7 4.3"/></svg> A LITTLE MORE FOCUS</p>
+        <h1 id="page-title">Small steps,<br><em>clear mind.</em></h1>
+        <p class="intro-copy">Make a little space for what matters.<br>Add a task, take a breath, and start there.</p>
+        <p class="date" id="today"></p>
+      </section>
+
+      <form id="task-form" class="task-form">
+        <label class="sr-only" for="task-input">New task</label>
+        <span class="input-plus" aria-hidden="true">+</span>
+        <input id="task-input" type="text" placeholder="What would you like to get done?" maxlength="240" required autocomplete="off">
+        <button class="add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
+      </form>
+      <p id="storage-warning" class="storage-warning" role="alert" hidden>Device storage is unavailable. Changes will only last while this page stays open.</p>
+
+      <section class="task-section" aria-labelledby="tasks-heading">
+        <div class="section-heading">
+          <h2 id="tasks-heading">Your tasks <span id="task-count" class="count">0</span></h2>
+          <div class="filters" role="group" aria-label="Filter tasks">
+            <button type="button" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-filter="active" aria-pressed="false">Active</button>
+            <button type="button" data-filter="completed" aria-pressed="false">Completed</button>
+          </div>
+        </div>
+
+        <div class="task-card">
+          <ul id="task-list" aria-label="Tasks"></ul>
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><rect x="9" y="7" width="22" height="28" rx="4"/><path d="M16 7V5h8v2M15 17l3 3 7-7M15 27h10"/></svg></div>
+            <h3 id="empty-title">A fresh start feels good.</h3>
+            <p id="empty-copy">Add your first task and give your day a little direction.</p>
+          </div>
+          <div class="list-footer">
+            <span id="remaining-count">No tasks yet</span>
+            <button id="clear-completed" type="button" hidden>Clear completed</button>
+          </div>
+        </div>
+
+        <div class="progress-card" id="progress-card" hidden>
+          <span class="progress-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <div class="progress-copy"><strong id="progress-title">You're making room for progress.</strong><span id="progress-label">0 of 0 tasks complete</span></div>
+          <progress id="task-progress" max="1" value="0" aria-label="Tasks completed"></progress>
+          <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+      </section>
+
+      <footer class="page-footer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2c0 5-3 8-8 8 5 0 8 3 8 8 0-5 3-8 8-8-5 0-8-3-8-8Z"/></svg> One thing at a time. You've got this.</footer>
+      <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
+      <noscript><p class="storage-warning">Please enable JavaScript to add and manage your tasks.</p></noscript>
+    </main>
+  </body>
+</html>

@@ -26,10 +26,10 @@ All property names use lower camelCase, including nested properties. These are a
 | `googleDrive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
 | `googleDrive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
 | `googleDrive.files` | Optional list of full Google Docs URLs. Documents can be outside the configured folders. URLs are validated when configuration loads, before the Drive client starts. |
-| `stages.codeReview.customSkills` | Optional project skill name for code review. |
-| `stages.securityReview.customSkills` | Optional project skill name for security review. |
-| `stages.riskClassification.customSkills` | Optional project skill name for risk classification. |
-| `stages.reviewChanges.customSkills` | Optional project skill name for the final change walkthrough. |
+| `stages.codeReview.customSkill` | Optional project skill name for code review. |
+| `stages.securityReview.customSkill` | Optional project skill name for security review. |
+| `stages.riskClassification.customSkill` | Optional project skill name for risk classification. |
+| `stages.reviewChanges.customSkill` | Optional project skill name for the final change walkthrough. |
 | `stages` | Optional per-stage agent/model overrides and review-stage custom skills. Agent/model overrides take priority over section and shared sandbox settings. |
 | `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
 
@@ -49,7 +49,7 @@ Minimal example:
 ```
 
 To add project-specific review instructions, set one skill name in
-`stages.<stage>.customSkills`, alongside that stage's agent and model settings.
+`stages.<stage>.customSkill`, alongside that stage's agent and model settings.
 Skill names keep their own spelling; only property names use camelCase.
 The former top-level `customSkills` property is ignored. Move each existing
 value into its corresponding stage; there is no automatic migration or fallback.
@@ -58,10 +58,10 @@ Custom skills are supported by the four review stages shown below.
 ```json
 {
   "stages": {
-    "codeReview": {"customSkills": "test-code-review"},
-    "securityReview": {"customSkills": "test-security-review"},
-    "riskClassification": {"customSkills": "test-risk-classification"},
-    "reviewChanges": {"customSkills": "test-review-changes"}
+    "codeReview": {"customSkill": "test-code-review"},
+    "securityReview": {"customSkill": "test-security-review"},
+    "riskClassification": {"customSkill": "test-risk-classification"},
+    "reviewChanges": {"customSkill": "test-review-changes"}
   }
 }
 ```

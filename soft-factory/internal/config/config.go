@@ -30,14 +30,14 @@ type StageConfig struct {
 // CustomSkillStageConfig adds a project skill to a review-stage selection.
 type CustomSkillStageConfig struct {
 	StageConfig
-	CustomSkills string `json:"customSkills,omitempty"`
+	CustomSkill string `json:"customSkill,omitempty"`
 }
 
 // SecurityReviewConfig keeps Factory's reporting option out of sandbox settings
 // and out of the other stages.
 type SecurityReviewConfig struct {
 	StageConfig
-	CustomSkills string `json:"customSkills,omitempty"`
+	CustomSkill  string `json:"customSkill,omitempty"`
 	SaveFindings bool   `json:"saveFindings,omitempty"`
 }
 
@@ -145,10 +145,10 @@ func (c Config) Validate() error {
 	}
 
 	skillNames := []struct{ stage, name string }{
-		{"codeReview", c.Stages.CodeReview.CustomSkills},
-		{"securityReview", c.Stages.SecurityReview.CustomSkills},
-		{"riskClassification", c.Stages.RiskClassification.CustomSkills},
-		{"reviewChanges", c.Stages.ReviewChanges.CustomSkills},
+		{"codeReview", c.Stages.CodeReview.CustomSkill},
+		{"securityReview", c.Stages.SecurityReview.CustomSkill},
+		{"riskClassification", c.Stages.RiskClassification.CustomSkill},
+		{"reviewChanges", c.Stages.ReviewChanges.CustomSkill},
 	}
 
 	for _, skill := range skillNames {
@@ -160,7 +160,7 @@ func (c Config) Validate() error {
 			skill.name == "." ||
 			skill.name == ".." ||
 			strings.ContainsAny(skill.name, `/\`) {
-			return fmt.Errorf("stages.%s.customSkills must be a single nonempty skill name", skill.stage)
+			return fmt.Errorf("stages.%s.customSkill must be a single nonempty skill name", skill.stage)
 		}
 	}
 

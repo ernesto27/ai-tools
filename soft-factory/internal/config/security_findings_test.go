@@ -23,7 +23,7 @@ func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 			if tc.value != "" {
 				property = `,"saveFindings":` + tc.value
 			}
-			data := fmt.Sprintf(`{"agentSandbox":{"agent":"shared"},"disabledStages":["securityReview"],"stages":{"securityReview":{"agent":"codex","model":"security-model","customSkills":"project"%s},"codeReview":{"model":"code-model"}}}`, property)
+			data := fmt.Sprintf(`{"agentSandbox":{"agent":"shared"},"disabledStages":["securityReview"],"stages":{"securityReview":{"agent":"codex","model":"security-model","customSkill":"project"%s},"codeReview":{"model":"code-model"}}}`, property)
 			path := filepath.Join(t.TempDir(), "config.json")
 			require.NoError(t, os.WriteFile(path, []byte(data), 0600))
 			cfg, err := Load(path)
@@ -35,7 +35,7 @@ func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 			require.Equal(t, tc.want, cfg.Stages.SecurityReview.SaveFindings)
 			require.Equal(t, "codex", cfg.Stages.SecurityReview.Agent)
 			require.Equal(t, "security-model", cfg.Stages.SecurityReview.Model)
-			require.Equal(t, "project", cfg.Stages.SecurityReview.CustomSkills)
+			require.Equal(t, "project", cfg.Stages.SecurityReview.CustomSkill)
 			require.Equal(t, "code-model", cfg.Stages.CodeReview.Model)
 			require.True(t, cfg.StageDisabled(StageSecurityReview))
 		})

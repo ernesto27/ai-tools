@@ -4,14 +4,14 @@ FROM ${BASE_IMAGE} AS browser-tools
 USER 0
 RUN set -eu; \
     if command -v apk >/dev/null 2>&1; then \
-        apk add --no-cache bash ripgrep ca-certificates curl git poppler-utils python3 chromium font-noto; \
+        apk add --no-cache bash ripgrep ca-certificates curl git poppler-utils python3 chromium font-noto ffmpeg; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             apk add --no-cache nodejs npm; \
         fi; \
     elif command -v apt-get >/dev/null 2>&1; then \
         apt-get update; \
         apt-get install -y --no-install-recommends \
-            bash ca-certificates curl git poppler-utils ripgrep python3 chromium fonts-liberation; \
+            bash ca-certificates curl git poppler-utils ripgrep python3 chromium fonts-liberation ffmpeg; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             apt-get install -y --no-install-recommends gnupg; \
             mkdir -p /etc/apt/keyrings; \
@@ -27,7 +27,7 @@ RUN set -eu; \
         || command -v microdnf >/dev/null 2>&1; then \
         if command -v dnf >/dev/null 2>&1; then rpm_pm=dnf; \
         else rpm_pm=microdnf; fi; \
-        "$rpm_pm" install -y bash ca-certificates curl git poppler-utils ripgrep python3 chromium liberation-sans-fonts; \
+        "$rpm_pm" install -y bash ca-certificates curl git poppler-utils ripgrep python3 chromium liberation-sans-fonts ffmpeg; \
         if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then \
             rpm_arch="$(uname -m)"; \
             case "$rpm_arch" in \

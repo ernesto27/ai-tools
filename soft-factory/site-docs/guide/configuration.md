@@ -18,12 +18,11 @@ All property names use lower camelCase, including nested properties. These are a
 | `googleDrive` | Optional Google Drive settings. When present, at least one of `folders` or `files` must contain an entry. Omit this section when Drive is not needed. |
 | `googleDrive.folders` | Optional list of exact folder names. Each name must identify one accessible folder. Blank names are rejected. |
 | `googleDrive.files` | Optional list of full Google Docs URLs. Documents can be outside the configured folders. URLs are validated when configuration loads, before the Drive client starts. |
-| `customSkills` | Optional project skills that extend the bundled stage skills. |
-| `customSkills.codeReview` | Optional project skill name for the code review stage. |
-| `customSkills.securityReview` | Optional project skill name for the security review stage. |
-| `customSkills.riskClassification` | Optional project skill name for the risk classification stage. |
-| `customSkills.reviewChanges` | Optional project skill name for the final review-changes walkthrough. |
-| `stages` | Optional agent and model overrides for individual stages. See [Stage agents and models](#stage-agents-and-models). |
+| `stages.codeReview.customSkill` | Optional project skill name for code review. |
+| `stages.securityReview.customSkill` | Optional project skill name for security review. |
+| `stages.riskClassification.customSkill` | Optional project skill name for risk classification. |
+| `stages.reviewChanges.customSkill` | Optional project skill name for the final change walkthrough. |
+| `stages` | Optional per-stage agent/model overrides and review-stage custom skills. Agent/model overrides take priority over section and shared sandbox settings. |
 | `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
 | `stages.securityReview.saveFindings` | Optional boolean; `true` saves security findings and suggested fixes without applying corrections or committing. Defaults to `false`. |
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
@@ -44,16 +43,20 @@ Minimal example:
 }
 ```
 
-To add project-specific review instructions, set skill names per stage. Skill
-names keep their own spelling; only property names use camelCase:
+To add project-specific review instructions, set one skill name in
+`stages.<stage>.customSkill`, alongside that stage's agent and model settings.
+Skill names keep their own spelling; only property names use camelCase.
+The former top-level `customSkills` property is ignored. Move each existing
+value into its corresponding stage; there is no automatic migration or fallback.
+Custom skills are supported by the four review stages shown below.
 
 ```json
 {
-  "customSkills": {
-    "codeReview": "test-code-review",
-    "securityReview": "test-security-review",
-    "riskClassification": "test-risk-classification",
-    "reviewChanges": "test-review-changes"
+  "stages": {
+    "codeReview": {"customSkill": "test-code-review"},
+    "securityReview": {"customSkill": "test-security-review"},
+    "riskClassification": {"customSkill": "test-risk-classification"},
+    "reviewChanges": {"customSkill": "test-review-changes"}
   }
 }
 ```
@@ -61,8 +64,9 @@ names keep their own spelling; only property names use camelCase:
 Each name must be one directory name, not a path. Soft Factory searches for
 `.agents/skills/<name>/SKILL.md` first, then `.claude/skills/<name>/SKILL.md`,
 relative to `software-factory.json`, and gives the first match to that stage
-after its default skill. A configured skill for an enabled stage that is missing
-or cannot be read stops the workflow before implementation with an error.
+after its default skill.
+A configured skill for an enabled stage at or after the selected start stage
+that is missing or cannot be read stops the workflow before agent execution.
 
 Example using both local documents and Google Drive:
 

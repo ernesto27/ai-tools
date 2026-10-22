@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"soft-factory/internal/config"
 )
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
@@ -12,12 +14,12 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			t.Setenv("PATH", t.TempDir())
-			data := `{"agentSandbox":{},"customSkills":{"` + stage + `":"missing"}}`
+			data := `{"agentSandbox":{},"stages":{"` + stage + `":{"customSkill":"missing"}}}`
 			require.NoError(t, os.WriteFile(factoryConfigFile, []byte(data), 0644))
 			require.NoError(t, os.WriteFile("config.json", []byte(`{`), 0644))
 
 			err := runWorkflow(workflowOptions{})
-			want := "customSkills." + stage + `: project skill "missing" not found`
+			want := "stages." + stage + `.customSkill: project skill "missing" not found`
 			require.ErrorContains(t, err, want)
 		})
 	}
@@ -45,4 +47,34 @@ func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkflowSkipsIneligibleCustomSkills(t *testing.T) {
+	for _, tc := range []struct {
+		name, disabled string
+		start          config.Stage
+	}{
+		{"disabled", `,"disabledStages":["codeReview"]`, ""},
+		{"before resume start", "", config.StageSecurityReview},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			t.Setenv("PATH", t.TempDir())
+			data := `{"agentSandbox":{},"stages":{"codeReview":{"customSkill":"skip-missing"},"securityReview":{"customSkill":"eligible-missing"}}` + tc.disabled + `}`
+			require.NoError(t, os.WriteFile(factoryConfigFile, []byte(data), 0600))
+			err := runWorkflow(workflowOptions{StartStage: tc.start})
+			require.ErrorContains(t, err, `stages.securityReview.customSkill: project skill "eligible-missing" not found`)
+			require.NotContains(t, err.Error(), "skip-missing")
+		})
+	}
+}
+
+func TestWorkflowIgnoresTopLevelCustomSkill(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("PATH", t.TempDir())
+	data := `{"agentSandbox":{},"customSkills":{"codeReview":"old-missing"},"stages":{"securityReview":{"customSkill":"nested-missing"}}}`
+	require.NoError(t, os.WriteFile(factoryConfigFile, []byte(data), 0600))
+	err := runWorkflow(workflowOptions{})
+	require.ErrorContains(t, err, `stages.securityReview.customSkill: project skill "nested-missing" not found`)
+	require.NotContains(t, err.Error(), "old-missing")
 }

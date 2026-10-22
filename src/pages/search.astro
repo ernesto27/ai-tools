@@ -1,0 +1,154 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostCard from "../components/PostCard.astro";
+import Icon from "../components/Icon.astro";
+import { getArticles } from "../lib/articles";
+const posts = await getArticles();
+const categories = [...new Set(posts.map((post) => post.data.category))].sort();
+---
+
+<BaseLayout title="Search the notebook" noindex>
+  <div class="shell page-content">
+    <header class="page-intro">
+      <div class="eyebrow">
+        <span class="eyebrow-dot"></span> Find a little perspective
+      </div>
+      <h1>Search the notebook.</h1>
+      <p>A word, a topic, a question. Find something worth reading.</p>
+    </header>
+    <form class="search-form" action="/search/" role="search">
+      <label for="search-input" class="sr-only">
+        Search by title, description, or tag
+      </label>
+      <div class="search-field">
+        <Icon name="search" />
+        <input
+          id="search-input"
+          name="q"
+          type="search"
+          placeholder="Search articles, ideas, and tags…"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          id="clear-search"
+          class="icon-button"
+          aria-label="Clear search"
+          hidden
+        >
+          <Icon name="close" size={18} />
+        </button>
+      </div>
+      <div class="filter-field">
+        <label for="category-filter">Filter by category</label>
+        <select id="category-filter" name="category">
+          <option value="">All categories</option>
+          {categories.map((category) => (
+            <option value={category}>{category}</option>
+          ))}
+        </select>
+      </div>
+    </form>
+    <p
+      class="result-status"
+      id="search-status"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {posts.length} articles in the notebook
+    </p>
+    <noscript>
+      <p>
+        Enable JavaScript to search and filter. You can also{" "}
+        <a class="text-link" href="/topics/">
+          browse articles by topic
+        </a>
+        .
+      </p>
+    </noscript>
+    <div class="post-grid" id="search-results">
+      {posts.map((post) => (
+        <div
+          data-search-article
+          data-search={JSON.stringify({
+            title: post.data.title,
+            description: post.data.description,
+            tags: post.data.tags,
+            category: post.data.category,
+          })}
+        >
+          <PostCard post={post} headingLevel={2} />
+        </div>
+      ))}
+    </div>
+    <div class="empty-state" id="search-empty" hidden>
+      <h2>No notes on that. Yet.</h2>
+      <p>
+        Try a different word, a broader topic, or clear the category filter.
+      </p>
+      <button type="button" class="button-link" id="reset-search">
+        Show all articles <Icon name="arrow" size={16} />
+      </button>
+    </div>
+  </div>
+  <script>
+    import { matchesArticle, type SearchableArticle } from "../lib/search";
+    const input = document.querySelector<HTMLInputElement>("#search-input")!;
+    const category =
+      document.querySelector<HTMLSelectElement>("#category-filter")!;
+    const clear = document.querySelector<HTMLButtonElement>("#clear-search")!;
+    const entries = [
+      ...document.querySelectorAll<HTMLElement>("[data-search-article]"),
+    ].map((element) => ({
+      element,
+      article: JSON.parse(element.dataset.search!) as SearchableArticle,
+    }));
+    const params = new URLSearchParams(location.search);
+    input.value = params.get("q") ?? "";
+    category.value = params.get("category") ?? "";
+    const filter = () => {
+      let count = 0;
+      for (const { element, article } of entries) {
+        const match = matchesArticle(article, input.value, category.value);
+        element.hidden = !match;
+        if (match) count++;
+      }
+      document.querySelector("#search-status")!.textContent =
+        `${count} ${count === 1 ? "article" : "articles"}${input.value.trim() ? ` matching “${input.value.trim()}”` : " in the notebook"}${category.value ? ` in ${category.value}` : ""}`;
+      (document.querySelector("#search-empty") as HTMLElement).hidden =
+        count !== 0;
+      clear.hidden = !input.value;
+      const next = new URL(location.href);
+      input.value.trim()
+        ? next.searchParams.set("q", input.value.trim())
+        : next.searchParams.delete("q");
+      category.value
+        ? next.searchParams.set("category", category.value)
+        : next.searchParams.delete("category");
+      history.replaceState(null, "", next);
+    };
+    const reset = () => {
+      input.value = "";
+      category.value = "";
+      filter();
+      input.focus();
+    };
+    input.addEventListener("input", filter);
+    category.addEventListener("change", filter);
+    clear.addEventListener("click", () => {
+      input.value = "";
+      filter();
+      input.focus();
+    });
+    document.querySelector("#reset-search")?.addEventListener("click", reset);
+    document
+      .querySelector(".search-form")
+      ?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        filter();
+      });
+    window.addEventListener("pageshow", filter);
+    filter();
+  </script>
+</BaseLayout>

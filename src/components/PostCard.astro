@@ -1,0 +1,39 @@
+---
+import type { CollectionEntry } from "astro:content";
+import Artwork from "./Artwork.astro";
+import Icon from "./Icon.astro";
+import { formatDate, readingTime, slugify } from "../lib/articles";
+interface Props {
+  post: CollectionEntry<"articles">;
+  headingLevel?: 2 | 3;
+}
+const { post, headingLevel = 3 } = Astro.props;
+const Heading = headingLevel === 2 ? "h2" : "h3";
+---
+
+<article class="post-card" data-post-card>
+  <a
+    class="post-image"
+    href={`/articles/${post.id}/`}
+    tabindex="-1"
+    aria-hidden="true"
+  >
+    <Artwork kind={post.data.artwork} />
+  </a>
+  <div class="post-meta">
+    <a href={`/category/${slugify(post.data.category)}/`}>
+      {post.data.category}
+    </a>
+    <span>{readingTime(post.body)} min read</span>
+  </div>
+  <Heading>
+    <a href={`/articles/${post.id}/`}>{post.data.title}</a>
+  </Heading>
+  <p class="post-description">{post.data.description}</p>
+  <div class="post-bottom">
+    <span>{formatDate(post.data.publishedAt)}</span>
+    <a href={`/articles/${post.id}/`} aria-label={`Read ${post.data.title}`}>
+      <Icon name="arrow" size={19} />
+    </a>
+  </div>
+</article>

@@ -1,0 +1,77 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+---
+
+<BaseLayout
+  title="About the journal"
+  description="Fieldnotes is an independent journal about software engineering, deliberate decisions, and the people behind the code."
+>
+  <div class="shell page-content">
+    <div class="about-content">
+      <header class="page-intro">
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span> A note about this journal
+        </div>
+        <h1>
+          For people who care
+          <br />
+          about the craft.
+        </h1>
+        <p>Software is a technical pursuit. Building it well is a human one.</p>
+      </header>
+      <div class="prose">
+        <p>
+          Fieldnotes is an independent engineering journal for people who like
+          to look a little closer. At the decisions behind a system. At the
+          tradeoffs behind a tool. At the habits that make a team a good place
+          to do good work.
+        </p>
+        <p>
+          We believe the most useful engineering writing begins with a real
+          question and makes room for an honest answer. Sometimes that answer is
+          a code example. Sometimes it is a diagram. Often, it is a better
+          question.
+        </p>
+        <div class="about-callout">
+          Less noise. More signal.
+          <br />A little perspective on the things we build.
+        </div>
+        <h2>What you’ll find here</h2>
+        <p>
+          Practical essays on architecture, development, performance, and
+          engineering culture. We share the reasoning alongside the result, so
+          you can decide what fits your own context.
+        </p>
+        <h2>A small editorial promise</h2>
+        <p>
+          Clear explanations. Specific examples. Respect for your time. No
+          manufactured urgency, and no assumption that the newest tool is the
+          right one.
+        </p>
+        <h2>Meet the contributors</h2>
+        <p>
+          <strong>Maya Chen</strong> writes about software architecture and
+          finding the right boundaries. <strong>Alex Rivera</strong> explores
+          TypeScript and testing. <strong>Sam Okafor</strong> focuses on web
+          performance and the experience on the other side of the screen.{" "}
+          <strong>Jordan Lee</strong> writes about collaboration and
+          maintainable code.
+        </p>
+        <p>
+          This is a sample publication. Its contributors and editorial identity
+          are fictional; the engineering lessons are here to be used.
+        </p>
+        <h2>Keep a thread open</h2>
+        <p>
+          Every article is available in our <a href="/rss.xml">RSS feed</a>. Add
+          it to your favorite reader and new notes will find their way to you.
+          No account or inbox required.
+        </p>
+      </div>
+      <a href="/" class="button-link">
+        Back to the journal <Icon name="arrow" size={17} />
+      </a>
+    </div>
+  </div>
+</BaseLayout>

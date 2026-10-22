@@ -1,0 +1,107 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Artwork from "../components/Artwork.astro";
+import PostCard from "../components/PostCard.astro";
+import Icon from "../components/Icon.astro";
+import { getArticles, formatDate, readingTime, slugify } from "../lib/articles";
+const posts = await getArticles();
+const featured = posts.find((post) => post.data.featured) ?? posts[0];
+const recent = posts.filter((post) => post.id !== featured?.id);
+const categories = [...new Set(posts.map((post) => post.data.category))].sort();
+---
+
+<BaseLayout>
+  <div class="shell">
+    <section class="home-intro" aria-labelledby="intro-title">
+      <div>
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span> An independent engineering journal
+        </div>
+        <h1 id="intro-title">
+          Good software.
+          <br />
+          <em>Considered ideas.</em>
+        </h1>
+      </div>
+      <p class="intro-note">
+        Notes on software, systems, and the craft of building things that last.
+        Written with curiosity. Shared with purpose.
+      </p>
+    </section>
+    {featured && (
+      <section class="featured" aria-labelledby="featured-title">
+        <a
+          class="featured-image"
+          href={`/articles/${featured.id}/`}
+          tabindex="-1"
+          aria-hidden="true"
+        >
+          <Artwork kind={featured.data.artwork} large />
+        </a>
+        <div class="featured-copy">
+          <span class="featured-label">
+            <Icon name="asterisk" size={11} /> Editor’s pick
+          </span>
+          <h2 id="featured-title">
+            <a href={`/articles/${featured.id}/`}>{featured.data.title}</a>
+          </h2>
+          <p>{featured.data.description}</p>
+          <div class="author-line">
+            <span class="avatar">
+              {featured.data.author.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")}
+            </span>
+            <strong>{featured.data.author.name}</strong>
+            <span class="dot">·</span>
+            <time datetime={featured.data.publishedAt.toISOString()}>
+              {formatDate(featured.data.publishedAt)}
+            </time>
+            <span class="dot">·</span>
+            <span>{readingTime(featured.body)} min read</span>
+          </div>
+          <a class="read-link" href={`/articles/${featured.id}/`}>
+            Read the story <Icon name="arrow" size={16} />
+          </a>
+        </div>
+      </section>
+    )}
+    <section id="latest" aria-labelledby="latest-title">
+      <div class="section-heading">
+        <h2 id="latest-title">Fresh from the notebook</h2>
+        <span>
+          Ideas worth your time{" "}
+          <span class="rotate-[135deg]">
+            <Icon name="arrow" size={12} />
+          </span>
+        </span>
+      </div>
+      <nav class="category-nav" aria-label="Browse articles by category">
+        <a class="active" href="#latest" aria-current="page">
+          All articles <span class="ml-1 opacity-60">{posts.length}</span>
+        </a>
+        {categories.map((category) => (
+          <a href={`/category/${slugify(category)}/`}>{category}</a>
+        ))}
+      </nav>
+      <div class="post-grid">
+        {recent.map((post) => (
+          <PostCard post={post} />
+        ))}
+      </div>
+    </section>
+    <aside class="journal-note">
+      <span class="note-symbol" aria-hidden="true">
+        <Icon name="asterisk" size={35} />
+      </span>
+      <div>
+        <h2>Built for the curious.</h2>
+        <p>No hot takes. No noise. Just thoughtful ideas for the work ahead.</p>
+      </div>
+      <a href="/about/">
+        A note about Fieldnotes <Icon name="arrow" size={17} />
+      </a>
+    </aside>
+  </div>
+</BaseLayout>

@@ -1,0 +1,170 @@
+---
+import Icon from "./Icon.astro";
+interface Props {
+  kind: string;
+  large?: boolean;
+}
+const { kind, large = false } = Astro.props;
+---
+
+<div
+  class:list={["artwork", `art-${kind}`, { "art-large": large }]}
+  aria-hidden="true"
+>
+  <span class="art-index">FIELDNOTES — ENGINEERING</span>
+  {kind === "systems" && (
+    <div class="system-diagram">
+      <div class="system-input">THE COMPLEXITY OF LESS</div>
+      <div class="system-top">
+        <span class="node">
+          <span class="-rotate-45">
+            <Icon name="arrow" size={21} />
+          </span>
+        </span>
+        <span class="node">
+          <Icon name="command" size={21} />
+        </span>
+        <span class="node">
+          <span class="rotate-45">
+            <Icon name="arrow" size={21} />
+          </span>
+        </span>
+      </div>
+      <div class="system-lines">
+        <i></i>
+        <i></i>
+        <i></i>
+      </div>
+      <div class="system-core">
+        <span class="core-icon">
+          <Icon name="asterisk" size={46} />
+        </span>
+        <span>
+          make it
+          <br />
+          <strong>simple.</strong>
+        </span>
+      </div>
+      <div class="system-bottom">
+        <span>FEWER MOVING PARTS.</span>
+        <span>MORE ROOM TO THINK.</span>
+      </div>
+    </div>
+  )}
+  {kind === "typescript" && (
+    <div class="type-art">
+      <span class="code-comment">// confidence, by design</span>
+      <div>
+        <span class="code-purple">type</span> BetterCode{" "}
+        <span class="code-purple">=</span> &#123;
+        <br />
+        <span class="indent">
+          clarity: <em>string</em>;
+        </span>
+        <br />
+        <span class="indent">
+          guesswork: <em>never</em>;
+        </span>
+        <br />
+        &#125;
+      </div>
+      <span class="art-stamp">TS</span>
+    </div>
+  )}
+  {kind === "testing" && (
+    <div class="test-art">
+      <span class="test-row">
+        <i>
+          <Icon name="check" size={11} />
+        </i>{" "}
+        works as expected
+      </span>
+      <span class="test-row">
+        <i>
+          <Icon name="check" size={11} />
+        </i>{" "}
+        fails as expected
+      </span>
+      <span class="test-row">
+        <i>
+          <Icon name="check" size={11} />
+        </i>{" "}
+        lets you sleep
+      </span>
+      <span class="test-total">
+        3 passed <span>·</span> 0 sleepless nights
+      </span>
+    </div>
+  )}
+  {kind === "performance" && (
+    <div class="performance-art">
+      <div class="speed-bars">
+        <i></i>
+        <i></i>
+        <i></i>
+        <i></i>
+        <i></i>
+        <i></i>
+        <i></i>
+        <i></i>
+      </div>
+      <span>
+        LESS WAITING.
+        <br />
+        <strong>More doing.</strong>
+      </span>
+      <span class="speed-label">MEASURE → UNDERSTAND → IMPROVE</span>
+    </div>
+  )}
+  {kind === "reviews" && (
+    <div class="review-art">
+      <div class="bubble">
+        What if we tried…{" "}
+        <span>
+          <Icon name="arrow" size={13} />
+        </span>
+      </div>
+      <div class="bubble bubble-reply">
+        I like where this is going.{" "}
+        <span>
+          <Icon name="asterisk" size={13} />
+        </span>
+      </div>
+      <span class="review-label">BETTER TOGETHER.</span>
+    </div>
+  )}
+  {kind === "simplicity" && (
+    <div class="simple-art">
+      <span class="simple-cross">{"{"}</span>
+      <span>
+        Less code.
+        <br />
+        <em>More intent.</em>
+      </span>
+      <span class="simple-cross">{"}"}</span>
+    </div>
+  )}
+  <span class="art-corner">
+    F /{" "}
+    {[
+      "systems",
+      "typescript",
+      "testing",
+      "performance",
+      "reviews",
+      "simplicity",
+    ].indexOf(kind) +
+      1 <
+    10
+      ? "0"
+      : ""}
+    {[
+      "systems",
+      "typescript",
+      "testing",
+      "performance",
+      "reviews",
+      "simplicity",
+    ].indexOf(kind) + 1}
+  </span>
+</div>

@@ -1,0 +1,219 @@
+---
+import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/newsreader";
+import "@fontsource-variable/newsreader/wght-italic.css";
+import "../styles/global.css";
+import Icon from "../components/Icon.astro";
+interface Props {
+  title?: string;
+  description?: string;
+  type?: "website" | "article";
+  publishedAt?: Date;
+  noindex?: boolean;
+}
+const {
+  title,
+  description = "Thoughtful writing on software engineering, architecture, and the craft of building things that last.",
+  type = "website",
+  publishedAt,
+  noindex = false,
+} = Astro.props;
+const pageTitle = title
+  ? `${title} — Fieldnotes`
+  : "Fieldnotes — Good software. Considered ideas.";
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const current = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f7f3" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="Fieldnotes RSS"
+      href={new URL("/rss.xml", Astro.site)}
+    />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="Fieldnotes" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content={new URL("/og-image.png", Astro.site)} />
+    <meta
+      property="og:image:alt"
+      content="Fieldnotes. Good software. Considered ideas."
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL("/og-image.png", Astro.site)} />
+    {publishedAt && (
+      <meta
+        property="article:published_time"
+        content={publishedAt.toISOString()}
+      />
+    )}
+    {noindex && <meta name="robots" content="noindex, follow" />}
+    <script is:inline>
+      (() => {
+        let theme;
+        try {
+          theme = localStorage.getItem("fieldnotes-theme");
+        } catch {}
+        const dark =
+          theme === "dark" ||
+          (theme !== "light" &&
+            matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">
+      Skip to content
+    </a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true">
+            f<span>.</span>
+          </span>
+          <span>
+            fieldnotes<span class="brand-period">.</span>
+          </span>
+        </a>
+        <nav aria-label="Main navigation" class="main-nav">
+          <a href="/" aria-current={current === "/" ? "page" : undefined}>
+            Journal
+          </a>
+          <a
+            href="/topics/"
+            aria-current={
+              current.startsWith("/topics") ||
+              current.startsWith("/category") ||
+              current.startsWith("/tag")
+                ? "page"
+                : undefined
+            }
+          >
+            Topics
+          </a>
+          <a
+            href="/about/"
+            aria-current={current === "/about/" ? "page" : undefined}
+          >
+            About
+          </a>
+        </nav>
+        <div class="header-actions">
+          <a href="/search/" class="search-link" aria-label="Search articles">
+            <Icon name="search" size={18} />
+            <span>Search</span>
+            <kbd>/</kbd>
+          </a>
+          <span class="header-divider"></span>
+          <button
+            class="theme-toggle icon-button"
+            aria-label="Switch to dark theme"
+            type="button"
+          >
+            <span class="theme-moon">
+              <Icon name="moon" size={19} />
+            </span>
+            <span class="theme-sun">
+              <Icon name="sun" size={19} />
+            </span>
+          </button>
+        </div>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-top">
+        <div>
+          <a class="brand footer-brand" href="/">
+            fieldnotes<span class="brand-period">.</span>
+          </a>
+          <p>A little perspective on the things we build.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/about/">About the journal</a>
+          <a href="/topics/">Explore topics</a>
+          <a href="/rss.xml">
+            <Icon name="rss" size={15} /> RSS feed
+          </a>
+        </div>
+      </div>
+      <div class="shell footer-bottom">
+        <span>© {new Date().getUTCFullYear()} Fieldnotes. Made with care.</span>
+        <span>
+          Less noise. More signal. <span class="status-dot"></span>
+        </span>
+      </div>
+    </footer>
+    <script>
+      const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
+      const updateLabel = () =>
+        button?.setAttribute(
+          "aria-label",
+          `Switch to ${document.documentElement.dataset.theme === "dark" ? "light" : "dark"} theme`,
+        );
+      updateLabel();
+      button?.addEventListener("click", () => {
+        const theme =
+          document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+        try {
+          localStorage.setItem("fieldnotes-theme", theme);
+        } catch {}
+        updateLabel();
+      });
+      matchMedia("(prefers-color-scheme: dark)").addEventListener(
+        "change",
+        (event) => {
+          let saved;
+          try {
+            saved = localStorage.getItem("fieldnotes-theme");
+          } catch {}
+          if (!saved) {
+            document.documentElement.dataset.theme = event.matches
+              ? "dark"
+              : "light";
+            updateLabel();
+          }
+        },
+      );
+      document.addEventListener("keydown", (event) => {
+        if (
+          event.key === "/" &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !(
+            event.target instanceof HTMLElement &&
+            (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) ||
+              event.target.isContentEditable)
+          )
+        ) {
+          event.preventDefault();
+          if (location.pathname === "/search/")
+            document.querySelector<HTMLInputElement>("#search-input")?.focus();
+          else location.href = "/search/";
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+---
+import Archive from "../../components/Archive.astro";
+import { getArticles, slugify } from "../../lib/articles";
+export async function getStaticPaths() {
+  const posts = await getArticles();
+  return [...new Set(posts.map((post) => post.data.category))].map(
+    (category) => ({
+      params: { category: slugify(category) },
+      props: {
+        category,
+        posts: posts.filter((post) => post.data.category === category),
+      },
+    }),
+  );
+}
+const { category, posts } = Astro.props;
+---
+
+<Archive
+  title={category}
+  description={`Ideas, practical lessons, and considered perspectives on ${category.toLowerCase()}.`}
+  posts={posts}
+  kind="category"
+/>

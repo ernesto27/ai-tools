@@ -1,0 +1,135 @@
+---
+import { render } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Artwork from "../../components/Artwork.astro";
+import PostCard from "../../components/PostCard.astro";
+import Icon from "../../components/Icon.astro";
+import {
+  getArticles,
+  formatDate,
+  readingTime,
+  slugify,
+} from "../../lib/articles";
+export async function getStaticPaths() {
+  return (await getArticles()).map((post) => ({
+    params: { id: post.id },
+    props: { post },
+  }));
+}
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const related = (await getArticles())
+  .filter((other) => other.id !== post.id)
+  .sort(
+    (a, b) =>
+      Number(b.data.category === post.data.category) -
+      Number(a.data.category === post.data.category),
+  )
+  .slice(0, 3);
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.publishedAt.toISOString(),
+  author: { "@type": "Person", name: post.data.author.name },
+  publisher: { "@type": "Organization", name: "Fieldnotes" },
+  mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).href,
+  image: new URL("/og-image.png", Astro.site).href,
+};
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  type="article"
+  publishedAt={post.data.publishedAt}
+>
+  <script
+    type="application/ld+json"
+    set:html={JSON.stringify(schema).replace(/</g, "\\u003c")}
+  />
+  <div class="shell">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Journal</a>
+      <Icon name="chevron" size={12} />
+      <a href={`/category/${slugify(post.data.category)}/`}>
+        {post.data.category}
+      </a>
+      <Icon name="chevron" size={12} />
+      <span>Article</span>
+    </nav>
+    <article>
+      <header class="article-header">
+        <a
+          class="eyebrow text-link"
+          href={`/category/${slugify(post.data.category)}/`}
+        >
+          {post.data.category}
+        </a>
+        <h1>{post.data.title}</h1>
+        <p class="article-deck">{post.data.description}</p>
+        <div class="article-byline">
+          <span class="avatar">
+            {post.data.author.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")}
+          </span>
+          <span class="author-details">
+            <strong>{post.data.author.name}</strong>
+            <span>{post.data.author.role}</span>
+          </span>
+          <time datetime={post.data.publishedAt.toISOString()}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span>·</span>
+          <span>{readingTime(post.body)} min read</span>
+        </div>
+      </header>
+      <div class="article-hero">
+        <Artwork kind={post.data.artwork} />
+      </div>
+      <div class="article-layout">
+        <div>
+          <div class="prose">
+            <Content />
+          </div>
+          <footer class="article-end">
+            <p>Filed under</p>
+            <div class="tag-list">
+              {post.data.tags.map((tag) => (
+                <a href={`/tag/${tag}/`}>#{tag}</a>
+              ))}
+            </div>
+          </footer>
+        </div>
+        <nav class="toc" aria-label="Table of contents">
+          <h2>On this page</h2>
+          <ol>
+            {headings
+              .filter((heading) => heading.depth === 2 || heading.depth === 3)
+              .map((heading) => (
+                <li class:list={{ subheading: heading.depth === 3 }}>
+                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                </li>
+              ))}
+          </ol>
+        </nav>
+      </div>
+    </article>
+    <section class="article-related" aria-labelledby="related-title">
+      <div class="section-heading">
+        <h2 id="related-title">Keep the curiosity going</h2>
+        <a class="read-link !mt-0" href="/">
+          All articles <Icon name="arrow" size={16} />
+        </a>
+      </div>
+      <div class="post-grid">
+        {related.map((post) => (
+          <PostCard post={post} />
+        ))}
+      </div>
+    </section>
+  </div>
+</BaseLayout>

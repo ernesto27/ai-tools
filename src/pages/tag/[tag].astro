@@ -1,0 +1,19 @@
+---
+import Archive from "../../components/Archive.astro";
+import { getArticles } from "../../lib/articles";
+export async function getStaticPaths() {
+  const posts = await getArticles();
+  return [...new Set(posts.flatMap((post) => post.data.tags))].map((tag) => ({
+    params: { tag },
+    props: { tag, posts: posts.filter((post) => post.data.tags.includes(tag)) },
+  }));
+}
+const { tag, posts } = Astro.props;
+---
+
+<Archive
+  title={`#${tag}`}
+  description={`From the notebook: articles about ${tag.replaceAll("-", " ")}.`}
+  posts={posts}
+  kind="tag"
+/>

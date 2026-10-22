@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+import { getArticles, slugify } from "../lib/articles";
+const posts = await getArticles();
+const categories = [...new Set(posts.map((post) => post.data.category))].sort();
+const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
+const descriptions: Record<string, string> = {
+  Architecture:
+    "Systems, boundaries, and decisions that stand the test of time.",
+  Development: "Practical techniques for clearer, more reliable software.",
+  "Engineering culture":
+    "The people, habits, and conversations behind better software.",
+  Performance: "Measure what matters. Make every millisecond count.",
+};
+---
+
+<BaseLayout title="Explore topics">
+  <div class="shell page-content">
+    <header class="page-intro">
+      <div class="eyebrow">
+        <span class="eyebrow-dot"></span> Follow your curiosity
+      </div>
+      <h1>A few things we think about.</h1>
+      <p>
+        Find your next read by discipline, or follow a thread through the tags.
+      </p>
+    </header>
+    <div class="topic-grid">
+      {categories.map((category) => (
+        <a href={`/category/${slugify(category)}/`} class="topic-card">
+          <h2>{category}</h2>
+          <p>{descriptions[category]}</p>
+          <span>
+            {posts.filter((post) => post.data.category === category).length}{" "}
+            articles <Icon name="arrow" size={18} />
+          </span>
+        </a>
+      ))}
+    </div>
+    <h2 class="tags-heading">Follow a thread</h2>
+    <div class="tag-list">
+      {tags.map((tag) => (
+        <a href={`/tag/${tag}/`}>
+          #{tag}{" "}
+          <span class="opacity-60 ml-1">
+            {posts.filter((post) => post.data.tags.includes(tag)).length}
+          </span>
+        </a>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

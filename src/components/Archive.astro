@@ -1,0 +1,33 @@
+---
+import type { CollectionEntry } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PostCard from "./PostCard.astro";
+interface Props {
+  title: string;
+  description: string;
+  posts: CollectionEntry<"articles">[];
+  kind: string;
+}
+const { title, description, posts, kind } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <div class="shell page-content">
+    <header class="page-intro">
+      <a href="/topics/" class="eyebrow text-link">
+        ← Explore topics
+      </a>
+      <h1>{title}</h1>
+      <p>{description}</p>
+    </header>
+    <p class="result-status">
+      {posts.length} {posts.length === 1 ? "article" : "articles"} in this{" "}
+      {kind}
+    </p>
+    <div class="post-grid">
+      {posts.map((post) => (
+        <PostCard post={post} headingLevel={2} />
+      ))}
+    </div>
+  </div>
+</BaseLayout>

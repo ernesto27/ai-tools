@@ -1,0 +1,7 @@
+{"timestamp":"2026-10-22T09:00:00Z","level":"info","message":"server listening on 127.0.0.1:8080","service":"api"}
+{"timestamp":"2026-10-22T09:00:01Z","level":"debug","message":"accepted request","request_id":"req-101"}
+{"timestamp":"2026-10-22T09:00:02Z","level":"warning","message":"upstream latency exceeded 500ms"}
+{"timestamp":"2026-10-22T11:00:03+02:00","level":"ERROR","message":"database connection timeout"}
+{"timestamp":"2026-10-22T09:00:04Z","level":"error","message":"database connection timeout"}
+{"timestamp":"2026-10-22T09:00:05Z","level":"critical","message":"worker pool exhausted"}
+{"level":"info","message":"shutdown complete"}

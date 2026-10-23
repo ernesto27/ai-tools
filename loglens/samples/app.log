@@ -1,0 +1,7 @@
+2026-10-22T09:00:00Z INFO server listening on 127.0.0.1:8080
+2026-10-22T09:00:01Z DEBUG accepted request request_id=req-101
+2026-10-22T09:00:02Z WARNING upstream latency exceeded 500ms
+2026-10-22T09:00:03Z ERROR database connection timeout
+2026-10-22T09:00:04Z ERROR database connection timeout
+[2026-10-22T09:00:05Z] [CRITICAL] worker pool exhausted
+INFO shutdown complete

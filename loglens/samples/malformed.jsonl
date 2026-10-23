@@ -1,0 +1,4 @@
+{"timestamp":"2026-10-22T09:00:00Z","level":"info","message":"server ready"}
+{"level":"error","message":"truncated
+{"timestamp":"yesterday","level":"error","message":"invalid timestamp"}
+{"level":"warn","message":"recovered after damaged records"}

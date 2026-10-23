@@ -1,0 +1,11 @@
+[package]
+name = "loglens"
+version = "0.1.0"
+edition = "2024"
+description = "Analyze local plain-text and JSON Lines logs incrementally"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

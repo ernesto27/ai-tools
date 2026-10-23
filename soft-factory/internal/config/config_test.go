@@ -2,12 +2,11 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
-	"slices"
-	"strings"
+	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,68 +64,50 @@ func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
 	}
 }
 
-func TestLoadDisabledStages(t *testing.T) {
-	const allowed = "allowed: implementation, codeReview, securityReview, riskClassification, reviewChanges"
-	for _, tc := range []struct {
-		name    string
-		data    string
-		want    []Stage
-		wantErr string
-	}{
-		{name: "omitted", data: `{"agentSandbox":{}}`},
-		{name: "empty", data: `{"agentSandbox":{},"disabledStages":[]}`, want: []Stage{}},
-		{name: "implementation", data: `{"agentSandbox":{},"disabledStages":["implementation"]}`, want: []Stage{StageImplementation}},
-		{name: "codeReview", data: `{"agentSandbox":{},"disabledStages":["codeReview"]}`, want: []Stage{StageCodeReview}},
-		{name: "securityReview", data: `{"agentSandbox":{},"disabledStages":["securityReview"]}`, want: []Stage{StageSecurityReview}},
-		{name: "riskClassification", data: `{"agentSandbox":{},"disabledStages":["riskClassification"]}`, want: []Stage{StageRiskClassification}},
-		{name: "reviewChanges", data: `{"agentSandbox":{},"disabledStages":["reviewChanges"]}`, want: []Stage{StageReviewChanges}},
-		{
-			name: "all",
-			data: `{"agentSandbox":{},"disabledStages":["reviewChanges","riskClassification","securityReview","codeReview","implementation"]}`,
-			want: []Stage{StageReviewChanges, StageRiskClassification, StageSecurityReview, StageCodeReview, StageImplementation},
-		},
-		{name: "duplicates", data: `{"agentSandbox":{},"disabledStages":["codeReview","codeReview"]}`, want: []Stage{StageCodeReview, StageCodeReview}},
-		{name: "malformed JSON", data: `{"agentSandbox":{},"disabledStages":["codeReview"`, wantErr: "parse factory configuration"},
-		{name: "null", data: `{"agentSandbox":{},"disabledStages":null}`, wantErr: "disabledStages must be an array"},
-		{name: "string", data: `{"agentSandbox":{},"disabledStages":"codeReview"}`, wantErr: "disabledStages must be an array"},
-		{name: "number", data: `{"agentSandbox":{},"disabledStages":1}`, wantErr: "disabledStages must be an array"},
-		{name: "boolean", data: `{"agentSandbox":{},"disabledStages":true}`, wantErr: "disabledStages must be an array"},
-		{name: "object", data: `{"agentSandbox":{},"disabledStages":{"codeReview":true}}`, wantErr: "disabledStages must be an array"},
-		{name: "null entry", data: `{"agentSandbox":{},"disabledStages":["codeReview",null]}`, wantErr: "disabledStages[1] must be a string"},
-		{name: "number entry", data: `{"agentSandbox":{},"disabledStages":[1]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "array entry", data: `{"agentSandbox":{},"disabledStages":[["codeReview"]]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "object entry", data: `{"agentSandbox":{},"disabledStages":[{}]}`, wantErr: "disabledStages[0] must be a string"},
-		{name: "blank", data: `{"agentSandbox":{},"disabledStages":[""]}`, wantErr: `disabledStages[0]: unknown stage ""; ` + allowed},
-		{name: "whitespace", data: `{"agentSandbox":{},"disabledStages":[" "]}`, wantErr: `disabledStages[0]: unknown stage " "`},
-		{name: "padded", data: `{"agentSandbox":{},"disabledStages":[" codeReview"]}`, wantErr: `disabledStages[0]: unknown stage " codeReview"`},
-		{name: "case mismatch", data: `{"agentSandbox":{},"disabledStages":["CodeReview"]}`, wantErr: `disabledStages[0]: unknown stage "CodeReview"`},
-		{name: "kebab-case", data: `{"agentSandbox":{},"disabledStages":["security-review"]}`, wantErr: `disabledStages[0]: unknown stage "security-review"`},
-		{name: "unknown after valid", data: `{"agentSandbox":{},"disabledStages":["codeReview","securityReveiw"]}`, wantErr: `disabledStages[1]: unknown stage "securityReveiw"; ` + allowed},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			require.NoError(t, os.WriteFile("software-factory.json", []byte(tc.data), 0600))
-			cfg, err := Load("software-factory.json")
-			if tc.wantErr != "" {
-				require.ErrorContains(t, err, tc.wantErr)
-				if !strings.Contains(tc.wantErr, "parse") {
-					require.ErrorContains(t, err, "validate factory configuration: disabledStages")
+func TestLoadStageDisabled(t *testing.T) {
+	for _, stage := range Stages {
+		for _, tc := range []struct {
+			name, value   string
+			want, invalid bool
+		}{
+			{"omitted", "", false, false},
+			{"false", "false", false, false},
+			{"true", "true", true, false},
+			{"null", "null", false, false},
+			{"string", `"true"`, false, true},
+			{"number", "1", false, true},
+			{"array", "[]", false, true},
+			{"object", "{}", false, true},
+		} {
+			t.Run(string(stage)+"/"+tc.name, func(t *testing.T) {
+				property := ""
+				if tc.value != "" {
+					property = `,"disabled":` + tc.value
 				}
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tc.want, cfg.DisabledStages)
-			for _, stage := range Stages {
-				got, want := cfg.StageDisabled(stage), slices.Contains(tc.want, stage)
-				assert.Equal(t, want, got, "stage %s", stage)
-			}
-		})
+				data := `{"agentSandbox":{},"stages":{"` + string(stage) +
+					`":{"agent":"codex","model":"stage-model"` + property + `}}}`
+				path := filepath.Join(t.TempDir(), "software-factory.json")
+				require.NoError(t, os.WriteFile(path, []byte(data), 0600))
+				cfg, err := Load(path)
+				if tc.invalid {
+					require.ErrorContains(t, err, "parse factory configuration")
+					var typeErr *json.UnmarshalTypeError
+					require.True(t, errors.As(err, &typeErr))
+					return
+				}
+				require.NoError(t, err)
+				for _, other := range Stages {
+					require.Equal(t, other == stage && tc.want, cfg.StageDisabled(other))
+				}
+				require.False(t, cfg.StageDisabled(Stage("unknown")))
+			})
+		}
 	}
 }
 
-func TestLoadDisabledStagesKeepsOtherValidation(t *testing.T) {
+func TestLoadStageDisabledKeepsOtherValidation(t *testing.T) {
 	t.Chdir(t.TempDir())
-	data := `{"agentSandbox":{},"stages":{"codeReview":{"customSkill":"../escape"}},"disabledStages":["codeReview"]}`
+	data := `{"agentSandbox":{},"stages":{"codeReview":{"disabled":true,"customSkill":"../escape"}}}`
 	require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
 
 	_, err := Load("software-factory.json")
@@ -138,7 +119,7 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 		name, input string
 		wantErr     bool
 	}{
-		{"shared and section pointers", `{"documents":["support.md"],"disabledStages":["reviewChanges"],"stages":{"implementation":{"agent":"stage-agent","model":"stage-model"},"codeReview":{"customSkill":"project"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
+		{"shared and section pointers", `{"documents":["support.md"],"stages":{"reviewChanges":{"disabled":true},"implementation":{"agent":"stage-agent","model":"stage-model"},"codeReview":{"customSkill":"project"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
 		{"absent", `{"documents":[]}`, true},
 		{"null", `{"agentSandbox":null}`, false},
 		{"empty", `{"agentSandbox":{}}`, false},
@@ -161,6 +142,7 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 				require.ErrorContains(t, err, "agentSandbox is required")
 			}
 			if tt.name == "shared and section pointers" {
+				require.True(t, cfg.StageDisabled(StageReviewChanges))
 				require.Equal(t, "invalid-agent", cfg.AgentSandbox.Agent)
 				require.Equal(t, "invalid-model", cfg.AgentSandbox.Model)
 				require.NotNil(t, cfg.AgentSandbox.Resume.Push)

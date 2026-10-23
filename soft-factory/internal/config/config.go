@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	sandboxconfig "github.com/ernesto27/ai-tools/agent-sandbox/config"
@@ -16,15 +15,13 @@ type Config struct {
 	AgentSandbox sandboxconfig.Config `json:"agentSandbox"`
 	Documents    []string             `json:"documents"`
 	GoogleDrive  *GoogleDriveConfig   `json:"googleDrive,omitempty"`
-	// DisabledStages lists stages that must not execute. Load parses it
-	// separately so type errors can name the offending entry.
-	DisabledStages []Stage      `json:"-"`
-	Stages         StagesConfig `json:"stages"`
+	Stages       StagesConfig         `json:"stages"`
 }
 
 type StageConfig struct {
-	Agent string `json:"agent,omitempty"`
-	Model string `json:"model,omitempty"`
+	Agent    string `json:"agent,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 // CustomSkillStageConfig adds a project skill to a review-stage selection.
@@ -69,9 +66,22 @@ var Stages = []Stage{
 	StageReviewChanges,
 }
 
-// StageDisabled reports whether stage is listed in disabledStages.
+// StageDisabled reports whether the stage's configuration disables execution.
 func (c Config) StageDisabled(stage Stage) bool {
-	return slices.Contains(c.DisabledStages, stage)
+	switch stage {
+	case StageImplementation:
+		return c.Stages.Implementation.Disabled
+	case StageCodeReview:
+		return c.Stages.CodeReview.Disabled
+	case StageSecurityReview:
+		return c.Stages.SecurityReview.Disabled
+	case StageRiskClassification:
+		return c.Stages.RiskClassification.Disabled
+	case StageReviewChanges:
+		return c.Stages.ReviewChanges.Disabled
+	default:
+		return false
+	}
 }
 
 type GoogleDriveConfig struct {
@@ -90,18 +100,13 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 	var raw struct {
-		AgentSandbox   json.RawMessage `json:"agentSandbox"`
-		DisabledStages json.RawMessage `json:"disabledStages"`
+		AgentSandbox json.RawMessage `json:"agentSandbox"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return Config{}, fmt.Errorf("parse factory configuration: %w", err)
 	}
 	if raw.AgentSandbox == nil {
 		return Config{}, fmt.Errorf("validate factory configuration: agentSandbox is required")
-	}
-	cfg.DisabledStages, err = parseDisabledStages(raw.DisabledStages)
-	if err != nil {
-		return Config{}, fmt.Errorf("validate factory configuration: %w", err)
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -111,39 +116,7 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// parseDisabledStages requires an array of strings when the field is present.
-// Validate checks the names.
-func parseDisabledStages(data json.RawMessage) ([]Stage, error) {
-	if data == nil {
-		return nil, nil
-	}
-	var entries []json.RawMessage
-	if string(data) == "null" || json.Unmarshal(data, &entries) != nil {
-		return nil, fmt.Errorf("disabledStages must be an array of stage names")
-	}
-	stages := make([]Stage, 0, len(entries))
-	for i, entry := range entries {
-		var name string
-		if string(entry) == "null" || json.Unmarshal(entry, &name) != nil {
-			return nil, fmt.Errorf("disabledStages[%d] must be a string", i)
-		}
-		stages = append(stages, Stage(name))
-	}
-	return stages, nil
-}
-
 func (c Config) Validate() error {
-	for i, stage := range c.DisabledStages {
-		if !slices.Contains(Stages, stage) {
-			allowed := make([]string, len(Stages))
-			for j, name := range Stages {
-				allowed[j] = string(name)
-			}
-			return fmt.Errorf("disabledStages[%d]: unknown stage %q; allowed: %s",
-				i, stage, strings.Join(allowed, ", "))
-		}
-	}
-
 	skillNames := []struct{ stage, name string }{
 		{"codeReview", c.Stages.CodeReview.CustomSkill},
 		{"securityReview", c.Stages.SecurityReview.CustomSkill},

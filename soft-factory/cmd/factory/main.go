@@ -18,6 +18,7 @@ import (
 
 	"soft-factory/internal/config"
 	"soft-factory/internal/executionlog"
+	"soft-factory/internal/github"
 	"soft-factory/internal/jira"
 	"soft-factory/internal/sandbox"
 	"soft-factory/internal/taskcontext"
@@ -44,7 +45,7 @@ type workflowOptions struct {
 	Branch     string
 }
 
-func runWorkflow(opts workflowOptions) (runErr error) {
+func runWorkflow(opts workflowOptions) error {
 	if err := loadEnvironment(); err != nil {
 		return err
 	}
@@ -111,115 +112,136 @@ func runWorkflow(opts workflowOptions) (runErr error) {
 		fmt.Fprintf(os.Stderr, "Warning: execution logging unavailable: %v; continuing execution.\n", err)
 	} else {
 		fmt.Printf("Execution logs: %s\n", runLog.Path())
-		defer func() { runLog.Finish(runErr) }()
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	var taskOverride string
-	if opts.IssueURL != "" {
-		taskOverride, err = loadJiraTask(ctx, opts.IssueURL)
+	workflowErr := func() error {
+		var taskOverride string
+		if opts.IssueURL != "" {
+			taskOverride, err = loadJiraTask(ctx, opts.IssueURL)
+			if err != nil {
+				return err
+			}
+		}
+
+		documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(factoryConfigFile))
 		if err != nil {
 			return err
 		}
-	}
-
-	documents, err := taskcontext.Build(ctx, cfg, filepath.Dir(factoryConfigFile))
-	if err != nil {
-		return err
-	}
-	input := sandbox.TaskContext{
-		TaskOverride: taskOverride,
-		Documents:    documents,
-		CustomSkills: loadedSkills,
-		Context:      ctx,
-		Log:          runLog,
-		Branch:       branch,
-		BranchSet:    branchSet,
-		Continue:     opts.Continue,
-		Config:       cfg,
-	}
-
-	if shouldRun(config.StageImplementation) {
-		if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
-			return sandbox.Run(input)
-		}); err != nil {
-			return err
+		input := sandbox.TaskContext{
+			TaskOverride: taskOverride,
+			Documents:    documents,
+			CustomSkills: loadedSkills,
+			Context:      ctx,
+			Log:          runLog,
+			Branch:       branch,
+			BranchSet:    branchSet,
+			Continue:     opts.Continue,
+			Config:       cfg,
 		}
-	}
 
-	// Reviews may come from this attempt or an earlier successful stage.
-	var reports []string
-	var disabledReviews []config.Stage
-	reviews := []struct {
-		stage   config.Stage
-		message string
-		review  func(sandbox.TaskContext) (string, error)
-	}{
-		{config.StageCodeReview, "\nStarting code review and corrections...", sandbox.Review},
-		{config.StageSecurityReview, "\nStarting security review and corrections...", sandbox.SecurityReview},
-	}
-	for _, review := range reviews {
-		if review.stage == config.StageSecurityReview && cfg.Stages.SecurityReview.SaveFindings {
-			review.message = "\nStarting security review (save findings; no corrections)..."
-		}
-		if cfg.StageDisabled(review.stage) {
-			disabledReviews = append(disabledReviews, review.stage)
-		}
-		if !shouldRun(review.stage) {
-			if !cfg.StageDisabled(review.stage) && shouldRun(config.StageRiskClassification) && !cfg.StageDisabled(config.StageRiskClassification) {
-				filename := ".soft-factory-stage-changes-" + rand.Text() + "-review.txt"
-				worktree, err := executionlog.WorktreeForBranch(ctx, branch)
-				if err != nil {
-					return err
-				}
-				if err := runLog.RestoreReview(opts.ResumePath, review.stage, filepath.Join(worktree, filename)); err != nil {
-					return fmt.Errorf("restore %s evidence: %w", review.stage, err)
-				}
-				reports = append(reports, filename)
+		if shouldRun(config.StageImplementation) {
+			if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
+				return sandbox.Run(input)
+			}); err != nil {
+				return err
 			}
-			continue
 		}
-		if err := runStage(input, cfg, review.stage, review.message, func() error {
-			report, err := review.review(input)
-			reports = append(reports, report)
-			return err
-		}); err != nil {
-			return err
-		}
-	}
 
-	if shouldRun(config.StageRiskClassification) {
-		if err := runStage(input, cfg, config.StageRiskClassification, "\nStarting risk classification...", func() error {
-			return sandbox.RiskClassification(input, reports, disabledReviews)
-		}); err != nil {
+		// Reviews may come from this attempt or an earlier successful stage.
+		var reports []string
+		var disabledReviews []config.Stage
+		reviews := []struct {
+			stage   config.Stage
+			message string
+			review  func(sandbox.TaskContext) (string, error)
+		}{
+			{config.StageCodeReview, "\nStarting code review and corrections...", sandbox.Review},
+			{config.StageSecurityReview, "\nStarting security review and corrections...", sandbox.SecurityReview},
+		}
+		for _, review := range reviews {
+			if review.stage == config.StageSecurityReview && cfg.Stages.SecurityReview.SaveFindings {
+				review.message = "\nStarting security review (save findings; no corrections)..."
+			}
+			if cfg.StageDisabled(review.stage) {
+				disabledReviews = append(disabledReviews, review.stage)
+			}
+			if !shouldRun(review.stage) {
+				if !cfg.StageDisabled(review.stage) && shouldRun(config.StageRiskClassification) && !cfg.StageDisabled(config.StageRiskClassification) {
+					filename := ".soft-factory-stage-changes-" + rand.Text() + "-review.txt"
+					worktree, err := executionlog.WorktreeForBranch(ctx, branch)
+					if err != nil {
+						return err
+					}
+					if err := runLog.RestoreReview(opts.ResumePath, review.stage, filepath.Join(worktree, filename)); err != nil {
+						return fmt.Errorf("restore %s evidence: %w", review.stage, err)
+					}
+					reports = append(reports, filename)
+				}
+				continue
+			}
+			if err := runStage(input, cfg, review.stage, review.message, func() error {
+				report, err := review.review(input)
+				reports = append(reports, report)
+				return err
+			}); err != nil {
+				return err
+			}
+		}
+
+		if shouldRun(config.StageRiskClassification) {
+			if err := runStage(input, cfg, config.StageRiskClassification, "\nStarting risk classification...", func() error {
+				return sandbox.RiskClassification(input, reports, disabledReviews)
+			}); err != nil {
+				return err
+			}
+		}
+		if cfg.StageDisabled(config.StageRiskClassification) {
+			// Risk classification normally removes this run's review reports.
+			sandbox.RemoveReviewReports(input, reports)
+		}
+		if !shouldRun(config.StageReviewChanges) {
+			return nil
+		}
+		if err := input.Context.Err(); err != nil {
 			return err
 		}
+		if cfg.StageDisabled(config.StageReviewChanges) {
+			skipStage(input, config.StageReviewChanges)
+			return nil
+		}
+		if err := runStage(input, cfg, config.StageReviewChanges, "\nStarting final change walkthrough...", func() error {
+			return sandbox.ReviewChanges(input)
+		}); err != nil {
+			if input.Context.Err() != nil || opts.ResumePath != "" {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "Warning: final change walkthrough unavailable: %v; continuing execution.\n", err)
+		}
+
+		return nil
+	}()
+
+	if runLog != nil {
+		runLog.Finish(workflowErr)
 	}
-	if cfg.StageDisabled(config.StageRiskClassification) {
-		// Risk classification normally removes this run's review reports.
-		sandbox.RemoveReviewReports(input, reports)
+	if workflowErr != nil {
+		return workflowErr
 	}
-	if !shouldRun(config.StageReviewChanges) {
+	if runLog == nil {
 		return nil
 	}
-	if err := input.Context.Err(); err != nil {
-		return err
-	}
-	if cfg.StageDisabled(config.StageReviewChanges) {
-		skipStage(input, config.StageReviewChanges)
-		return nil
-	}
-	if err := runStage(input, cfg, config.StageReviewChanges, "\nStarting final change walkthrough...", func() error {
-		return sandbox.ReviewChanges(input)
-	}); err != nil {
-		if input.Context.Err() != nil || opts.ResumePath != "" {
-			return err
-		}
-		fmt.Fprintf(os.Stderr, "Warning: final change walkthrough unavailable: %v; continuing execution.\n", err)
-	}
 
+	repository, err := github.RepositoryFromOrigin(ctx)
+	if err == nil {
+		err = github.AppendBody(ctx, repository, branch, runLog.Summary())
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr,
+			"Warning: append PR execution summary: %v\n", err)
+	}
 	return nil
 }
 

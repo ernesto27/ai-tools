@@ -47,7 +47,8 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 		status.Close()
 		return nil, fmt.Errorf("open existing summary: %w", err)
 	}
-	if _, err := fmt.Fprintf(summary, "\n%s\nRESUMED: %s\n\n", separator, timestamp()); err != nil {
+	resumeHeader := fmt.Sprintf("\n%s\nRESUMED: %s\n\n", separator, timestamp())
+	if _, err := summary.WriteString(resumeHeader); err != nil {
 		summary.Close()
 		status.Close()
 		return nil, fmt.Errorf("append resume summary: %w", err)
@@ -56,6 +57,7 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 		path:           path,
 		header:         fmt.Sprintf("EXECUTION\nRun: %s\nBranch: %s\nResumed: %s\nPlanned stages: %s\n", filepath.Base(path), branch, timestamp(), stageList(planned)),
 		summary:        summary,
+		summaryText:    string(data) + resumeHeader,
 		summaryEntries: entries,
 		stageStatus:    status,
 		attempts:       make(map[config.Stage]int),

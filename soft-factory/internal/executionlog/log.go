@@ -76,6 +76,7 @@ type Run struct {
 	stageStatus          *StageStatus
 	resuming             bool
 	tokenCost            *tokencost.TokenCost
+	summaryText          string
 }
 
 // NewRun initializes a private invocation directory under the branch's log folder.
@@ -120,7 +121,8 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 		return nil, fmt.Errorf("create stage status: %w", err)
 	}
 
-	_, writeErr := fmt.Fprintf(file, "SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator)
+	summaryHeader := fmt.Sprintf("SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator)
+	_, writeErr := io.WriteString(file, summaryHeader)
 	if writeErr != nil {
 		file.Close()
 		stageStatus.Close()
@@ -138,6 +140,7 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 			path:        path,
 			header:      header,
 			summary:     file,
+			summaryText: summaryHeader,
 			attempts:    make(map[config.Stage]int),
 			newline:     true,
 			ready:       true,
@@ -223,6 +226,13 @@ func sanitizeBranch(branch string) string {
 }
 
 func (r *Run) Path() string { return r.path }
+
+// Summary returns the accumulated summary text, including after Finish.
+func (r *Run) Summary() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.summaryText
+}
 
 func (r *Run) Message(message string) {
 	r.mu.Lock()
@@ -360,6 +370,8 @@ func (r *Run) Finish(err error) {
 	if r.summary != nil {
 		if _, writeErr := fmt.Fprintln(r.summary, separator); writeErr != nil {
 			r.failLocked(fmt.Errorf("write summary footer: %w", writeErr))
+		} else {
+			r.summaryText += separator + "\n"
 		}
 		if closeErr := r.summary.Close(); closeErr != nil {
 			r.failLocked(fmt.Errorf("close summary: %w", closeErr))
@@ -603,6 +615,9 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 	if _, err := io.WriteString(r.summary, entry+"\n"); err != nil {
 		return fmt.Errorf("write stage summary: %w", err)
 	}
+
+	r.summaryText += entry + "\n"
+
 	r.summaryEntries++
 	if stage == config.StageSecurityReview && r.securityReporting {
 		r.retainSecurityReport = false
@@ -662,6 +677,7 @@ func (r *Run) RecordSkippedStage(message string) error {
 	if _, err := io.WriteString(r.summary, message+"\n\n"); err != nil {
 		return fmt.Errorf("write skipped stage: %w", err)
 	}
+	r.summaryText += message + "\n\n"
 	return nil
 }
 

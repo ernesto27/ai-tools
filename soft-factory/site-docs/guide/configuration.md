@@ -26,7 +26,7 @@ All property names use lower camelCase, including nested properties. These are a
 | `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
 | `stages.securityReview.saveFindings` | Optional boolean; `true` saves security findings and suggested fixes without applying corrections or committing. Defaults to `false`. |
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
-| `disabledStages` | Optional list of stages to skip: `implementation`, `codeReview`, `securityReview`, `riskClassification`, or `reviewChanges`. See [Disabling stages](#disabling-stages). |
+| `stages.<name>.disabled` | Optional boolean for any of the five stages. Set `true` to skip the stage; omission or `false` enables it. See [Disabling stages](#disabling-stages). |
 
 Minimal example:
 
@@ -100,39 +100,22 @@ Folder loading includes only Google Docs directly inside the selected folders. I
 
 #### Disabling stages
 
-To skip stages without changing their order, list them in `disabledStages`.
-Omitting the property or using `[]` runs every stage as before:
+Set `disabled: true` inside a stage to skip it without changing the order of later stages. Merge the stage settings into your existing `software-factory.json`:
 
 ```json
 {
-  "documents": ["task.txt"],
-  "disabledStages": ["securityReview", "riskClassification"]
+  "stages": {
+    "securityReview": {"disabled": true},
+    "riskClassification": {"disabled": true}
+  }
 }
 ```
 
-| Stage | Default workflow | `continue` |
-| --- | --- | --- |
-| `implementation` | Yes | Yes |
-| `codeReview` | Yes | Yes |
-| `securityReview` | Yes | Yes |
-| `riskClassification` | Yes | Yes |
-| `reviewChanges` | Yes | Yes |
+All five stage keys support this property: `implementation`, `codeReview`, `securityReview`, `riskClassification`, and `reviewChanges`. Omission or `false` enables a stage when it is eligible for the selected workflow. Normal JSON decoding also treats `null` as false; incompatible value types return a configuration parsing error.
 
-Names are exact and case-sensitive. Kebab-case names such as
-`security-review`, other spellings, blank or padded names, `null`, and
-non-string entries are rejected before any agent runs, for example:
+The former top-level `disabledStages` property is ignored. Move each listed stage to `stages.<name>.disabled: true` manually; there is no automatic migration or fallback. Preserve its existing agent, model, custom skill, and other settings.
 
-```text
-Error: validate factory configuration: disabledStages[0]: unknown stage "securityReveiw"; allowed: implementation, codeReview, securityReview, riskClassification, reviewChanges
-```
-
-Duplicates are allowed. Listing a stage that the selected command never runs,
-such as `implementation` with `continue`, has no effect. Each skipped stage
-prints `Skipping disabled stage: <name>` and, when execution logging is enabled,
-adds that line to `summary.log`. Skipped stages start no agent,
-create no stage log or report, and do not load their configured custom skill,
-so a missing skill file does not block a disabled stage. Skill names are still
-validated.
+Each skipped stage prints `Skipping disabled stage: <name>` and adds that line to `summary.log`. Skipped stages start no agent, create no stage log or report, and do not load their configured custom skill. Skill names are still validated.
 
 Disabling a stage never disables later stages. Risk classification uses only
 the reports from reviews that ran in the current invocation and states when
@@ -188,7 +171,7 @@ by the selected agent.
 | `reviewChanges` | Final read-only walkthrough in the default workflow and `continue`. |
 
 Use these exact camelCase keys. Overrides apply only when the stage runs;
-`disabledStages` still skips a stage even when it has settings here.
+`disabled: true` still skips a stage even when it has agent or model settings here.
 
 Each nonempty `agent` or `model` overrides its corresponding value from
 `agentSandbox` for that invocation. Omitted or empty fields retain

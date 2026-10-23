@@ -65,7 +65,7 @@ The last entry in `stage_status.txt` determines where recovery starts. A
 `SUCCEEDED` entry advances to the next stage; a `FAILED` or `INTERRUPTED`
 entry retries that stage. An empty status file starts at implementation.
 If the final walkthrough is already recorded as successful, the command
-returns without running stages. Current `disabledStages` settings still apply.
+returns without running stages. Current `stages.<name>.disabled` settings still apply.
 
 Unlike `continue`, `resume` reuses the same invocation directory and appends
 to its stage logs and summary. Keep `summary.log`, `stage_status.txt`, and the

@@ -23,7 +23,7 @@ func TestSecuritySaveFindingsConfiguration(t *testing.T) {
 			if tc.value != "" {
 				property = `,"saveFindings":` + tc.value
 			}
-			data := fmt.Sprintf(`{"agentSandbox":{"agent":"shared"},"disabledStages":["securityReview"],"stages":{"securityReview":{"agent":"codex","model":"security-model","customSkill":"project"%s},"codeReview":{"model":"code-model"}}}`, property)
+			data := fmt.Sprintf(`{"agentSandbox":{"agent":"shared"},"stages":{"securityReview":{"disabled":true,"agent":"codex","model":"security-model","customSkill":"project"%s},"codeReview":{"model":"code-model"}}}`, property)
 			path := filepath.Join(t.TempDir(), "config.json")
 			require.NoError(t, os.WriteFile(path, []byte(data), 0600))
 			cfg, err := Load(path)

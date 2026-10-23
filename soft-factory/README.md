@@ -120,7 +120,7 @@ All five stage keys support this property: `implementation`, `codeReview`, `secu
 
 The former top-level `disabledStages` property is ignored. Move each listed stage to `stages.<name>.disabled: true` manually; there is no automatic migration or fallback. Preserve its existing agent, model, custom skill, and other settings.
 
-Each skipped stage prints `Skipping disabled stage: <name>` and adds that line to `summary.log`. Skipped stages start no agent, create no stage log or report, and do not load their configured custom skill. Skill names are still validated.
+Each skipped stage prints `Skipping disabled stage: <name>` and, when execution logging is enabled, adds that line to `summary.log`. Skipped stages start no agent, create no stage log or report, and do not load their configured custom skill. Skill names are still validated.
 
 Disabling a stage never disables later stages. Risk classification uses only
 the reports from reviews that ran in the current invocation and states when

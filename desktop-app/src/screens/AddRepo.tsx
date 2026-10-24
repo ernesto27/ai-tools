@@ -1,26 +1,57 @@
 import { useState } from "react";
-import { AGENTS, knownFolders } from "../data";
-import { Checkbox, Field, Input, LinkButton, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
+import { AGENTS } from "../data";
+import { Checkbox, Field, Input, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
+import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
+
 
 interface Props {
   onDone: () => void;
 }
 
-export function AddRepo({ onDone }: Props) {
-  const [path, setPath] = useState(knownFolders[0].path);
+interface FolderInfo {
+  isGit: boolean;
+  hasConfig: boolean;
+}
 
-  // Mock folder inspection; later this comes from a Tauri command.
-  const found = knownFolders.find((f) => f.path === path.trim());
-  const branch = found?.branch ?? "main";
-  const hasConfig = found?.hasConfig ?? false;
+export function AddRepo({ onDone }: Props) {
+  const [path, setPath] = useState("");
+  const [info, setInfo] = useState<FolderInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const hasConfig = info?.hasConfig ?? false;
 
   const checks = [
-    { ok: true, text: `git repository · ${branch}` },
+    info?.isGit
+      ? { ok: true, text: "git repository" }
+      : { ok: false, text: "not a git repository" },
     hasConfig
       ? { ok: true, text: "software-factory.json found" }
       : { ok: false, text: "no software-factory.json — a starter will be created" },
     { ok: true, text: "agent-sandbox · git · docker on PATH" },
   ];
+
+   async function browse() {
+    const folder = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: path || undefined,
+    });
+     if (!folder) return;
+    setError(null);
+    setPath(folder);
+    setInfo(await invoke<FolderInfo>("inspect_folder", { path: folder }));
+  }
+
+  async function addRepo() {
+    try {
+      await invoke("save_repo", { path });
+      onDone();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
 
   return (
     <div className="flex max-w-[680px] flex-col gap-9">
@@ -41,29 +72,31 @@ export function AddRepo({ onDone }: Props) {
             id="folder"
             mono
             large
+            readOnly
             className="min-w-0 grow"
             value={path}
             placeholder="/path/to/repository"
-            onChange={(e) => setPath(e.target.value)}
           />
-          <OutlineButton>Browse</OutlineButton>
+          <OutlineButton onClick={browse}>Browse</OutlineButton>
         </div>
       </section>
 
-      <section aria-labelledby="chk-h" className="flex flex-col gap-1.5">
-        <SectionHeading id="chk-h" plain className="mb-1">
-          Checks
-        </SectionHeading>
-        {checks.map((c) => (
-          <span key={c.text} className="font-mono text-sm whitespace-pre">
-            <span className={c.ok ? "text-ok" : "text-warn"}>{c.ok ? "✓" : "!"}</span>
-            {"  "}
-            {c.text}
-          </span>
-        ))}
-      </section>
+      {info && (
+        <section aria-labelledby="chk-h" className="flex flex-col gap-1.5">
+          <SectionHeading id="chk-h" plain className="mb-1">
+            Checks
+          </SectionHeading>
+          {checks.map((c) => (
+            <span key={c.text} className="font-mono text-sm whitespace-pre">
+              <span className={c.ok ? "text-ok" : "text-warn"}>{c.ok ? "✓" : "!"}</span>
+              {"  "}
+              {c.text}
+            </span>
+          ))}
+        </section>
+      )}
 
-      {!hasConfig && (
+      {info?.isGit && !hasConfig && (
         <section aria-labelledby="starter-h" className="flex flex-col gap-4">
           <div className="flex flex-col gap-0.5 border-b border-line pb-3">
             <SectionHeading id="starter-h" plain>
@@ -93,12 +126,14 @@ export function AddRepo({ onDone }: Props) {
       )}
 
       <div className="flex items-center gap-5 border-t border-line pt-2">
-        <PrimaryButton size="lg" onClick={onDone}>
+        <PrimaryButton size="lg" disabled={!info?.isGit} onClick={addRepo}>
           Add repository
         </PrimaryButton>
-        <LinkButton muted className="text-base" onClick={onDone}>
-          Cancel
-        </LinkButton>
+        {error && (
+          <span role="alert" className="text-base text-warn">
+            {error}
+          </span>
+        )}
       </div>
     </div>
   );

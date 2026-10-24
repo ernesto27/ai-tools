@@ -1,0 +1,6 @@
+add respostory
+
+- save list of projects repo in desktop config folder -  desktop 
+- by default do not show checks,  only show after add a folder  - desktop 
+- softwre factory shuld be create with default values,  only agent be select here
+- logs folder should be save in .config/factor not in repo 

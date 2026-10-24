@@ -29,7 +29,7 @@ export function PrimaryButton({ size = "md", className, ...props }: ComponentPro
     <button
       type="button"
       className={cx(
-        "inline-flex items-center rounded-md bg-ink font-medium text-canvas hover:bg-ink-strong",
+        "inline-flex items-center rounded-md bg-ink font-medium text-canvas enabled:hover:bg-ink-strong disabled:cursor-not-allowed disabled:opacity-40",
         size === "lg" ? "min-h-10 px-[18px]" : "min-h-9 px-3.5",
         className,
       )}

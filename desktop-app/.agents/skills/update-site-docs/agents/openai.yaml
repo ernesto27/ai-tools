@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Site Docs"
+  short_description: "Maintain the Soft Factory documentation website"
+  default_prompt: "Use $update-site-docs to update the Soft Factory user guide for the relevant changes and validate the documentation build."

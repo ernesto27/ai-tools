@@ -67,6 +67,18 @@ agent-sandbox doctor
 This checks whether `git`, `docker`, `gh` (optional, for PRs), and `code`
 (optional, for `worktree-editor`) are in `PATH`.
 
+For tools that need machine-readable output:
+
+```bash
+agent-sandbox doctor --json
+```
+
+This returns a JSON array with only `name` (string) and `installed` (boolean)
+for each dependency, in the order `git`, `docker`, `gh`, `code`. Missing tools
+are included with `installed: false` and do not cause a nonzero exit status.
+The command checks executable availability only; it does not run tools or
+check service health. Without `--json`, the colored text report is unchanged.
+
 Browse the public OpenRouter model catalog with `agent-sandbox models`.
 
 ```text

@@ -8,7 +8,7 @@
 | `resume` | Continue a recorded task; requires `-b`. |
 | `run-tui` | Start a task in the terminal UI. |
 | `resume-tui` | Continue a task in the terminal UI; requires `-b`. |
-| `doctor` | Check host dependency availability in `PATH`. |
+| `doctor [--json]` | Check host dependency availability in `PATH`; optionally return JSON. |
 | `update` | Install the latest release binary. |
 | `worktree-list` | List registered worktrees for the current repository. |
 | `worktree-editor -b <branch>` | Open a recorded worktree in VS Code. |
@@ -18,6 +18,15 @@
 Codex and Claude Code show a [compact audit feed](running.md#read-the-compact-audit-feed)
 in all four execution commands. Plain commands support redirection; TUI commands
 require interactive terminal input and output.
+
+## Doctor output
+
+`doctor --json` writes one JSON array to stdout with exactly `name` (string)
+and `installed` (boolean) per dependency, ordered `git`, `docker`, `gh`, `code`.
+It includes missing tools with `installed: false` and exits successfully even
+when tools are missing. It checks PATH only, without running tools or checking
+service health. Output and usage errors retain the normal CLI error handling.
+Without `--json`, or with `--json=false`, output is the colored text table.
 
 ## Execution flags
 

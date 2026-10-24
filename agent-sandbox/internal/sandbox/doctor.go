@@ -1,12 +1,29 @@
 package sandbox
 
-import "os/exec"
+import (
+	"encoding/json"
+	"io"
+	"os/exec"
+)
 
 // Dependency describes a host tool's installation and the feature that uses it.
 type Dependency struct {
 	Name      string
 	Optional  string
 	Installed bool
+}
+
+// WriteDependenciesJSON writes only the installation fields consumed by CLI clients.
+func WriteDependenciesJSON(w io.Writer, dependencies []Dependency) error {
+	type dependencyStatus struct {
+		Name      string `json:"name"`
+		Installed bool   `json:"installed"`
+	}
+	statuses := make([]dependencyStatus, len(dependencies))
+	for i, dependency := range dependencies {
+		statuses[i] = dependencyStatus{Name: dependency.Name, Installed: dependency.Installed}
+	}
+	return json.NewEncoder(w).Encode(statuses)
 }
 
 // Dependencies checks PATH without running tools or contacting services.

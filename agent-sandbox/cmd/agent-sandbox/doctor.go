@@ -10,20 +10,26 @@ import (
 )
 
 func newDoctorCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "List host dependencies and their installation status",
 		Long: "Check PATH for git, docker, gh (optional for PRs), and code (optional for\n" +
 			"worktree-editor). Does not run tools or check service health. Works from\n" +
 			"any directory, ignores configuration, and succeeds even if tools are missing.\n" +
-			"Installation statuses always use green/red ANSI colors.",
+			"Text installation statuses always use green/red ANSI colors. Use --json\n" +
+			"for an array containing each dependency's name and installed status.",
 		Args: usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			dependencies := sandbox.Dependencies()
+			if jsonOutput {
+				return sandbox.WriteDependenciesJSON(cmd.OutOrStdout(), dependencies)
+			}
 			var report strings.Builder
 			report.WriteString("Dependency checks:\n\n")
 			report.WriteString("Dependency  Status         Usage\n")
 			report.WriteString("----------  -------------  -----\n")
-			for _, dependency := range sandbox.Dependencies() {
+			for _, dependency := range dependencies {
 				usage := "Required"
 				if dependency.Optional != "" {
 					usage = "Optional: " + dependency.Optional
@@ -40,4 +46,6 @@ func newDoctorCmd() *cobra.Command {
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output dependency names and installation status as JSON")
+	return cmd
 }

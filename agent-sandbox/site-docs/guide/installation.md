@@ -27,6 +27,28 @@ It succeeds even if dependencies are missing and does **not** check Docker
 service health, authentication, or permissions. `docker info` checks whether
 your user can reach Docker.
 
+For a GUI or script, request JSON output:
+
+```bash
+agent-sandbox doctor --json
+```
+
+The response is an array containing only `name` (string) and `installed`
+(boolean), in the order `git`, `docker`, `gh`, `code`. For example, if all four
+tools are missing:
+
+```json
+[
+  {"name": "git", "installed": false},
+  {"name": "docker", "installed": false},
+  {"name": "gh", "installed": false},
+  {"name": "code", "installed": false}
+]
+```
+
+Missing tools still produce a successful exit. JSON output contains no ANSI
+colors or text headings; omitting `--json` keeps the colored text report.
+
 ## Update
 
 ```bash

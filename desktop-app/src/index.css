@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  /* Multiplies every font size in the app; 1 = the design's original sizes. */
+  --font-scale: 1.25;
+}
+
+@theme {
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  /* Only the design's palette is available as utilities (bg-panel, text-muted, border-line…). */
+  --color-*: initial;
+  --color-canvas: #111110;
+  --color-ink: #edece8;
+  --color-ink-strong: #ffffff;
+  --color-muted: #9b9a95;
+  --color-faint: #5e5d59;
+  --color-line: #262624;
+  --color-field-line: #363531;
+  --color-field: #171716;
+  --color-panel: #1a1a19;
+  --color-selected: #1f1f1d;
+  --color-hover: #181817;
+  --color-ok: #5bbf85;
+  --color-bad: #f07a6e;
+  --color-warn: #e0a94a;
+  --color-info: #7fa8f5;
+
+  /* The design's type scale (px at scale 1), all multiplied by --font-scale. */
+  --text-*: initial;
+  --text-2xs: calc(11px * var(--font-scale));
+  --text-xs: calc(12px * var(--font-scale));
+  --text-sm: calc(12.5px * var(--font-scale));
+  --text-md: calc(13px * var(--font-scale));
+  --text-base: calc(13.5px * var(--font-scale));
+  --text-lg: calc(14px * var(--font-scale));
+  --text-xl: calc(16px * var(--font-scale));
+  --text-2xl: calc(18px * var(--font-scale));
+  --text-3xl: calc(22px * var(--font-scale));
+
+  /* Fixed text columns grow with the font scale so labels don't wrap (w-nav, w-run-status…). */
+  --spacing-nav: calc(220px * var(--font-scale));
+  --spacing-run-status: calc(110px * var(--font-scale));
+  --spacing-run-risk: calc(60px * var(--font-scale));
+  --spacing-run-dur: calc(64px * var(--font-scale));
+  --spacing-run-action: calc(56px * var(--font-scale));
+  --spacing-stage-label: calc(144px * var(--font-scale));
+  --spacing-stage-agent: calc(128px * var(--font-scale));
+  --spacing-stage-skill: calc(80px * var(--font-scale));
+  --spacing-stage-extra: calc(104px * var(--font-scale));
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-lg);
+    line-height: 1.5;
+    color-scheme: dark;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-info);
+    outline-offset: 2px;
+  }
+}

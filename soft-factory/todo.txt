@@ -1,3 +1,12 @@
+[]- "disabledStages": [
+    "implementation",
+    "codeReview",
+    "securityReview",
+    "riskClassification",
+    "reviewChanges"
+  ]
+
+shoule be in stages prop
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
 [] - custom skill should be add in stages prop

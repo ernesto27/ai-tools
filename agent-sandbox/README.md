@@ -443,6 +443,9 @@ they do not affect manually created worktrees.
 # Show registered worktrees for the current repository.
 agent-sandbox worktree-list
 
+# Get branch objects for a repository selected by a GUI or script.
+agent-sandbox worktree-list --repo /path/to/repository --json
+
 # Open a registered worktree in VS Code.
 agent-sandbox worktree-editor -b fix-login
 
@@ -458,6 +461,18 @@ agent-sandbox worktree-delete-all
 # Skip confirmation for bulk deletion.
 agent-sandbox worktree-delete-all --yes
 ```
+
+`worktree-list --repo <directory>` accepts an absolute or relative directory
+inside a Git repository and resolves its root. Without `--repo`, it uses the
+current directory. Only records belonging to that repository are selected.
+
+`--json` returns an array containing only branch names as objects, for example
+`[{"branch":"fix-login"},{"branch":"add-tests"}]`, in registry order. It includes
+all registered records for that repository without checking their worktree
+paths. No matches returns `[]`. Without `--json` (or with `--json=false`), text
+output retains the branch/path columns. Both formats include stale records;
+subsequent actions handle invalid worktree paths. Errors retain stderr diagnostics and
+nonzero exit status rather than returning JSON error objects.
 
 `worktree-delete` refuses to discard changes without `--force`.
 `worktree-delete-all` always deletes uncommitted changes after confirmation

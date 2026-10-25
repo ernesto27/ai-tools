@@ -194,7 +194,7 @@ func Resume(ctx context.Context, opts Options, runtime Runtime) (int, error) {
 // state file is the sandbox's source of truth, so the name the user sees in
 // worktree-list is enough to recover the worktree path and branch to reuse.
 func resumableWorktree(branch string) (repoWorktrees, worktreeRecord, error) {
-	found, err := sandboxWorktrees()
+	found, err := sandboxWorktrees(".")
 	if err != nil {
 		return repoWorktrees{}, worktreeRecord{}, err
 	}

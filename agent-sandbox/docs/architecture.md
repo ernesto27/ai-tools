@@ -92,6 +92,13 @@ A run records its worktree before starting the agent and rolls back creation
 if registration fails. Delete commands rewrite the registry.
 [worktreelock.go](../internal/sandbox/worktreelock.go) coordinates resume and deletion.
 
+`worktree-list --repo` supplies an explicit directory to the shared repository
+lookup; other worktree commands retain current-directory selection. Text
+and JSON listing both keep stale records without inspecting worktree paths.
+The JSON path uses `WorktreeBranches` in [list.go](../internal/sandbox/list.go),
+then [worktree.go](../cmd/agent-sandbox/worktree.go) projects branch-only objects.
+Subsequent worktree actions handle invalid paths.
+
 ## Authentication and container mounts
 
 `containerOptions` in [sandbox.go](../internal/sandbox/sandbox.go) selects one

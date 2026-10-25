@@ -10,7 +10,7 @@ import (
 // OpenWorktree finds a sandbox-created worktree in the current repository and
 // asks the host's VS Code command to open it.
 func OpenWorktree(branch string) error {
-	found, err := sandboxWorktrees()
+	found, err := sandboxWorktrees(".")
 	if err != nil {
 		return err
 	}

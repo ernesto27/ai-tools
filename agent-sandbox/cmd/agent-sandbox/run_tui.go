@@ -122,7 +122,7 @@ func newLiveCommand(state *commandState, mode string) *cobra.Command {
 	flags.bind(cmd)
 	if mode == "resume" {
 		completeFlag(cmd, flagBranch, func(string) ([]string, error) {
-			return sandbox.WorktreeBranches()
+			return sandbox.WorktreeBranches(".")
 		})
 	}
 	return cmd

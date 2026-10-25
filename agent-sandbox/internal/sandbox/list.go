@@ -3,16 +3,16 @@ package sandbox
 import (
 	"fmt"
 	"io"
-	"os"
+	"path/filepath"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
-// WorktreeList prints the worktrees the sandbox created in the repository the
-// command was run in, one per line: the branch and the path. It reads the state
-// file and git, so it needs neither Docker nor the network.
-func WorktreeList(out io.Writer) error {
-	found, err := sandboxWorktrees()
+// WorktreeList prints branch and path for registered worktrees in dir.
+// Stale records remain visible so users can find and clean them up with the
+// worktree management commands.
+func WorktreeList(dir string, out io.Writer) error {
+	found, err := sandboxWorktrees(dir)
 	if err != nil {
 		return err
 	}
@@ -21,10 +21,9 @@ func WorktreeList(out io.Writer) error {
 	return nil
 }
 
-// WorktreeBranches names the branches the sandbox worktrees hold, for the shell
-// completion of the flags that take one.
-func WorktreeBranches() ([]string, error) {
-	found, err := sandboxWorktrees()
+// WorktreeBranches returns registered branch names for the repository containing dir.
+func WorktreeBranches(dir string) ([]string, error) {
+	found, err := sandboxWorktrees(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -43,16 +42,16 @@ type repoWorktrees struct {
 	worktrees []worktreeRecord
 }
 
-// sandboxWorktrees are the worktrees of the repository the command was run in.
+// sandboxWorktrees finds registered worktrees for the repository containing dir.
 // Only the ones the sandbox created are there to find: a worktree the user made
 // by hand was never written down, so no verb here can reach it.
-func sandboxWorktrees() (repoWorktrees, error) {
-	executionDir, err := os.Getwd()
+func sandboxWorktrees(dir string) (repoWorktrees, error) {
+	absoluteDir, err := filepath.Abs(dir)
 	if err != nil {
 		return repoWorktrees{}, err
 	}
 
-	repo, err := git.Open(executionDir)
+	repo, err := git.Open(absoluteDir)
 	if err != nil {
 		return repoWorktrees{}, err
 	}

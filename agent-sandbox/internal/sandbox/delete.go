@@ -12,7 +12,12 @@ import (
 )
 
 func WorktreeDelete(branch string, force bool, out io.Writer) error {
-	found, err := sandboxWorktrees()
+	executionDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	found, err := sandboxWorktrees(".")
 	if err != nil {
 		return err
 	}
@@ -20,11 +25,6 @@ func WorktreeDelete(branch string, force bool, out io.Writer) error {
 	worktree, ok := findWorktree(found.worktrees, branch)
 	if !ok {
 		return missingWorktreeError(branch)
-	}
-
-	executionDir, err := os.Getwd()
-	if err != nil {
-		return err
 	}
 
 	inside, err := isInside(executionDir, worktree.Path)
@@ -45,18 +45,18 @@ func WorktreeDelete(branch string, force bool, out io.Writer) error {
 // The removal is always forced, so the confirmation is the only thing standing
 // between the question and the uncommitted work it discards.
 func WorktreeDeleteAll(assumeYes bool, in io.Reader, out io.Writer) error {
-	found, err := sandboxWorktrees()
+	executionDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	found, err := sandboxWorktrees(".")
 	if err != nil {
 		return err
 	}
 	if len(found.worktrees) == 0 {
 		fmt.Fprintln(out, "No sandbox worktrees to delete.")
 		return nil
-	}
-
-	executionDir, err := os.Getwd()
-	if err != nil {
-		return err
 	}
 
 	// The whole command is refused when it would delete the directory it is

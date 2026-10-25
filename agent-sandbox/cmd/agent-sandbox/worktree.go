@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -43,22 +45,48 @@ func newResumeCmd(state *commandState) *cobra.Command {
 	flags.bind(cmd)
 
 	completeFlag(cmd, flagBranch, func(string) ([]string, error) {
-		return sandbox.WorktreeBranches()
+		return sandbox.WorktreeBranches(".")
 	})
 	return cmd
 }
 
-// newWorktreeListCmd is the verb that shows what the sandbox has left behind:
-// the worktrees it added to this repository, one per line.
+// newWorktreeListCmd lists registered worktrees for the selected repository.
 func newWorktreeListCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "worktree-list",
-		Short: "List the worktrees the sandbox added to this repository",
-		Args:  usageArgs(cobra.NoArgs),
+	var repoDir string
+	var jsonOutput bool
+	cmd := &cobra.Command{
+		Use:   "worktree-list [--repo <directory>] [--json]",
+		Short: "List the worktrees the sandbox added to a repository",
+		Long: "List sandbox worktrees for the repository containing the current directory\n" +
+			"or --repo. Text output shows branch and path, including stale records.\n" +
+			"With --json, return registered records as objects containing only branch.\n" +
+			"No matches returns []. Worktree directories are not checked when listing.",
+		Args: usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return sandbox.WorktreeList(cmd.OutOrStdout())
+			if !jsonOutput {
+				return sandbox.WorktreeList(repoDir, cmd.OutOrStdout())
+			}
+			branches, err := sandbox.WorktreeBranches(repoDir)
+			if err != nil {
+				return err
+			}
+			return writeWorktreeBranchesJSON(cmd.OutOrStdout(), branches)
 		},
 	}
+	cmd.Flags().StringVar(&repoDir, "repo", ".", "directory inside the repository to list (defaults to current directory)")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output registered branch objects as a JSON array")
+	return cmd
+}
+
+func writeWorktreeBranchesJSON(out io.Writer, branches []string) error {
+	type branchRecord struct {
+		Branch string `json:"branch"`
+	}
+	records := make([]branchRecord, 0, len(branches))
+	for _, branch := range branches {
+		records = append(records, branchRecord{Branch: branch})
+	}
+	return json.NewEncoder(out).Encode(records)
 }
 
 // newWorktreeDeleteCmd is the verb that cleans one of them up, freeing the
@@ -85,7 +113,7 @@ func newWorktreeDeleteCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "delete even if the worktree has uncommitted changes")
 
 	completeFlag(cmd, flagBranch, func(string) ([]string, error) {
-		return sandbox.WorktreeBranches()
+		return sandbox.WorktreeBranches(".")
 	})
 
 	return cmd

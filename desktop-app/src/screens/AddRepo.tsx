@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { AGENTS } from "../data";
-import { Checkbox, Field, Input, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
+import { useEffect, useState } from "react";
+import { Input, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -14,10 +13,24 @@ interface FolderInfo {
   hasConfig: boolean;
 }
 
+interface Requirement {
+  name: string;
+  installed: boolean;
+}
+
+
 export function AddRepo({ onDone }: Props) {
   const [path, setPath] = useState("");
   const [info, setInfo] = useState<FolderInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [sandboxError, setSandboxError] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke<Requirement[]>("check_requirements")
+      .then(setRequirements)
+      .catch((e) => setSandboxError(String(e)));
+  }, []);
 
   const hasConfig = info?.hasConfig ?? false;
 
@@ -27,8 +40,13 @@ export function AddRepo({ onDone }: Props) {
       : { ok: false, text: "not a git repository" },
     hasConfig
       ? { ok: true, text: "software-factory.json found" }
-      : { ok: false, text: "no software-factory.json — a starter will be created" },
-    { ok: true, text: "agent-sandbox · git · docker on PATH" },
+      : { ok: false, text: "no software-factory.json — create it in the repository's Config section" },
+    ...(sandboxError
+      ? [{ ok: false, text: sandboxError }]
+      : requirements.map((r) => ({
+          ok: r.installed,
+          text: r.installed ? `${r.name} installed` : `${r.name} not installed`,
+        }))),
   ];
 
    async function browse() {
@@ -93,35 +111,6 @@ export function AddRepo({ onDone }: Props) {
               {c.text}
             </span>
           ))}
-        </section>
-      )}
-
-      {info?.isGit && !hasConfig && (
-        <section aria-labelledby="starter-h" className="flex flex-col gap-4">
-          <div className="flex flex-col gap-0.5 border-b border-line pb-3">
-            <SectionHeading id="starter-h" plain>
-              Starter software-factory.json
-            </SectionHeading>
-            <span className="text-sm text-muted">You can change everything later in Config.</span>
-          </div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
-            <Field label="Agent">
-              <Select defaultValue="codex">
-                {AGENTS.map((a) => (
-                  <option key={a}>{a}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="run.branch">
-              <Input mono defaultValue="factory-task" />
-            </Field>
-            <Field label="Task file">
-              <Input mono defaultValue="task.txt" />
-            </Field>
-          </div>
-          <Checkbox className="text-base" defaultChecked>
-            Add logs/ to .gitignore
-          </Checkbox>
         </section>
       )}
 

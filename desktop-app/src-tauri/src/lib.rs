@@ -72,12 +72,32 @@ async fn sandbox_help() -> Result<String, String> {
 }
 
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Requirement {
+    name: String,
+    installed: bool,
+}
+
+#[tauri::command]
+async fn check_requirements() -> Result<Vec<Requirement>, String> {
+    let output = std::process::Command::new("agent-sandbox")
+        .args(["doctor", "--json"])
+        .output()
+        .map_err(|e| format!("could not run agent-sandbox: {e}"))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, inspect_folder, save_repo, sandbox_help])
+        .invoke_handler(tauri::generate_handler![greet, inspect_folder, save_repo, sandbox_help, check_requirements])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

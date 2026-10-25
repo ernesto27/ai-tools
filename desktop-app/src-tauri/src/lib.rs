@@ -34,15 +34,8 @@ fn inspect_folder(path: String) -> FolderInfo {
 
 #[tauri::command]
 fn save_repo(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let file = dir.join("repos.json");
-
-    let mut repos: Vec<SavedRepo> = match std::fs::read_to_string(&file) {
-        Ok(text) => serde_json::from_str(&text).map_err(|e| e.to_string())?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(e) => return Err(e.to_string()),
-    };
+    let file = repos_file(&app)?;
+    let mut repos = read_repos(&file)?;
 
     if repos.iter().any(|r| r.path == path) {
         return Err("This repository is already added.".to_string());
@@ -92,12 +85,53 @@ async fn check_requirements() -> Result<Vec<Requirement>, String> {
 }
 
 
+fn repos_file(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("repos.json"))
+}
+
+fn read_repos(file: &std::path::Path) -> Result<Vec<SavedRepo>, String> {
+    match std::fs::read_to_string(file) {
+        Ok(text) => serde_json::from_str(&text).map_err(|e| e.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn list_repos(app: tauri::AppHandle) -> Result<Vec<SavedRepo>, String> {
+    read_repos(&repos_file(&app)?)
+}
+
+#[derive(serde::Deserialize)]
+struct Worktree {
+    branch: String,
+}
+
+#[tauri::command]
+async fn list_branches(path: String) -> Result<Vec<String>, String> {
+    let output = std::process::Command::new("agent-sandbox")
+        .args(["worktree-list", "--json", "--repo"])
+        .arg(&path)
+        .output()
+        .map_err(|e| format!("could not run agent-sandbox: {e}"))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+
+    let worktrees: Option<Vec<Worktree>> =
+        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    Ok(worktrees.unwrap_or_default().into_iter().map(|w| w.branch).collect())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, inspect_folder, save_repo, sandbox_help, check_requirements])
+        .invoke_handler(tauri::generate_handler![greet, inspect_folder, save_repo, sandbox_help, check_requirements, list_repos, list_branches])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

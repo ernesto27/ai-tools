@@ -1,12 +1,19 @@
-import { useState, type ComponentProps } from "react";
-import { repos, STATUS_COLOR } from "../data";
+import { useEffect, useState, type ComponentProps } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { STATUS_COLOR } from "../data";
 import type { Navigate, Route } from "../router";
 import { Dot } from "./Dot";
 import { cx } from "./ui";
 
 interface Props {
+  repos: SavedRepo[];
   route: Route;
   navigate: Navigate;
+}
+
+export interface SavedRepo {
+  name: string;
+  path: string;
 }
 
 function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tall?: boolean }) {
@@ -24,10 +31,19 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ route, navigate }: Props) {
+export function Sidebar({ repos, route, navigate }: Props) {
   const activeRepo = route.screen === "addRepo" ? null : route.repo;
   const activeBranch = route.screen === "addRepo" ? null : route.branch;
-  const [openRepo, setOpenRepo] = useState(activeRepo ?? repos[0].name);
+  const [openRepo, setOpenRepo] = useState(activeRepo ?? repos[0]?.name ?? "");
+  const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    for (const repo of repos) {
+      invoke<string[]>("list_branches", { path: repo.path })
+        .then((branches) => setBranchesByPath((prev) => ({ ...prev, [repo.path]: branches })))
+        .catch(console.error);
+    }
+  }, [repos]);
 
   // Which branch sub-item (Runs / Continue / Config) is current.
   const sub =
@@ -42,17 +58,21 @@ export function Sidebar({ route, navigate }: Props) {
 
       <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">Repositories</span>
       <div className="flex flex-col gap-2">
-        {repos.map((repo) => {
+        {repos.map((saved) => {
+          const branches = (branchesByPath[saved.path] ?? []).map((name) => ({ name, status: "idle" as const }));
+          const repo = { name: saved.name, status: "idle" as const, branches };
           const isOpen = openRepo === repo.name;
           return (
-            <div key={repo.name} className="flex flex-col">
+            <div key={saved.path} className="flex flex-col">
               <button
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
                 className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
               >
-                <span>{repo.name}</span>
+                <span className="min-w-0 truncate" title={repo.name}>
+                  {repo.name}
+                </span>
                 <Dot color={STATUS_COLOR[repo.status]} />
               </button>
 
@@ -64,9 +84,14 @@ export function Sidebar({ route, navigate }: Props) {
                     const at = { repo: repo.name, branch: b.name };
                     return (
                       <div key={b.name} className="flex flex-col">
-                        <NavItem className="font-mono text-sm" aria-expanded={expanded} onClick={() => navigate({ screen: "branch", ...at })}>
+                        <NavItem
+                          className="font-mono text-sm"
+                          title={b.name}
+                          aria-expanded={expanded}
+                          onClick={() => navigate({ screen: "branch", ...at })}
+                        >
                           <Dot color={STATUS_COLOR[b.status]} />
-                          {b.name}
+                          <span className="min-w-0 truncate">{b.name}</span>
                         </NavItem>
                         {expanded && (
                           <div className="ml-[11px] flex flex-col gap-px border-l border-line pl-2.5 text-md">

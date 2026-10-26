@@ -41,12 +41,13 @@ Before finishing, attempt verification appropriate to this session's changes.
 Use project-specific tests, builds, functional checks, infrastructure validation or dry runs, documentation checks, or other relevant checks.
 For UI changes, use browser assertions, screenshots, and video recordings where possible. Non-UI tasks do not require screenshots or videos, and visual evidence alone does not prove functional correctness.
 
-Create /workspace/` + verificationDir + `/ and keep the final evidence minimal:
-- summary.md: overall result (passed, failed, or unavailable), actual checks and commands, exit codes, results, evidence paths, and limitations.
-- verification.log: one combined log of relevant check output, with command labels. Omit it if there is no useful output.
+Create /workspace/` + verificationDir + `/ and keep the final evidence informative without excessive detail:
+- summary.md: a concise account of the overall result (passed, failed, or unavailable), actual checks and commands, exit codes, key results, evidence paths, and limitations. Include enough detail to assess the outcome without repeating the log.
+- verification.log: one combined, summarized record of relevant check output, with command labels. Keep key results and diagnostic excerpts needed to understand failures; omit repetitive success lines, progress output, dependency-install output, and full command transcripts. Omit it if there is no useful output beyond the summary.
 - For web UI changes, save final desktop.png (1280x800 viewport) and mobile.png (390x844 viewport). Also record a short demo.webm demonstrating the changed functionality through relevant clicks, typing, and navigation, and describe what it demonstrates in summary.md. Capture the implemented UI in its requested theme, including dark mode when requested. Keep these screenshots and the video after verification; do not delete them during cleanup. Save additional final screenshots only for distinct important states.
 - .gitignore as described below.
 Put exit codes directly in summary.md; do not create separate .exit-code files or per-command logs. Do not keep empty logs, incomplete recordings, or intermediate/before-fix screenshots.
+Text evidence is embedded in the pull request description, which has a 65,536-character limit shared with the PR text and formatting. Before finishing, review all text evidence together and condense excessive output into summaries with relevant excerpts, leaving ample room for the PR description and formatting. State when output was summarized or omitted, and preserve important failures and limitations rather than hiding them to reduce length.
 Create /workspace/` + verificationDir + `/.gitignore containing a single line: *
 This keeps evidence, including the ignore file itself, out of normal Git staging without changing the project's tracked ignore rules.
 When continuing a task, update the summary, combined log, screenshots, and video to reflect the latest verification instead of accumulating numbered or dated copies. Preserve useful failure details in the summary or combined log.

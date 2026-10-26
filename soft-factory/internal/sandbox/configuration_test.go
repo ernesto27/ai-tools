@@ -193,3 +193,106 @@ waiting:
 	}
 	assertNoConfigArtifacts(t)
 }
+
+func TestStageEffortArguments(t *testing.T) {
+	high, empty := "high", ""
+	for _, mode := range []string{"run", "resume"} {
+		for _, tc := range []struct {
+			name, settings string
+			effort         *string
+			want           []string
+		}{
+			{"stage", `{"effort":"low","run":{"effort":"medium"},"resume":{"effort":"medium"}}`, &high, []string{mode, "--effort", "high"}},
+			{"empty stage", `{"effort":"low","run":{"effort":"medium"},"resume":{"effort":"medium"}}`, &empty, []string{mode, "--effort", ""}},
+			{"section", `{"effort":"low","run":{"effort":"medium"},"resume":{"effort":"medium"}}`, nil, []string{mode, "--effort", "medium"}},
+			{"empty section", `{"effort":"low","run":{"effort":""},"resume":{"effort":""}}`, nil, []string{mode, "--effort", ""}},
+			{"shared", `{"effort":"low"}`, nil, []string{mode, "--effort", "low"}},
+			{"defaults", `{}`, nil, []string{mode}},
+		} {
+			t.Run(mode+"/"+tc.name, func(t *testing.T) {
+				args := appendStageArgs([]string{mode}, config.StageConfig{Effort: tc.effort})
+				got := sandboxArgs(ExecuteOptions{Config: decodeConfig(t, tc.settings), Args: args})
+				require.Equal(t, tc.want, got)
+			})
+		}
+	}
+	settings := config.StageConfig{Agent: "claude", Model: "existing-model", Effort: &high}
+	require.Equal(t, []string{"resume", "-a", "claude", "-m", "existing-model", "--effort", "high"}, appendStageArgs([]string{"resume"}, settings))
+}
+
+func TestStageEffortIntegration(t *testing.T) {
+	for _, stage := range []string{"implementation", "implementation-resume", "codeReview", "securityReview", "securityReview-findings", "riskClassification", "reviewChanges"} {
+		for _, tc := range []struct {
+			name, property, want string
+		}{
+			{"stage", `"effort":"high"`, "high"},
+			{"empty", `"effort":""`, ""},
+			{"omitted", ``, ""},
+			{"null", `"effort":null`, ""},
+			{"literal", `"effort":"$(touch forbidden); value"`, "$(touch forbidden); value"},
+		} {
+			t.Run(stage+"/"+tc.name, func(t *testing.T) {
+				capture := preparePromptSandbox(t)
+				key := stage
+				if stage == "implementation-resume" {
+					key = "implementation"
+				}
+				if stage == "securityReview-findings" {
+					key = "securityReview"
+				}
+				property := tc.property
+				if stage == "securityReview-findings" {
+					if property != "" {
+						property += ","
+					}
+					property += `"saveFindings":true`
+				}
+				data := `{"agentSandbox":{"effort":"low","run":{"filePrompt":"task.txt","effort":"run-effort"},"resume":{"effort":"resume-effort"}},"stages":{"` + key + `":{` + property + `}}}`
+				require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+				cfg, err := config.Load("software-factory.json")
+				require.NoError(t, err)
+				input := TaskContext{Config: cfg, Branch: "main", Continue: stage == "implementation-resume"}
+				switch stage {
+				case "implementation", "implementation-resume":
+					err = Run(input)
+				case "codeReview":
+					_, err = Review(input)
+				case "securityReview", "securityReview-findings":
+					_, err = SecurityReview(input)
+				case "riskClassification":
+					err = RiskClassification(input, nil, nil)
+				case "reviewChanges":
+					input.Log, err = executionlog.NewRun("main", executionlog.CommandRun, nil)
+					require.NoError(t, err)
+					t.Cleanup(func() { input.Log.Finish(nil) })
+					err = ReviewChanges(input)
+				}
+				require.NoError(t, err)
+				got := readPromptCapture(t, capture)
+				mode := "resume"
+				if stage == "implementation" {
+					mode = "run"
+				}
+				require.Equal(t, mode, got.Args[0])
+				want := tc.want
+				if tc.name == "omitted" || tc.name == "null" {
+					want = mode + "-effort"
+				}
+				var values []string
+				for i, arg := range got.Args {
+					if arg == "--effort" {
+						require.Less(t, i+1, len(got.Args))
+						values = append(values, got.Args[i+1])
+					}
+				}
+				require.Equal(t, []string{want}, values)
+				cwd, err := os.Getwd()
+				require.NoError(t, err)
+				require.Equal(t, cwd, got.Directory)
+				_, err = os.Stat("forbidden")
+				require.ErrorIs(t, err, os.ErrNotExist)
+				assertNoConfigArtifacts(t)
+			})
+		}
+	}
+}

@@ -22,7 +22,8 @@ All property names use lower camelCase, including nested properties. These are a
 | `stages.securityReview.customSkill` | Optional project skill name for security review. |
 | `stages.riskClassification.customSkill` | Optional project skill name for risk classification. |
 | `stages.reviewChanges.customSkill` | Optional project skill name for the final change walkthrough. |
-| `stages` | Optional per-stage agent/model overrides and review-stage custom skills. Agent/model overrides take priority over section and shared sandbox settings. |
+| `stages` | Optional per-stage agent, model, and effort overrides and review-stage custom skills. Overrides take priority over section and shared sandbox settings. |
+| `stages.<stage>.effort` | Optional effort string for any stage. Omitted or null inherits; an empty string explicitly overrides inherited effort. Supported values are validated by Agent Sandbox. |
 | `stages.<stage>.agent` | Optional agent override: `codex`, `claude`, `opencode`, or `pi`. |
 | `stages.securityReview.saveFindings` | Optional boolean; `true` saves security findings and suggested fixes without applying corrections or committing. Defaults to `false`. |
 | `stages.<stage>.model` | Optional model ID supported by the agent selected for that stage. |
@@ -97,6 +98,34 @@ The downloaded file must contain service-account credentials, including:
 When `googleDrive` is configured, a missing or invalid credentials file stops the workflow. Without `googleDrive`, this file is not required. Keep the key private; `service_account*.json` files are ignored by Git.
 
 Folder loading includes only Google Docs directly inside the selected folders. Individual URLs load the specified Google Docs regardless of their folder. See [Google Drive setup](google-drive.md) for download and sharing instructions.
+
+#### Per-stage effort
+
+Set `effort` inside any of the five stages to control its effort independently.
+Merge these settings into your existing `software-factory.json`, preserving
+existing agent, model, custom skill, and other assignments:
+
+```json
+{
+  "stages": {
+    "implementation": {"effort": "high"},
+    "codeReview": {"effort": "medium"},
+    "securityReview": {"effort": "high"}
+  }
+}
+```
+
+Stage effort takes priority over the active `agentSandbox.run` or
+`agentSandbox.resume` section, then shared `agentSandbox.effort`.
+If none is configured, Agent Sandbox applies its defaults. Normal
+implementation uses `run`; continuation implementation and later stages
+use `resume`.
+
+Omitting stage effort or setting it to `null` preserves inheritance.
+Setting `"effort": ""` explicitly overrides inherited effort and forwards an
+empty value. Factory forwards strings unchanged; Agent Sandbox validates
+supported values for the selected agent. Other JSON types cause a configuration
+parsing error. Stage effort does not enable a disabled stage.
 
 #### Disabling stages
 
@@ -183,7 +212,7 @@ the new agent, or set both fields.
 The default workflow inherits `run` settings for implementation and `resume`
 settings for later stages. `continue` and `resume <path>` inherit `resume` settings.
 Soft Factory resolves supported embedded settings into command-line arguments.
-Stage agent and model overrides are independent and take priority over the
+Stage agent, model, and effort overrides are independent and take priority over the
 applicable section, then shared `agentSandbox` fields, then Agent Sandbox defaults.
 Factory-generated prompts replace both section `query` and `filePrompt`; workflow
 controls such as the risk stage's `push=false` and `pr=false` take priority too.
@@ -245,8 +274,8 @@ continuation and recovery, unless `--jira` supplies it.
 The default workflow uses `run` settings for implementation and `resume`
 settings for later stages. `continue` and `resume <path>` use
 `resume` settings.
-The [stage overrides](#stage-agents-and-models) take priority over agent and
-model defaults from this file.
+The [stage overrides](#stage-agents-and-models) take priority over agent, model, and
+effort defaults from this file.
 Soft Factory selects one branch for every stage: `run.branch` for the default
 workflow, or `resume.branch` for `continue` and `resume <path>`.
 It overrides the branch in each Agent Sandbox invocation. Set both branches to the same value when

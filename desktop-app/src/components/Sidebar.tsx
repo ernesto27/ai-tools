@@ -33,8 +33,11 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
 
 export function Sidebar({ repos, route, navigate }: Props) {
   const activeRepo = route.screen === "addRepo" ? null : route.repo;
-  const activeBranch = route.screen === "addRepo" ? null : route.branch;
+  const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState(activeRepo ?? repos[0]?.name ?? "");
+  const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(
+    activeRepo && activeBranch ? { repo: activeRepo, branch: activeBranch } : null,
+  );
   const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -45,9 +48,9 @@ export function Sidebar({ repos, route, navigate }: Props) {
     }
   }, [repos]);
 
-  // Which branch sub-item (Runs / Continue / Config) is current.
+  // Which branch sub-item (Runs / Continue) is current.
   const sub =
-    route.screen === "config" ? "config" : route.screen === "newRun" && route.mode !== "run" ? "continue" : route.screen === "newRun" ? null : "runs";
+    route.screen === "newRun" && route.mode !== "run" ? "continue" : route.screen === "newRun" ? null : "runs";
 
   return (
     <nav aria-label="Main" className="flex w-nav flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-4 py-7 text-base">
@@ -70,8 +73,22 @@ export function Sidebar({ repos, route, navigate }: Props) {
                 onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
                 className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
               >
-                <span className="min-w-0 truncate" title={repo.name}>
-                  {repo.name}
+                <span className="flex min-w-0 items-center gap-2">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={cx("size-3.5 shrink-0", isOpen && "rotate-90")}
+                  >
+                    <path d="m6 4 4 4-4 4" />
+                  </svg>
+                  <span className="min-w-0 truncate" title={repo.name}>
+                    {repo.name}
+                  </span>
                 </span>
                 <Dot color={STATUS_COLOR[repo.status]} />
               </button>
@@ -80,7 +97,8 @@ export function Sidebar({ repos, route, navigate }: Props) {
                 <div className="flex flex-col gap-px pl-3">
                   {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">No branches yet</span>}
                   {repo.branches.map((b) => {
-                    const expanded = activeRepo === repo.name && activeBranch === b.name;
+                    const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
+                    const isActive = activeRepo === repo.name && activeBranch === b.name;
                     const at = { repo: repo.name, branch: b.name };
                     return (
                       <div key={b.name} className="flex flex-col">
@@ -88,30 +106,49 @@ export function Sidebar({ repos, route, navigate }: Props) {
                           className="font-mono text-sm"
                           title={b.name}
                           aria-expanded={expanded}
-                          onClick={() => navigate({ screen: "branch", ...at })}
+                          onClick={() => {
+                            setOpenBranch(expanded ? null : at);
+                            if (!expanded) navigate({ screen: "branch", ...at });
+                          }}
                         >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={cx("size-3.5 shrink-0", expanded && "rotate-90")}
+                          >
+                            <path d="m6 4 4 4-4 4" />
+                          </svg>
                           <Dot color={STATUS_COLOR[b.status]} />
                           <span className="min-w-0 truncate">{b.name}</span>
                         </NavItem>
                         {expanded && (
                           <div className="ml-[11px] flex flex-col gap-px border-l border-line pl-2.5 text-md">
-                            <NavItem aria-current={sub === "runs" ? "page" : undefined} onClick={() => navigate({ screen: "branch", ...at })}>
+                            <NavItem aria-current={isActive && sub === "runs" ? "page" : undefined} onClick={() => navigate({ screen: "branch", ...at })}>
                               Runs
                             </NavItem>
                             <NavItem
-                              aria-current={sub === "continue" ? "page" : undefined}
+                              aria-current={isActive && sub === "continue" ? "page" : undefined}
                               onClick={() => navigate({ screen: "newRun", ...at, mode: "continue" })}
                             >
                               Continue
-                            </NavItem>
-                            <NavItem aria-current={sub === "config" ? "page" : undefined} onClick={() => navigate({ screen: "config", ...at })}>
-                              Config
                             </NavItem>
                           </div>
                         )}
                       </div>
                     );
                   })}
+                  <NavItem
+                    className="text-md"
+                    aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
+                    onClick={() => navigate({ screen: "config", repo: repo.name })}
+                  >
+                    Config
+                  </NavItem>
                   <NavItem
                     className="text-md"
                     aria-current={route.screen === "newRun" && route.mode === "run" && route.repo === repo.name ? "page" : undefined}

@@ -1,3 +1,6 @@
+config screen
+[] - i want model input to be autocomplete with options
+
 add respostory
 
 - save list of projects repo in desktop config folder -  desktop 

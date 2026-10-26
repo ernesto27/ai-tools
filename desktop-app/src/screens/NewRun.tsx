@@ -186,7 +186,7 @@ export function NewRun({ repo, branch, mode, navigate }: Props) {
             </dl>
             <span className="text-sm text-muted">
               Read from software-factory.json ·{" "}
-              <LinkButton muted onClick={() => navigate({ screen: "config", repo, branch })}>
+              <LinkButton muted onClick={() => navigate({ screen: "config", repo })}>
                 Edit in Config
               </LinkButton>
             </span>

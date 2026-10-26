@@ -26,7 +26,7 @@ function App() {
   }, []);
 
   const navigate = (next: Route) => {
-    if (route.screen !== "addRepo") lastBranchRoute.current = route;
+    if (route.screen !== "addRepo" && route.screen !== "config") lastBranchRoute.current = route;
     setRoute(next);
     mainRef.current?.scrollTo({ top: 0 });
   };
@@ -37,6 +37,7 @@ function App() {
       <main ref={mainRef} className="min-w-0 flex-auto overflow-y-auto px-14 pt-10 pb-16">
          <Screen
           route={route}
+          repoPath={route.screen === "config" ? savedRepos.find((repo) => repo.name === route.repo)?.path : undefined}
           navigate={navigate}
           back={() => navigate(lastBranchRoute.current)}
           repoAdded={() => {
@@ -53,13 +54,19 @@ function Screen({
   route,
   navigate,
   repoAdded,
+  repoPath,
 }: {
   route: Route;
   navigate: (r: Route) => void;
   back: () => void;
   repoAdded: () => void;
+  repoPath?: string;
 }) {
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
+  if (route.screen === "config") {
+    if (!repoPath) return <p>Repository folder not found.</p>;
+    return <Config key={repoPath} repo={route.repo} repoPath={repoPath} />;
+  }
 
   const branch = repos.find((r) => r.name === route.repo)?.branches.find((b) => b.name === route.branch);
 
@@ -68,8 +75,6 @@ function Screen({
       return branch ? <BranchRuns key={branch.name} repo={route.repo} branch={branch} navigate={navigate} /> : null;
     case "run":
       return <RunDetail key={route.runId} repo={route.repo} branch={route.branch} navigate={navigate} />;
-    case "config":
-      return <Config key={route.branch} repo={route.repo} branch={route.branch} />;
     case "newRun":
       return <NewRun key={route.branch} repo={route.repo} branch={route.branch} mode={route.mode} navigate={navigate} />;
   }

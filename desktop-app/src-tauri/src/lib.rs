@@ -1,5 +1,7 @@
 use tauri::Manager;
+mod factory_config;
 
+use factory_config::FactoryConfigFile;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -126,12 +128,49 @@ async fn list_branches(path: String) -> Result<Vec<String>, String> {
     Ok(worktrees.unwrap_or_default().into_iter().map(|w| w.branch).collect())
 }
 
+
+#[tauri::command]
+fn create_factory_config(
+    path: String,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    FactoryConfigFile::new(&path).create(&config)
+}
+
+
+#[tauri::command]
+fn load_factory_config(
+    path: String,
+) -> Result<Option<serde_json::Value>, String> {
+    FactoryConfigFile::new(&path).load()
+}
+
+#[tauri::command]
+fn update_factory_config(
+    path: String,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    FactoryConfigFile::new(&path).update(&config)
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, inspect_folder, save_repo, sandbox_help, check_requirements, list_repos, list_branches])
+         .invoke_handler(tauri::generate_handler![
+            greet,
+            inspect_folder,
+            save_repo,
+            sandbox_help,
+            check_requirements,
+            list_repos,
+            list_branches,
+            create_factory_config,
+            load_factory_config,
+            update_factory_config,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

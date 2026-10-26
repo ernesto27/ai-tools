@@ -6,7 +6,7 @@ export type NewRunMode = "run" | "continue" | "resume";
 export type Route =
   | { screen: "branch"; repo: string; branch: string }
   | { screen: "run"; repo: string; branch: string; runId: string }
-  | { screen: "config"; repo: string; branch: string }
+  | { screen: "config"; repo: string }
   | { screen: "newRun"; repo: string; branch: string; mode: NewRunMode }
   | { screen: "addRepo" };
 

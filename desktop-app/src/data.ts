@@ -201,13 +201,11 @@ export const AGENTS = ["codex", "claude", "opencode", "pi"];
 
 export const CONFIG_STAGES = [
   { key: "implementation", label: "Implement", agent: "", skill: "" },
-  { key: "codeReview", label: "Code review", agent: "claude", skill: "go-review" },
+  { key: "codeReview", label: "Code review", agent: "claude", skill: "" },
   { key: "securityReview", label: "Security review", agent: "claude", skill: "" },
   { key: "riskClassification", label: "Risk", agent: "", skill: "" },
   { key: "reviewChanges", label: "Walkthrough", agent: "", skill: "" },
 ];
-
-export const configDocuments = ["docs/logging.md", "docs/arch.md"];
 
 // ---- Add repository ----
 

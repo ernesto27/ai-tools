@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,14 +25,14 @@ func TestSecurityReportingBoundary(t *testing.T) {
 	// Preserve distinct staged and unstaged contents, plus untracked task work.
 	require.NoError(t, os.WriteFile("tracked.txt", []byte("staged task change\n"), 0600))
 
-	_, err := gitOutput(nil, ".", "add", "tracked.txt")
+	_, err := gitOutput(context.Background(), ".", "add", "tracked.txt")
 	require.NoError(t, err)
 
 	require.NoError(t, os.WriteFile("tracked.txt", []byte("unstaged task change\n"), 0600))
 	require.NoError(t, os.WriteFile("untracked.txt", []byte("untracked task change\n"), 0600))
-	headBefore, err := gitOutput(nil, ".", "log", "-1", "--format=%H")
+	headBefore, err := gitOutput(context.Background(), ".", "log", "-1", "--format=%H")
 	require.NoError(t, err)
-	indexBefore, err := gitOutput(nil, ".", "diff", "--cached", "--binary")
+	indexBefore, err := gitOutput(context.Background(), ".", "diff", "--cached", "--binary")
 	require.NoError(t, err)
 	run, err := executionlog.NewRun("main", executionlog.CommandRun, nil)
 	require.NoError(t, err)
@@ -54,8 +55,8 @@ func TestSecurityReportingBoundary(t *testing.T) {
 	for _, forbidden := range []string{"You coordinate reviews and corrections", "## Fixer subagent", "Run at most THREE rounds", "Corrections made during this stage"} {
 		assert.NotContains(t, capture.Prompt, forbidden)
 	}
-	headAfter, _ := gitOutput(nil, ".", "log", "-1", "--format=%H")
-	indexAfter, _ := gitOutput(nil, ".", "diff", "--cached", "--binary")
+	headAfter, _ := gitOutput(context.Background(), ".", "log", "-1", "--format=%H")
+	indexAfter, _ := gitOutput(context.Background(), ".", "diff", "--cached", "--binary")
 	require.Equal(t, string(headBefore), string(headAfter))
 	require.Equal(t, string(indexBefore), string(indexAfter))
 	for path, want := range map[string]string{"tracked.txt": "unstaged task change\n", "untracked.txt": "untracked task change\n"} {

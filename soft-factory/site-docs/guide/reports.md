@@ -6,8 +6,8 @@ plus a run summary and the final walkthrough.
 
 | Command | Saved output |
 | --- | --- |
-| `software-factory` | `logs/<sanitized-branch>/run-<UTC-timestamp>/summary.log`, stage `.log` files, and `05-reviewChanges.md` when the walkthrough runs successfully. |
-| `software-factory continue` | The same files in `logs/<sanitized-branch>/continue-<UTC-timestamp>/` for `resume.branch`. |
+| `software-factory` | `~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/run-<local-timestamp>/summary.log`, stage `.log` files, and `05-reviewChanges.md` when the walkthrough runs successfully. |
+| `software-factory continue` | The same files in a `continue-<local-timestamp>` child under the selected project's branch folder. |
 | `software-factory resume <path>` | Appends stage logs, progress, and summary entries to the supplied invocation folder; saves the walkthrough there. |
 
 Code and security reviews also write temporary reports in the sandbox worktree
@@ -31,38 +31,47 @@ Local configuration, credentials, task files, and generated reports are ignored 
 
 ## Execution logs
 
-Default workflows save logs in `logs/<sanitized-branch>/run-<UTC-timestamp>/`,
-using `run.branch`. `continue` uses `resume.branch` and creates
-`logs/<sanitized-branch>/continue-<UTC-timestamp>/`. When commands select the
-same branch, their invocations share a branch folder. The parent is created
-when needed, including for a continue without earlier logs. The log root is
-relative to the CLI working directory. Existing flat log folders stay untouched.
+New workflows save logs under
+`~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/`.
+The project folder is where Factory is invoked, including a project subfolder
+inside a monorepo. The ID is the first 12 hexadecimal characters of SHA-256 of
+the cleaned absolute invocation path. Two folders named `app` at different
+locations get separate groups. Moving a project changes its ID. Symlink paths
+are not explicitly canonicalized. The root always uses the home directory's
+`.config` folder, regardless of `XDG_CONFIG_HOME`; there is no configuration
+setting for it.
 
-ASCII letters, digits, `.`, `_`, and `-` remain in branch folder names; all
-other characters become `-`. For example, `feature/logs` maps to the single
-folder `feature-logs`. The timestamp is UTC with nanosecond precision, using
-`2006-01-02_15-04-05.000000000`. An existing child name gets a suffix of `-2`,
-`-3`, and so on, keeping every invocation's files separate.
+Default invocations use `run.branch` and create `run-<local-timestamp>`;
+`continue` uses `resume.branch` and creates `continue-<local-timestamp>`.
+The timestamp is local time in `YYYY-MM-DD_HH-MM-SS` format, without fractional
+seconds. An existing child name gets `-2`, `-3`, and later suffixes.
+Timestamps inside log contents retain their existing UTC format.
+
+ASCII letters, digits, `.`, `_`, and `-` remain in branch folder names;
+all other characters become `-`. For example, `feature/logs` becomes
+`feature-logs`. Directories are created when needed. Existing project-local
+logs stay untouched and remain usable with explicit-path `resume`.
+
+The project ID below is illustrative; use the path printed by your run.
 
 ```text
-logs/
-└── feature-logs/
-    ├── run-2026-10-08_19-38-48.007046183/
-    │   ├── summary.log
-    │   ├── 01-implementation.log
-    │   └── 05-reviewChanges.md
-    ├── continue-2026-10-08_20-09-49.425026374/
-    │   ├── summary.log
-    │   └── ...
-    └── continue-2026-10-08_21-15-30.123456789/
-        ├── summary.log
-        └── ...
+~/.config/software-factory/logs/
+└── soft-factory-a1b2c3d4e5f6/
+    └── feature-logs/
+        ├── run-2026-10-26_17-47-23/
+        │   ├── summary.log
+        │   ├── stage_status.txt
+        │   ├── 01-implementation.log
+        │   └── 05-reviewChanges.md
+        └── continue-2026-10-26_18-15-30/
+            ├── summary.log
+            └── ...
 ```
 
-The CLI prints the invocation child path, for example:
+The CLI prints the absolute invocation path, for example:
 
 ```text
-Execution logs: logs/feature-logs/continue-2026-10-08_20-09-49.425026374
+Execution logs: /home/user/.config/software-factory/logs/soft-factory-a1b2c3d4e5f6/feature-logs/run-2026-10-26_17-47-23
 ```
 
 Stages have position-prefixed log files (`01-implementation.log`,

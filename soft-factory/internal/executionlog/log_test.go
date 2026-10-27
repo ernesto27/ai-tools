@@ -280,43 +280,56 @@ func TestHeaderListsOnlyPlannedStages(t *testing.T) {
 
 func prepareLogTestDirectory(t *testing.T) {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
 	t.Chdir(t.TempDir())
 
 	output, err := exec.Command("git", "init", "-b", "main").CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }
 
+func logTestProjectDirectory(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	root, project, err := projectLogDirectory(workingDirectory)
+	require.NoError(t, err)
+	return filepath.Join(root, project)
+}
+
 func TestInvocationDirectoryAllocation(t *testing.T) {
 	for _, firstCommand := range []string{CommandRun, CommandContinue} {
 		t.Run(firstCommand+" first", func(t *testing.T) {
-			t.Chdir(t.TempDir())
+			workingDirectory := t.TempDir()
+			t.Setenv("HOME", t.TempDir())
+			originalLocal := time.Local
+			time.Local = time.FixedZone("test-local", -3*60*60)
+			t.Cleanup(func() { time.Local = originalLocal })
 			// Earlier flat logs must remain untouched.
-			legacy := filepath.Join("logs", "feature-logs-2026-10-08_19-38-48.007046183")
+			legacy := filepath.Join(workingDirectory, "logs", "feature-logs-2026-10-08_19-38-48.007046183")
 			require.NoError(t, os.MkdirAll(legacy, 0700))
 			legacyFile := filepath.Join(legacy, summaryFile)
 			require.NoError(t, os.WriteFile(legacyFile, []byte("earlier summary"), 0600))
-			// A non-UTC input also produces the existing UTC timestamp format.
+			// Format the instant in local time, discarding fractional seconds.
 			started := time.Date(2026, 10, 8, 21, 38, 48, 7046183, time.FixedZone("UTC+2", 2*60*60))
-			parent := filepath.Join("logs", "feature-logs")
-			name := firstCommand + "-2026-10-08_19-38-48.007046183"
+			parent := filepath.Join(logTestProjectDirectory(t, workingDirectory), "feature-logs")
+			name := firstCommand + "-2026-10-08_16-38-48"
 			for i := 1; i <= 3; i++ {
-				path, err := createRunDirectory("feature/logs", firstCommand, started)
+				path, err := createRunDirectory(workingDirectory, "feature/logs", firstCommand, started)
 				require.NoError(t, err)
 				want := filepath.Join(parent, name)
 				if i > 1 {
 					want += fmt.Sprintf("-%d", i)
 				}
 				require.Equal(t, want, path)
-				require.False(t, filepath.IsAbs(path))
+				require.True(t, filepath.IsAbs(path))
+				require.NotContains(t, filepath.Base(path), ".")
 				require.NoError(t, os.WriteFile(filepath.Join(path, summaryFile), []byte(path), 0600))
 			}
 			otherCommand := CommandContinue
 			if firstCommand == CommandContinue {
 				otherCommand = CommandRun
 			}
-			otherPath, err := createRunDirectory("feature/logs", otherCommand, started)
+			otherPath, err := createRunDirectory(workingDirectory, "feature/logs", otherCommand, started)
 			require.NoError(t, err)
-			require.Equal(t, filepath.Join(parent, otherCommand+"-2026-10-08_19-38-48.007046183"), otherPath)
+			require.Equal(t, filepath.Join(parent, otherCommand+"-2026-10-08_16-38-48"), otherPath)
 			children, err := os.ReadDir(parent)
 			require.NoError(t, err)
 			require.Len(t, children, 4)
@@ -332,7 +345,7 @@ func TestInvocationDirectoryAllocation(t *testing.T) {
 			data, err := os.ReadFile(legacyFile)
 			require.NoError(t, err)
 			require.Equal(t, "earlier summary", string(data))
-			for _, path := range []string{"logs", parent, otherPath} {
+			for _, path := range []string{filepath.Dir(logTestProjectDirectory(t, workingDirectory)), logTestProjectDirectory(t, workingDirectory), parent, otherPath} {
 				info, err := os.Stat(path)
 				require.NoError(t, err)
 				assert.Equal(t, os.FileMode(0700), info.Mode().Perm(), "path %s", path)
@@ -348,7 +361,9 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 	require.NoError(t, err)
 	referenceInfo, statErr := reference.Stat()
 	require.NoError(t, errors.Join(statErr, reference.Close()))
-	parent := filepath.Join("logs", "Feature-logs._-9-")
+	workingDirectory, err := os.Getwd()
+	require.NoError(t, err)
+	parent := filepath.Join(logTestProjectDirectory(t, workingDirectory), "Feature-logs._-9-")
 	paths := make(map[string]int)
 	for i, command := range []string{CommandRun, CommandContinue, CommandContinue, CommandRun} {
 		run, err := NewRun("Feature/logs._-9é", command, []config.Stage{config.StageImplementation})
@@ -392,10 +407,12 @@ func TestInvocationArtifactsAreIsolated(t *testing.T) {
 }
 
 func TestBranchDirectoryCreationFailure(t *testing.T) {
-	t.Chdir(t.TempDir())
-	require.NoError(t, os.Mkdir("logs", 0700))
-	require.NoError(t, os.WriteFile(filepath.Join("logs", "feature"), []byte("existing file"), 0600))
-	_, err := createRunDirectory("feature", CommandContinue, time.Now())
+	workingDirectory := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	project := logTestProjectDirectory(t, workingDirectory)
+	require.NoError(t, os.MkdirAll(project, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(project, "feature"), []byte("existing file"), 0600))
+	_, err := createRunDirectory(workingDirectory, "feature", CommandContinue, time.Now())
 	require.ErrorContains(t, err, "create branch log directory")
 }
 
@@ -403,13 +420,15 @@ func TestBranchDirectoryRejectsDotComponents(t *testing.T) {
 	for _, branch := range []string{".", ".."} {
 		t.Run(branch, func(t *testing.T) {
 			workingDirectory := t.TempDir()
-			t.Chdir(workingDirectory)
-			path, err := createRunDirectory(branch, CommandContinue, time.Now())
+			t.Setenv("HOME", t.TempDir())
+			path, err := createRunDirectory(workingDirectory, branch, CommandContinue, time.Now())
 			require.ErrorContains(t, err, "invalid branch directory")
 			require.Empty(t, path)
 			entries, err := os.ReadDir(workingDirectory)
 			require.NoError(t, err)
 			require.Len(t, entries, 0)
+			_, err = os.Stat(filepath.Join(os.Getenv("HOME"), ".config"))
+			require.ErrorIs(t, err, os.ErrNotExist)
 		})
 	}
 }
@@ -418,24 +437,25 @@ func TestBranchDirectoryRejectsSymlinks(t *testing.T) {
 	for _, target := range []string{"../outside", "other-branch", "../missing"} {
 		t.Run(target, func(t *testing.T) {
 			workingDirectory := t.TempDir()
-			t.Chdir(workingDirectory)
-			for _, directory := range []string{"logs", "outside", filepath.Join("logs", "other-branch")} {
+			t.Setenv("HOME", t.TempDir())
+			project := logTestProjectDirectory(t, workingDirectory)
+			for _, directory := range []string{project, filepath.Join(filepath.Dir(project), "outside"), filepath.Join(project, "other-branch")} {
 				require.NoError(t, os.MkdirAll(directory, 0700))
 			}
-			require.NoError(t, os.Symlink(target, filepath.Join("logs", "feature")))
-			path, err := createRunDirectory("feature", CommandContinue, time.Now())
+			require.NoError(t, os.Symlink(target, filepath.Join(project, "feature")))
+			path, err := createRunDirectory(workingDirectory, "feature", CommandContinue, time.Now())
 			require.ErrorContains(t, err, "create branch log directory")
 			require.Empty(t, path)
-			for _, directory := range []string{"outside", filepath.Join("logs", "other-branch")} {
+			for _, directory := range []string{filepath.Join(filepath.Dir(project), "outside"), filepath.Join(project, "other-branch")} {
 				entries, err := os.ReadDir(directory)
 				require.NoError(t, err)
 				require.Len(t, entries, 0)
 			}
 
-			_, err = os.Stat("missing")
+			_, err = os.Stat(filepath.Join(filepath.Dir(project), "missing"))
 			require.ErrorIs(t, err, os.ErrNotExist)
 
-			targetAfter, err := os.Readlink(filepath.Join("logs", "feature"))
+			targetAfter, err := os.Readlink(filepath.Join(project, "feature"))
 			require.NoError(t, err)
 			require.Equal(t, target, targetAfter)
 		})

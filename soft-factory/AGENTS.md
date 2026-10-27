@@ -25,6 +25,8 @@ Use Go 1.26.0 or later. Run commands from the repository root so relative skill 
 
 Workflow commands require `agent-sandbox` on `PATH` and local configuration.
 
+Do not use the `code-review-and-quality` skill during implementation.
+
 ## Coding Style & Naming Conventions
 
 Follow idiomatic Go and use `gofmt` tab indentation. Keep package names lowercase, exported identifiers in PascalCase, and unexported identifiers in camelCase. Place reusable logic under `internal/`; keep CLI orchestration in `cmd/factory`. Return contextual errors and wrap underlying errors with `%w`.

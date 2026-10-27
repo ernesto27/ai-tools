@@ -328,18 +328,25 @@ Soft Factory runs these stages in order:
 4. Classify the final risk as **LOW**, **MEDIUM**, **HIGH**, or **UNKNOWN**.
 5. Write a read-only walkthrough of the final changes, including diff lines and flow diagrams.
 
-The default workflow saves logs in `logs/<branch>-<UTC-datetime>/`, using the
-sandbox worktree branch from `software-factory.json: agentSandbox.run.branch`. Branch slashes
-become hyphens, so `feature/logs` appears as `feature-logs`. Each
-first four stages have position-prefixed files (`01-implementation.log`,
-`02-code-review.log`, `03-security-review.log`, and
-`04-risk-classification.log`); another attempt at a stage uses a numbered file
-such as `01-implementation-2.log`. Each stage file includes the run details
-and that stage's result. A stage that never starts has no file. The CLI prints
-the directory path when the run starts and continues to show stage output
-live. The final stage writes `05-review-changes.md` as the only Markdown file
-in the default run directory. The code review, security review, and risk classification
-output stays in their stage logs.
+New workflows save logs in
+`~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/run-<local-timestamp>/`.
+`continue` creates a `continue-<local-timestamp>` child. The project folder is
+where you invoke Factory, including a project subfolder inside a monorepo.
+The ID is the first 12 hexadecimal characters of SHA-256 of that folder's
+cleaned absolute path, separating projects with the same local folder name.
+The location does not use `XDG_CONFIG_HOME` and cannot be configured.
+
+Branch slashes and other unsupported characters become hyphens. Invocation
+timestamps use local time in `YYYY-MM-DD_HH-MM-SS` format, without fractional
+seconds. Collisions receive `-2`, `-3`, and later suffixes. The CLI prints the
+absolute invocation path at startup. Existing project-local logs remain in
+place and can still be passed to `software-factory resume <path>`.
+
+Stage files are `01-implementation.log`, `02-codeReview.log`,
+`03-securityReview.log`, `04-riskClassification.log`, and `05-reviewChanges.log`.
+Retries can add a numeric suffix. The final walkthrough is saved separately
+as `05-reviewChanges.md`. Timestamps inside log contents retain their existing
+UTC format.
 
 Each review stage allows up to three rounds. Reviews require reviewer and fixer subagents; unavailable subagents or incomplete necessary verification are reported as **BLOCKED**.
 
@@ -354,7 +361,7 @@ flowchart TD
     Code --> Security[Security review and corrections]
     Security --> Risk[Classify final risk]
     Risk -->|Default workflow| Changes[Explain final changes]
-    Changes --> DefaultReports[Reports in terminal and logs/]
+    Changes --> DefaultReports[Reports in terminal and central project logs]
 ```
 
 Each code or security review follows **review → corrections when needed → verification**, with up to three rounds. Failures before the final walkthrough stop the workflow. A walkthrough failure warns and does not change the exit status.
@@ -417,8 +424,8 @@ See [Google Drive setup](GOOGLE_DRIVE_SERVICE_ACCOUNT_SETUP.md) for instructions
 
 Reports appear in the terminal. The default workflow saves the code review,
 security review, and risk classification output in their `.log` files, and
-only the final walkthrough as `logs/<run>/05-review-changes.md`.
-The default workflow's `05-review-changes.md` shows the changed code lines,
+only the final walkthrough as `<invocation-path>/05-reviewChanges.md`.
+The default workflow's `05-reviewChanges.md` shows the changed code lines,
 file-by-file explanations, findings, and flow diagrams. Terminal setup and
 command output from that final stage are shown live but are not saved in the
 Markdown file. The agent writes the report in its sandbox worktree; Soft Factory

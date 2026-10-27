@@ -36,9 +36,8 @@ const (
 	statusFailed      = "FAILED"
 	StatusSucceeded   = "SUCCEEDED"
 
-	logDirectory = "logs"
-	separator    = "=================================================="
-	summaryFile  = "summary.log"
+	separator   = "=================================================="
+	summaryFile = "summary.log"
 	// containerWorktree matches agent-sandbox's container mount point.
 	containerWorktree = "/workspace"
 )
@@ -97,7 +96,7 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 	if err := IgnoreStageReports(); err != nil {
 		return nil, fmt.Errorf("ignore stage change reports: %w", err)
 	}
-	path, err := createRunDirectory(branch, command, time.Now().UTC())
+	path, err := createRunDirectory(workingDirectory, branch, command, time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("create execution log directory: %w", err)
 	}
@@ -172,40 +171,39 @@ func IgnoreStageReports() error {
 }
 
 // createRunDirectory reserves a unique child without replacing an earlier invocation.
-func createRunDirectory(branch, command string, started time.Time) (string, error) {
+func createRunDirectory(workingDirectory, branch, command string, started time.Time) (string, error) {
 	branchName := sanitizeBranch(branch)
 	if branchName == "." || branchName == ".." {
 		return "", fmt.Errorf("create branch log directory: invalid branch directory %q", branchName)
 	}
-	if err := os.MkdirAll(logDirectory, 0700); err != nil {
-		return "", fmt.Errorf("create branch log directory: %w", err)
+	baseDirectory, projectName, err := projectLogDirectory(workingDirectory)
+	if err != nil {
+		return "", err
 	}
-	root, err := os.OpenRoot(logDirectory)
+	if err := os.MkdirAll(baseDirectory, 0700); err != nil {
+		return "", fmt.Errorf("create log directory: %w", err)
+	}
+	root, err := os.OpenRoot(baseDirectory)
 	if err != nil {
 		return "", fmt.Errorf("open log directory: %w", err)
 	}
 	defer root.Close()
-	if err := root.Mkdir(branchName, 0700); err != nil {
-		if !errors.Is(err, os.ErrExist) {
-			return "", fmt.Errorf("create branch log directory: %w", err)
-		}
-		info, err := root.Lstat(branchName)
-		if err != nil {
-			return "", fmt.Errorf("inspect branch log directory: %w", err)
-		}
-		if !info.IsDir() {
-			return "", fmt.Errorf("create branch log directory: %q is not a directory", branchName)
-		}
+	if err := ensureLogDirectory(root, projectName, "project"); err != nil {
+		return "", err
 	}
-	branchDirectory := filepath.Join(logDirectory, branchName)
-	name := command + "-" + started.UTC().Format("2006-01-02_15-04-05.000000000")
+	branchRelative := filepath.Join(projectName, branchName)
+	if err := ensureLogDirectory(root, branchRelative, "branch"); err != nil {
+		return "", err
+	}
+	branchDirectory := filepath.Join(baseDirectory, projectName, branchName)
+	name := command + "-" + started.In(time.Local).Format("2006-01-02_15-04-05")
 	for suffix := 0; ; suffix++ {
 		directory := name
 		if suffix > 0 {
 			directory = fmt.Sprintf("%s-%d", name, suffix+1)
 		}
 		path := filepath.Join(branchDirectory, directory)
-		err := root.Mkdir(filepath.Join(branchName, directory), 0700)
+		err := root.Mkdir(filepath.Join(branchRelative, directory), 0700)
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}

@@ -30,13 +30,14 @@ Every stage uses the branch selected for that command, even when the two
 configured branches differ. List available worktrees with
 `agent-sandbox worktree-list`.
 
-`continue` starts a new workflow invocation in
-`logs/<sanitized-branch>/continue-<UTC-timestamp>/`. Default invocations use a
-`run-<UTC-timestamp>` child under the same branch folder when `run.branch` and
-`resume.branch` select the same branch. A continue creates the branch folder
-if needed and keeps its files separate from all earlier invocations. See
-[execution logs](reports.md#execution-logs) for examples. It runs implementation
-again rather than resuming at the last failed stage.
+`continue` starts a new invocation under
+`~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/`,
+named `continue-YYYY-MM-DD_HH-MM-SS` in local time. Default invocations use
+`run-YYYY-MM-DD_HH-MM-SS`. The project name comes from the directory where
+Factory is invoked; its path ID separates same-named projects. A continue
+creates missing folders and keeps its files separate from earlier invocations.
+See [execution logs](reports.md#execution-logs) for identity and collision
+details. It runs implementation again rather than resuming at the last failed stage.
 
 Keep the original task in `run.filePrompt`, or supply `--jira` again when
 continuing a Jira task. Supporting documents and enabled stages still apply.
@@ -45,10 +46,10 @@ See [configuration](configuration.md#disabling-stages) to skip selected stages.
 ## Resume a failed or interrupted run
 
 To recover from the last saved stage, pass the invocation folder printed by
-that run:
+that run. The ID below is illustrative; copy the path printed by your run:
 
 ```bash
-software-factory resume logs/fix-login/run-2026-10-08_19-38-48.007046183
+software-factory resume "$HOME/.config/software-factory/logs/soft-factory-a1b2c3d4e5f6/fix-login/run-2026-10-26_17-47-23"
 ```
 
 Run this from the original project directory, with `resume.branch` set to the
@@ -58,7 +59,14 @@ supporting documents, and task from `run.filePrompt`. For a Jira task, pass
 `--jira` again:
 
 ```bash
-software-factory resume logs/eng-123/run-2026-10-08_19-38-48.007046183 --jira 'https://your-company.atlassian.net/browse/ENG-123'
+software-factory resume "$HOME/.config/software-factory/logs/soft-factory-a1b2c3d4e5f6/eng-123/run-2026-10-26_17-47-23" --jira 'https://your-company.atlassian.net/browse/ENG-123'
+```
+
+Existing project-local log directories are still valid recovery inputs.
+They are not moved automatically. For example:
+
+```bash
+software-factory resume logs/fix-login/run-2026-10-08_19-38-48.007046183
 ```
 
 The last entry in `stage_status.txt` determines where recovery starts. A

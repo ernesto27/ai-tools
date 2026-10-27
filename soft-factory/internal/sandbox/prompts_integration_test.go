@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -83,6 +84,7 @@ func TestPromptSandboxHelper(t *testing.T) {
 
 func preparePromptSandbox(t *testing.T) string {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
 	root := t.TempDir()
 	t.Chdir(root)
 	t.Setenv("TMPDIR", t.TempDir())
@@ -171,7 +173,7 @@ func TestStagePromptIntegration(t *testing.T) {
 					input.CustomSkills = ProjectSkills{CodeReview: project, SecurityReview: project, RiskClassification: project, ReviewChanges: project}
 					hostEvidence := ""
 					if stage == "review-changes" {
-						snapshot, err := changeEvidence(nil, "main")
+						snapshot, err := changeEvidence(context.Background(), "main")
 						require.NoError(t, err)
 						hostEvidence = snapshot.Text
 					}

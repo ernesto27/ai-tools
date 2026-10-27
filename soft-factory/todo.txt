@@ -1,12 +1,10 @@
-[]- "disabledStages": [
-    "implementation",
-    "codeReview",
-    "securityReview",
-    "riskClassification",
-    "reviewChanges"
-  ]
+[] - implementaion stage should accept custom skill
+[] - add efffort setting in stage
+[] - check The screenshot shows the command launches, but Software Factory ignores run.query when building the task prompt. It tries to read run.filePrompt, which is absent, and attempts to open "".
 
-shoule be in stages prop
+I confirmed this in runner.go (/home/eponce/code/ai-enginering/ai-tools/soft-factory/internal/sandbox/runner.go:352).
+
+The fix belongs in Software Factory: use run.query when provided; otherwise read run.filePrompt. The desktop is correctly saving your task text.
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
 [] - custom skill should be add in stages prop

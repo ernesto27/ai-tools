@@ -14,6 +14,7 @@ import (
 )
 
 func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Chdir(t.TempDir())
 
 	output, err := exec.Command("git", "init", "-b", "main").CombinedOutput()
@@ -24,7 +25,13 @@ func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 	defer run.Finish(nil)
 	source := "agent-report.md"
 	destination := filepath.Join(run.Path(), "05-reviewChanges.md")
-	require.Equal(t, filepath.Join("logs", "feature-logs"), filepath.Dir(run.Path()))
+	require.True(t, filepath.IsAbs(run.Path()))
+	require.Equal(t, "feature-logs", filepath.Base(filepath.Dir(run.Path())))
+	projectDirectory := filepath.Dir(filepath.Dir(run.Path()))
+	require.Equal(t, filepath.Join(os.Getenv("HOME"), ".config", "software-factory", "logs"), filepath.Dir(projectDirectory))
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(filepath.Base(projectDirectory), filepath.Base(cwd)+"-"))
 	require.True(t, strings.HasPrefix(filepath.Base(run.Path()), "continue-"))
 	content := "# Changes\n\n### File: `./a.go`\nThe branch has no changed files.\n" + strings.Repeat("extra output\n", 200)
 	require.NoError(t, os.WriteFile(source, []byte(content), 0644))

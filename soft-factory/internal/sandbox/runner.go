@@ -392,6 +392,9 @@ func appendStageArgs(args []string, settings config.StageConfig) []string {
 	if settings.Model != "" {
 		args = append(args, "-m", settings.Model)
 	}
+	if settings.Effort != nil {
+		args = append(args, "--effort", *settings.Effort)
+	}
 	return args
 }
 

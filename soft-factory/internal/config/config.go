@@ -19,9 +19,10 @@ type Config struct {
 }
 
 type StageConfig struct {
-	Agent    string `json:"agent,omitempty"`
-	Model    string `json:"model,omitempty"`
-	Disabled bool   `json:"disabled,omitempty"`
+	Agent    string  `json:"agent,omitempty"`
+	Model    string  `json:"model,omitempty"`
+	Effort   *string `json:"effort,omitempty"`
+	Disabled bool    `json:"disabled,omitempty"`
 }
 
 // CustomSkillStageConfig adds a project skill to a review-stage selection.

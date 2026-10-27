@@ -37,7 +37,11 @@ function App() {
       <main ref={mainRef} className="min-w-0 flex-auto overflow-y-auto px-14 pt-10 pb-16">
          <Screen
           route={route}
-          repoPath={route.screen === "config" ? savedRepos.find((repo) => repo.name === route.repo)?.path : undefined}
+          repoPath={
+          route.screen !== "addRepo"
+            ? savedRepos.find((repo) => repo.name === route.repo)?.path
+            : undefined
+          }
           navigate={navigate}
           back={() => navigate(lastBranchRoute.current)}
           repoAdded={() => {
@@ -76,7 +80,18 @@ function Screen({
     case "run":
       return <RunDetail key={route.runId} repo={route.repo} branch={route.branch} navigate={navigate} />;
     case "newRun":
-      return <NewRun key={route.branch} repo={route.repo} branch={route.branch} mode={route.mode} navigate={navigate} />;
+      return repoPath ? (
+        <NewRun
+          key={`${repoPath}:${route.branch}`}
+          repo={route.repo}
+          repoPath={repoPath}
+          branch={route.branch}
+          mode={route.mode}
+          navigate={navigate}
+        />
+      ) : (
+        <p>Repository folder not found.</p>
+      );
   }
 }
 

@@ -187,7 +187,7 @@ export function Config({ repo, repoPath }: Props) {
   }
 
   return (
-    <div className="config-form flex max-w-[1080px] flex-col gap-9">
+    <div className="config-form flex w-full min-w-0 flex-col gap-9">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <Crumb>{repo} · {repoPath}</Crumb>
@@ -207,8 +207,8 @@ export function Config({ repo, repoPath }: Props) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-start gap-12">
-        <fieldset disabled={saving || loading || !!loadError} className="@container m-0 flex min-w-0 flex-[999_1_640px] flex-col border-0 p-0">
+      <div className="flex flex-wrap items-start gap-8">
+        <fieldset disabled={saving || loading || !!loadError} className="@container m-0 flex min-w-0 flex-[1.2_1_520px] flex-col border-0 p-0">
           <SectionHeading>Agent defaults</SectionHeading>
           <div className={FORM_GRID}>
             <Field label="Agent">
@@ -360,7 +360,7 @@ export function Config({ repo, repoPath }: Props) {
           </div>
         </fieldset>
 
-        <aside aria-labelledby="json-h" className="sticky top-0 flex min-w-0 flex-[1_1_340px] flex-col gap-2.5">
+        <aside aria-labelledby="json-h" className="sticky top-0 flex min-w-0 flex-[1_1_440px] flex-col gap-2.5">
           <h2 id="json-h" className="font-mono text-sm font-normal text-muted">
             software-factory.json
           </h2>

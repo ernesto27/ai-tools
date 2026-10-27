@@ -1,5 +1,6 @@
 use tauri::Manager;
 mod factory_config;
+mod factory_process;
 
 use factory_config::FactoryConfigFile;
 
@@ -130,11 +131,13 @@ async fn list_branches(path: String) -> Result<Vec<String>, String> {
 
 
 #[tauri::command]
-fn create_factory_config(
+async fn create_factory_config(
     path: String,
     config: serde_json::Value,
 ) -> Result<(), String> {
-    FactoryConfigFile::new(&path).create(&config)
+    tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).create(&config))
+        .await
+        .map_err(|error| format!("Could not save configuration: {error}"))?
 }
 
 
@@ -146,13 +149,39 @@ fn load_factory_config(
 }
 
 #[tauri::command]
-fn update_factory_config(
+async fn update_factory_config(
     path: String,
     config: serde_json::Value,
 ) -> Result<(), String> {
-    FactoryConfigFile::new(&path).update(&config)
+    tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).update(&config))
+        .await
+        .map_err(|error| format!("Could not save configuration: {error}"))?
 }
 
+
+
+#[tauri::command]
+async fn start_factory_run(
+    path: String,
+    jira_url: Option<String>,
+    on_output: tauri::ipc::Channel<factory_process::RunOutput>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut command = std::process::Command::new("software-factory");
+        command.current_dir(&path);
+
+        if let Some(url) = jira_url.filter(|url| !url.trim().is_empty()) {
+            command.arg("--jira").arg(url.trim());
+        }
+
+        factory_process::run(command, |output| {
+            // A closed debug panel must not stop draining the child process pipes.
+            let _ = on_output.send(output);
+        })
+    })
+    .await
+    .map_err(|error| format!("Could not wait for software-factory: {error}"))?
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -170,6 +199,7 @@ pub fn run() {
             create_factory_config,
             load_factory_config,
             update_factory_config,
+            start_factory_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

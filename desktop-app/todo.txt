@@ -1,5 +1,23 @@
+[] - use lang ,  english , spanish
+
+
+Run screen.
+[] - add input for task,  file browser, folder browser, jira url 
+[] - update file software json 
+[] - show a visual representation of json factory
+[] - remove this Branch
+factory-task
+Stages
+All 5
+Checks
+All passed
+$ software-factory
+
 config screen
 [] - i want model input to be autocomplete with options
+[] - remove input , file for task
+
+
 
 add respostory
 

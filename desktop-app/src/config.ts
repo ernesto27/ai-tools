@@ -25,13 +25,14 @@ export interface FactoryConfig {
     push?: boolean;
     pr?: boolean;
     hn?: boolean;
-    run?: { filePrompt?: string; [key: string]: unknown };
+    run?: { branch?: string; query?: string; filePrompt?: string; [key: string]: unknown };
     [key: string]: unknown;
   };
   stages?: Record<string, StageConfig>;
   documents?: string[];
   googleDrive?: { folders?: string[]; files?: string[]; [key: string]: unknown };
   taskFolder?: string;
+  jiraUrl?: string;
   [key: string]: unknown;
 }
 
@@ -51,6 +52,34 @@ export interface ConfigForm {
 }
 
 type JsonObject = Record<string, unknown>;
+
+export function applyTaskInputs(original: FactoryConfig | null, values: {
+  task: string;
+  file: string;
+  folder: string;
+  jira: string;
+  branch?: string;
+}): FactoryConfig {
+  const config = { ...original };
+  const agentSandbox = { ...original?.agentSandbox };
+  const run = { ...agentSandbox.run };
+
+  function setOptionalString(target: JsonObject, key: string, value: string) {
+    if (value.trim()) target[key] = value;
+    else delete target[key];
+  }
+
+  setOptionalString(config, "taskFolder", values.folder);
+  setOptionalString(config, "jiraUrl", values.jira);
+  setOptionalString(run, "query", values.task);
+  setOptionalString(run, "filePrompt", values.file);
+  if (values.branch !== undefined) setOptionalString(run, "branch", values.branch.trim());
+
+  if (Object.keys(run).length || agentSandbox.run !== undefined) agentSandbox.run = run;
+  if (Object.keys(agentSandbox).length || original?.agentSandbox !== undefined) config.agentSandbox = agentSandbox;
+
+  return config;
+}
 
 function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -82,7 +111,7 @@ export function parseFactoryConfig(value: unknown): FactoryConfig {
     checkFields(value.agentSandbox, ["push", "pr", "hn"], "boolean", "agentSandbox");
     if (value.agentSandbox.run !== undefined) {
       requireObject(value.agentSandbox.run, "agentSandbox.run");
-      checkFields(value.agentSandbox.run, ["filePrompt"], "string", "agentSandbox.run");
+      checkFields(value.agentSandbox.run, ["branch", "query", "filePrompt"], "string", "agentSandbox.run");
     }
   }
   if (value.stages !== undefined) {
@@ -96,7 +125,7 @@ export function parseFactoryConfig(value: unknown): FactoryConfig {
     }
   }
   checkStringList(value.documents, "documents");
-  checkFields(value, ["taskFolder"], "string", "Configuration");
+  checkFields(value, ["taskFolder", "jiraUrl"], "string", "Configuration");
   if (value.googleDrive !== undefined) {
     requireObject(value.googleDrive, "googleDrive");
     checkStringList(value.googleDrive.files, "googleDrive.files");

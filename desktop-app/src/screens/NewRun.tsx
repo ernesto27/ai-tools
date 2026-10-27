@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { AGENTS, DEFAULT_TASK_TEXT, folderFiles, jsonSettings, resumableRuns, STATUS_COLOR } from "../data";
+import { useEffect, useState } from "react";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { applyTaskInputs, parseFactoryConfig, type FactoryConfig } from "../config";
+import { resumableRuns, STATUS_COLOR } from "../data";
+import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
+import { StatusMessage } from "../components/StatusMessage";
+import { DebugOutput } from "../components/DebugOutput";
+import { useRunDebug } from "../hooks/useRunDebug";
 import type { Navigate, NewRunMode } from "../router";
 import {
-  Checkbox,
   Crumb,
   Field,
   Input,
-  LinkButton,
-  OutlineButton,
   PrimaryButton,
   SectionHeading,
-  Select,
   Tabs,
-  Textarea,
-  TextTabs,
   Title,
 } from "../components/ui";
 
@@ -29,52 +29,124 @@ const MODE_DESC: Record<NewRunMode, string> = {
   resume: "Pick up an interrupted run from its log folder.",
 };
 
-type Source = "local" | "folder" | "jira";
-const SOURCES = [
-  ["local", "Local file"],
-  ["folder", "Folder"],
-  ["jira", "Jira"],
-] as const;
-
-type SettingsMode = "json" | "custom";
-const SETTINGS_MODES = [
-  ["json", "From software-factory.json"],
-  ["custom", "Custom for this run"],
-] as const;
-
-const STAGES = ["Implement", "Code review", "Security", "Risk", "Walkthrough"];
-const JIRA_URL = "https://your-team.atlassian.net/browse/SF-142";
-
 interface Props {
   repo: string;
   branch: string;
   mode: NewRunMode;
   navigate: Navigate;
+  repoPath: string;
 }
 
-export function NewRun({ repo, branch, mode, navigate }: Props) {
-  const [src, setSrc] = useState<Source>("local");
+interface RunOutputEvent {
+  stream: "stdout" | "stderr";
+  data: number[];
+}
+
+export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
+  const [source, setSource] = useState<TaskSource>("task");
+  const [runBranch, setRunBranch] = useState("");
+  const [taskValues, setTaskValues] = useState<Record<TaskSource, string>>({
+    task: "", file: "", folder: "", jira: "",
+  });
   const [res, setRes] = useState(0);
-  const [settings, setSettings] = useState<SettingsMode>("json");
+  const [loadedConfig, setLoadedConfig] = useState<FactoryConfig | null>(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [savingTask, setSavingTask] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const { output: runOutput, reset: resetDebug, append: appendDebug, flush: flushDebug } = useRunDebug();
+
+  useEffect(() => {
+    let active = true;
+
+    setLoadingConfig(true);
+    setConfigError(null);
+    setLoadedConfig(null);
+    setSaveError(null);
+    setSaveMessage(null);
+    resetDebug();
+
+    invoke<unknown>("load_factory_config", { path: repoPath })
+      .then((value) => {
+        if (!active) return;
+
+        const config = value === null ? null : parseFactoryConfig(value);
+        setLoadedConfig(config);
+        setRunBranch(config?.agentSandbox?.run?.branch ?? config?.agentSandbox?.branch ?? "");
+        setTaskValues({
+          task: config?.agentSandbox?.run?.query ?? "",
+          file: config?.agentSandbox?.run?.filePrompt ?? "",
+          folder: config?.taskFolder ?? "",
+          jira: config?.jiraUrl ?? "",
+        });
+      })
+      .catch((error) => {
+        if (active) setConfigError(String(error));
+      })
+      .finally(() => {
+        if (active) setLoadingConfig(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [repoPath, resetDebug]);
+
+  const taskConfig = applyTaskInputs(loadedConfig, {
+    ...taskValues,
+    ...(mode === "run" ? { branch: runBranch } : {}),
+  });
+
+  async function saveTaskInputs() {
+    if (savingTask || loadingConfig || configError) return;
+
+    setSavingTask(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    resetDebug("Saving configuration…\n");
+
+    try {
+      await invoke(loadedConfig ? "update_factory_config" : "create_factory_config", {
+        path: repoPath,
+        config: taskConfig,
+      });
+      setLoadedConfig(taskConfig);
+      if (mode === "run") {
+        appendDebug("Starting Software Factory…\n");
+        const channel = new Channel<RunOutputEvent>();
+        const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
+        channel.onmessage = ({ stream, data }) => {
+          appendDebug(data.length
+            ? decoders[stream].decode(new Uint8Array(data), { stream: true })
+            : decoders[stream].decode());
+        };
+        await invoke<void>("start_factory_run", {
+          path: repoPath,
+          jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
+          onOutput: channel,
+        });
+        appendDebug("\nRun completed.\n");
+        setSaveMessage("Run completed.");
+      } else {
+        appendDebug("Task inputs saved.\n");
+        setSaveMessage("Task inputs saved to software-factory.json.");
+      }
+    } catch (error) {
+      appendDebug(`\n${String(error)}\n`);
+      setSaveError(String(error));
+    } finally {
+      flushDebug();
+      setSavingTask(false);
+    }
+  }
 
   const setMode = (m: NewRunMode) => navigate({ screen: "newRun", repo, branch, mode: m });
 
-  let command: string, runBranch: string, cta: string, stagesLabel: string;
-  if (mode === "resume") {
-    const r = resumableRuns[res];
-    command = `software-factory resume ${r.folder}`;
-    runBranch = r.branch;
-    cta = "Resume";
-    stagesLabel = r.next;
-  } else {
-    command = "software-factory" + (mode === "continue" ? " continue" : "") + (src === "jira" ? ` --jira ${JIRA_URL}` : "");
-    runBranch = mode === "continue" ? branch : "factory-task";
-    cta = mode === "continue" ? "Continue" : "Start run";
-    stagesLabel = "All 5";
-  }
+  const cta = mode === "run" ? "Start run" : mode === "continue" ? "Continue" : "Resume";
 
   return (
-    <div className="flex max-w-[720px] flex-col gap-8">
+    <div className="@container flex h-full w-full max-w-[1440px] flex-col gap-8">
       <header className="flex flex-col gap-1">
         <Crumb>
           {repo} / {branch}
@@ -82,167 +154,100 @@ export function NewRun({ repo, branch, mode, navigate }: Props) {
         <Title>New run</Title>
       </header>
 
-      <Tabs label="Mode" items={MODES} value={mode} onChange={setMode} />
-      <p className="-mt-3 text-base text-muted">{MODE_DESC[mode]}</p>
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 items-start gap-8 @min-[1040px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <fieldset disabled={savingTask} className="m-0 min-w-0 border-0 p-0">
+            <Tabs label="Mode" items={MODES} value={mode} onChange={setMode} />
+          </fieldset>
+          <p className="-mt-3 text-base text-muted">{MODE_DESC[mode]}</p>
 
-      {mode !== "resume" && (
-        <section aria-labelledby="task-h" className="flex flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionHeading id="task-h" plain>
-              Task
-            </SectionHeading>
-            <TextTabs label="Task source" items={SOURCES} value={src} onChange={setSrc} />
-          </div>
-
-          {src === "local" && (
-            <>
-              <label className="sr-only" htmlFor="task-text">
-                Task text (task.txt)
-              </label>
-              <Textarea id="task-text" rows={7} defaultValue={DEFAULT_TASK_TEXT} />
-              <span className="font-mono text-xs text-muted">task.txt · saved before the run starts</span>
-            </>
+          {(loadingConfig || (!configError && !loadedConfig)) && (
+            <p role="status" className="text-sm text-muted">
+              {loadingConfig
+                ? "Loading configuration…"
+                : "No configuration yet. Saving will create software-factory.json."}
+            </p>
           )}
 
-          {src === "jira" && (
-            <>
-              <label className="sr-only" htmlFor="jira-url">
-                Jira issue URL
-              </label>
-              <Input id="jira-url" type="url" mono large defaultValue={JIRA_URL} />
-              <span className="text-sm text-muted">[Issue title loads here] · passed as --jira</span>
-            </>
+          {configError && (
+            <p role="alert" className="text-sm text-bad">{configError}</p>
           )}
 
-          {src === "folder" && (
-            <>
-              <div className="flex gap-2">
-                <label className="sr-only" htmlFor="task-folder">
-                  Task folder
-                </label>
-                <Input
-                  id="task-folder"
-                  mono
-                  large
-                  className="min-w-0 grow"
-                  defaultValue="tasks/logging"
-                  placeholder="folder with task and context files"
+          {mode !== "resume" && (
+            <div className="flex flex-col gap-3">
+              <fieldset disabled={loadingConfig || savingTask || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+                {mode === "run" && (
+                  <Field label="Branch name" hint="Leave blank to use the default branch from your configuration.">
+                    <Input mono large className="w-full" placeholder="feature/my-task" value={runBranch}
+                      onChange={(event) => {
+                        setRunBranch(event.target.value);
+                        setSaveMessage(null);
+                        setSaveError(null);
+                      }} />
+                  </Field>
+                )}
+                <RunTaskInput
+                  source={source}
+                  onSourceChange={setSource}
+                  values={taskValues}
+                  onChange={(source, value) => {
+                    setTaskValues((current) => ({ ...current, [source]: value }));
+                    setSaveMessage(null);
+                    setSaveError(null);
+                  }}
                 />
-                <OutlineButton>Browse</OutlineButton>
-              </div>
-              <div className="flex flex-col">
-                {folderFiles.map((f) => (
-                  <div key={f.name} className="flex min-h-10 items-center justify-between gap-3 border-b border-line">
-                    <span className="font-mono text-md">{f.name}</span>
-                    <span className="text-sm text-muted">{f.role}</span>
-                  </div>
-                ))}
-              </div>
-              <span className="text-sm text-muted">task.md becomes run.filePrompt · other files are added as documents</span>
-            </>
+              </fieldset>
+              {saveMessage && <StatusMessage message={saveMessage} />}
+              {saveError && <p role="alert" className="text-sm whitespace-pre-wrap break-words text-bad">{saveError}</p>}
+            </div>
           )}
-        </section>
-      )}
 
-      {mode === "resume" && (
-        <section aria-labelledby="rs-h" className="flex flex-col">
-          <SectionHeading id="rs-h">Interrupted runs</SectionHeading>
-          {resumableRuns.map((r, i) => (
-            <label key={r.folder} className="flex min-h-14 cursor-pointer items-center gap-3 border-b border-line">
-              <input type="radio" name="resume" className="m-0 size-4 accent-ink" checked={res === i} onChange={() => setRes(i)} />
-              <span className="flex grow flex-col">
-                <span className="font-medium">
-                  {r.branch} · {r.when}
-                </span>
-                <span className="font-mono text-xs text-muted">
-                  {r.last} → {r.next}
-                </span>
-              </span>
-              <span className="text-md" style={{ color: STATUS_COLOR[r.status] }}>
-                {r.status}
-              </span>
-            </label>
-          ))}
-        </section>
-      )}
+          {mode === "resume" && (
+            <section aria-labelledby="rs-h" className="flex flex-col">
+              <SectionHeading id="rs-h">Interrupted runs</SectionHeading>
+              {resumableRuns.map((r, i) => (
+                <label key={r.folder} className="flex min-h-14 cursor-pointer items-center gap-3 border-b border-line">
+                  <input type="radio" name="resume" className="m-0 size-4 accent-ink" checked={res === i} onChange={() => setRes(i)} />
+                  <span className="flex grow flex-col">
+                    <span className="font-medium">
+                      {r.branch} · {r.when}
+                    </span>
+                    <span className="font-mono text-xs text-muted">
+                      {r.last} → {r.next}
+                    </span>
+                  </span>
+                  <span className="text-md" style={{ color: STATUS_COLOR[r.status] }}>
+                    {r.status}
+                  </span>
+                </label>
+              ))}
+            </section>
+          )}
 
-      <section aria-labelledby="set-h" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionHeading id="set-h" plain>
-            Settings
-          </SectionHeading>
-          <TextTabs label="Settings source" items={SETTINGS_MODES} value={settings} onChange={setSettings} />
+          <div className="flex border-t border-line pt-4">
+            <PrimaryButton
+              size="lg"
+              className="self-start"
+              disabled={mode !== "resume" && (loadingConfig || savingTask || !!configError)}
+              onClick={mode !== "resume" ? saveTaskInputs : undefined}
+            >
+              {savingTask ? (mode === "run" ? "Running…" : "Saving…") : cta}
+            </PrimaryButton>
+          </div>
+          {runOutput !== null && (
+            <DebugOutput output={runOutput} active={savingTask} />
+          )}
         </div>
 
-        {settings === "json" && (
-          <>
-            <dl className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-x-6 gap-y-3 rounded-md bg-panel px-4 py-3.5 text-md">
-              {jsonSettings.map((v) => (
-                <div key={v.k} className="flex flex-col gap-0.5">
-                  <dt className="font-mono text-xs text-muted">{v.k}</dt>
-                  <dd className="font-mono">{v.v}</dd>
-                </div>
-              ))}
-            </dl>
-            <span className="text-sm text-muted">
-              Read from software-factory.json ·{" "}
-              <LinkButton muted onClick={() => navigate({ screen: "config", repo })}>
-                Edit in Config
-              </LinkButton>
-            </span>
-          </>
+        {!loadingConfig && !configError && (
+          <section aria-labelledby="config-preview-h" className="flex h-[70dvh] min-h-[320px] min-w-0 flex-col gap-3 @min-[1040px]:h-full @min-[1040px]:min-h-0">
+            <SectionHeading id="config-preview-h" plain>software-factory.json preview</SectionHeading>
+            <pre className="min-h-0 flex-1 overflow-auto rounded-md bg-panel p-4 font-mono text-md whitespace-pre-wrap break-words">
+              <code>{JSON.stringify(mode === "resume" ? loadedConfig ?? {} : taskConfig, null, 2)}</code>
+            </pre>
+          </section>
         )}
-
-        {settings === "custom" && (
-          <>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
-              <Field label="Agent">
-                <Select defaultValue="codex">
-                  {AGENTS.map((a) => (
-                    <option key={a}>{a}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Model">
-                <Input placeholder="agent default" />
-              </Field>
-            </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-base">
-              {["push", "pr", "saveFindings"].map((k) => (
-                <Checkbox key={k} tight>
-                  {k}
-                </Checkbox>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-base">
-              <span className="w-full text-sm text-muted">Stages</span>
-              {STAGES.map((s) => (
-                <Checkbox key={s} tight defaultChecked>
-                  {s}
-                </Checkbox>
-              ))}
-            </div>
-            <Checkbox tight className="text-base">
-              Also save these to software-factory.json
-            </Checkbox>
-          </>
-        )}
-      </section>
-
-      <section aria-label="Summary" className="flex flex-col gap-3.5 border-t border-line pt-2">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-base">
-          <dt className="text-muted">Branch</dt>
-          <dd className="font-mono text-md">{runBranch}</dd>
-          <dt className="text-muted">Stages</dt>
-          <dd>{stagesLabel}</dd>
-          <dt className="text-muted">Checks</dt>
-          <dd className="text-ok">All passed</dd>
-        </dl>
-        <code className="rounded-md bg-panel px-3.5 py-3 font-mono text-md break-all">$ {command}</code>
-        <PrimaryButton size="lg" className="self-start">
-          {cta}
-        </PrimaryButton>
-      </section>
+      </div>
     </div>
   );
 }

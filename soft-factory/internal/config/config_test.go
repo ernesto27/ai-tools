@@ -245,3 +245,51 @@ func TestImplementationCustomSkillIgnored(t *testing.T) {
 		})
 	}
 }
+
+func TestStageEffortConfiguration(t *testing.T) {
+	for _, stage := range Stages {
+		for _, tc := range []struct {
+			name, property, want string
+			present, invalid     bool
+		}{
+			{name: "omitted"},
+			{name: "null", property: `,"effort":null`},
+			{name: "empty", property: `,"effort":""`, present: true},
+			{name: "value", property: `,"effort":"high"`, want: "high", present: true},
+			{name: "upstream value", property: `,"effort":"future-level"`, want: "future-level", present: true},
+			{name: "whitespace", property: `,"effort":" "`, want: " ", present: true},
+			{name: "number", property: `,"effort":1`, invalid: true},
+			{name: "boolean", property: `,"effort":true`, invalid: true},
+			{name: "array", property: `,"effort":[]`, invalid: true},
+			{name: "object", property: `,"effort":{}`, invalid: true},
+		} {
+			t.Run(string(stage)+"/"+tc.name, func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "software-factory.json")
+				data := `{"agentSandbox":{},"stages":{"` + string(stage) + `":{"agent":"claude","model":"existing-model","disabled":true` + tc.property + `}}}`
+				require.NoError(t, os.WriteFile(path, []byte(data), 0600))
+				cfg, err := Load(path)
+				if tc.invalid {
+					require.ErrorContains(t, err, "parse factory configuration")
+					return
+				}
+				require.NoError(t, err)
+				settings := map[Stage]StageConfig{
+					StageImplementation:     cfg.Stages.Implementation,
+					StageCodeReview:         cfg.Stages.CodeReview.StageConfig,
+					StageSecurityReview:     cfg.Stages.SecurityReview.StageConfig,
+					StageRiskClassification: cfg.Stages.RiskClassification.StageConfig,
+					StageReviewChanges:      cfg.Stages.ReviewChanges.StageConfig,
+				}[stage]
+				require.Equal(t, "claude", settings.Agent)
+				require.Equal(t, "existing-model", settings.Model)
+				require.True(t, settings.Disabled)
+				if tc.present {
+					require.NotNil(t, settings.Effort)
+					require.Equal(t, tc.want, *settings.Effort)
+				} else {
+					require.Nil(t, settings.Effort)
+				}
+			})
+		}
+	}
+}

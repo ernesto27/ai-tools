@@ -1,6 +1,7 @@
 use tauri::Manager;
 mod factory_config;
 mod factory_process;
+mod stage_log;
 
 use factory_config::FactoryConfigFile;
 
@@ -183,6 +184,25 @@ async fn start_factory_run(
     .map_err(|error| format!("Could not wait for software-factory: {error}"))?
 }
 
+#[tauri::command]
+async fn list_branch_runs(
+    app: tauri::AppHandle,
+    path: String,
+    branch: String,
+) -> Result<Vec<stage_log::RunEntry>, String> {
+    let home = app
+        .path()
+        .home_dir()
+        .map_err(|error| format!("Could not resolve home directory: {error}"))?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let logs = stage_log::StageLog::new(&home, std::path::Path::new(&path))?;
+        logs.list_run_entries(&branch)
+    })
+    .await
+    .map_err(|error| format!("Could not load runs: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -196,6 +216,7 @@ pub fn run() {
             check_requirements,
             list_repos,
             list_branches,
+            list_branch_runs,
             create_factory_config,
             load_factory_config,
             update_factory_config,

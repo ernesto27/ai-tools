@@ -24,7 +24,7 @@ const MODES = [
 ] as const;
 
 const MODE_DESC: Record<NewRunMode, string> = {
-  run: "Full workflow on run.branch: implement, review, classify risk, explain.",
+  run: "Full workflow: implement, review, classify risk, explain.",
   continue: "Rerun implementation and later stages on the existing resume.branch worktree.",
   resume: "Pick up an interrupted run from its log folder.",
 };
@@ -73,7 +73,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
 
         const config = value === null ? null : parseFactoryConfig(value);
         setLoadedConfig(config);
-        setRunBranch(config?.agentSandbox?.run?.branch ?? config?.agentSandbox?.branch ?? "");
+        setRunBranch(config?.agentSandbox?.branch ?? "");
         setTaskValues({
           task: config?.agentSandbox?.run?.query ?? "",
           file: config?.agentSandbox?.run?.filePrompt ?? "",
@@ -177,7 +177,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
             <div className="flex flex-col gap-3">
               <fieldset disabled={loadingConfig || savingTask || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
                 {mode === "run" && (
-                  <Field label="Branch name" hint="Leave blank to use the default branch from your configuration.">
+                  <Field label="Branch name" hint="Sets the shared branch for the workflow.">
                     <Input mono large className="w-full" placeholder="feature/my-task" value={runBranch}
                       onChange={(event) => {
                         setRunBranch(event.target.value);

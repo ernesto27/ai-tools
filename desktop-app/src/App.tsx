@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { repos } from "./data";
 import type { Route } from "./router";
 import { Sidebar, type SavedRepo } from "./components/Sidebar";
 import { BranchRuns } from "./screens/BranchRuns";
@@ -72,11 +71,19 @@ function Screen({
     return <Config key={repoPath} repo={route.repo} repoPath={repoPath} />;
   }
 
-  const branch = repos.find((r) => r.name === route.repo)?.branches.find((b) => b.name === route.branch);
-
   switch (route.screen) {
     case "branch":
-      return branch ? <BranchRuns key={branch.name} repo={route.repo} branch={branch} navigate={navigate} /> : null;
+      return repoPath ? (
+        <BranchRuns
+          key={`${repoPath}:${route.branch}`}
+          repo={route.repo}
+          repoPath={repoPath}
+          branch={route.branch}
+          navigate={navigate}
+        />
+      ) : (
+        <p>Repository folder not found.</p>
+      );
     case "run":
       return <RunDetail key={route.runId} repo={route.repo} branch={route.branch} navigate={navigate} />;
     case "newRun":

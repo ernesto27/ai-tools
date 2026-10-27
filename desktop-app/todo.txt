@@ -1,9 +1,13 @@
 [] - use lang ,  english , spanish
 
 
+sidebar
+[] - order by new in list of branchs
+
 Run screen.
 [] - add input for task,  file browser, folder browser, jira url 
 [] - update file software json 
+[] - when createa a new branch , task,  update sidebar too
 [] - show a visual representation of json factory
 [] - remove this Branch
 factory-task
@@ -16,6 +20,8 @@ $ software-factory
 config screen
 [] - i want model input to be autocomplete with options
 [] - remove input , file for task
+
+
 
 
 

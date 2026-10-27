@@ -1,88 +1,87 @@
-import { STAGE_NAMES, STATUS_COLOR, type Branch } from "../data";
 import type { Navigate } from "../router";
-import { Dot } from "../components/Dot";
-import { Crumb, LinkButton, PrimaryButton, SectionHeading, TextButton, Title } from "../components/ui";
-
-const PIP_LABEL: Record<string, string> = { s: "done", f: "failed", i: "interrupted", r: "running", "-": "not run" };
-const PIP_COLOR: Record<string, string> = { s: "bg-ink", f: "bg-bad", i: "bg-warn", r: "bg-info", "-": "bg-line" };
+import { useBranchRuns, type RunEntry } from "../hooks/useBranchRuns";
+import { Crumb, LinkButton, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
 
 interface Props {
   repo: string;
-  branch: Branch;
+  repoPath: string;
+  branch: string;
   navigate: Navigate;
 }
 
-export function BranchRuns({ repo, branch, navigate }: Props) {
-  const at = { repo, branch: branch.name };
+const STAGE_LABELS: Record<string, string> = {
+  implementation: "Implementation",
+  codeReview: "Code review",
+  securityReview: "Security review",
+  riskClassification: "Risk classification",
+  reviewChanges: "Review changes",
+};
+
+const STATUS_CLASSES: Record<string, string> = {
+  SUCCEEDED: "text-ok",
+  FAILED: "text-bad",
+  RUNNING: "text-info",
+  STARTED: "text-info",
+  INTERRUPTED: "text-warn",
+  SKIPPED: "text-muted",
+};
+
+function RunRow({ entry }: { entry: RunEntry }) {
+  return (
+    <article className="flex min-w-0 flex-col gap-3 border-b border-line py-4">
+      <h3 className="font-mono text-md break-words">{entry.name}</h3>
+      <p className="font-mono text-xs break-all text-muted">{entry.directory}</p>
+      {entry.error && <p role="alert" className="text-sm break-words text-bad">{entry.error}</p>}
+      {!entry.error && entry.stages.length === 0 && (
+        <p className="text-sm text-muted">No stage results recorded yet.</p>
+      )}
+      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-2 text-md">
+        {entry.stages.map((stage, index) => (
+          <StageRow key={`${stage.stage}:${index}`} name={stage.stage} status={stage.status} />
+        ))}
+      </dl>
+    </article>
+  );
+}
+
+function StageRow({ name, status }: { name: string; status: string }) {
+  return (
+    <>
+      <dt>{STAGE_LABELS[name] ?? name}</dt>
+      <dd className={STATUS_CLASSES[status] ?? "text-muted"}>{status}</dd>
+    </>
+  );
+}
+
+export function BranchRuns({ repo, repoPath, branch, navigate }: Props) {
+  const { entries, loading, error, refresh } = useBranchRuns(repoPath, branch);
+  const at = { repo, branch };
 
   return (
-    <div className="flex max-w-[1080px] flex-col gap-10">
+    <div className="flex max-w-[1080px] flex-col gap-8" aria-busy={loading}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <Crumb>{repo} / branch</Crumb>
-          <Title>
-            <span className="font-mono font-medium">{branch.name}</span>
-          </Title>
+          <Title><span className="font-mono font-medium">{branch}</span></Title>
         </div>
-        <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: "run" })}>New run</PrimaryButton>
+        <div className="flex flex-wrap items-center gap-3">
+          <OutlineButton onClick={refresh} disabled={loading}>{loading ? "Loading…" : "Refresh"}</OutlineButton>
+          <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: "run" })}>New run</PrimaryButton>
+        </div>
       </header>
-
-      <section aria-label="Branch" className="flex flex-col gap-7">
-        <div className="flex flex-col gap-2.5">
-          <span className="font-mono text-sm text-muted">
-            {branch.task} · {branch.ahead} commits ahead · <span className="text-ok">{branch.add}</span>{" "}
-            <span className="text-bad">{branch.del}</span> · {branch.pr}
-          </span>
-          <div className="flex flex-wrap items-center gap-5 pt-1.5 text-md">
-            <LinkButton className="font-medium" onClick={() => navigate({ screen: "newRun", ...at, mode: "continue" })}>
-              Continue
-            </LinkButton>
-            <TextButton>Open diff</TextButton>
-            <TextButton>Set as resume branch</TextButton>
-            <TextButton tone="danger">Remove worktree</TextButton>
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          <SectionHeading as="h3">
-            {branch.runs.length} {branch.runs.length === 1 ? "run" : "runs"}
-          </SectionHeading>
-          {branch.runs.map((run) => (
-            <div key={run.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line py-4">
-              <button
-                type="button"
-                className="group flex min-w-0 flex-[1_1_240px] flex-col gap-0.5 text-left"
-                onClick={() => navigate({ screen: "run", ...at, runId: run.id })}
-              >
-                <span className="font-medium underline-offset-4 group-hover:underline">
-                  {run.kind} · {run.when}
-                </span>
-                <span className="text-sm text-muted">{run.note}</span>
-              </button>
-              <span
-                role="img"
-                aria-label={run.pips
-                  .split("")
-                  .map((p, i) => `${STAGE_NAMES[i]} ${PIP_LABEL[p]}`)
-                  .join(", ")}
-                className="flex gap-[3px]"
-              >
-                {run.pips.split("").map((p, i) => (
-                  <span key={i} className={`block h-1 w-3.5 rounded-[1px] ${PIP_COLOR[p]}`} />
-                ))}
-              </span>
-              <span className="inline-flex w-run-status items-center gap-2 text-md">
-                <Dot color={STATUS_COLOR[run.status]} />
-                {run.status}
-              </span>
-              <span className="w-run-risk font-mono text-xs">{run.risk}</span>
-              <span className="w-run-dur font-mono text-xs text-muted">{run.dur}</span>
-              <span className="w-run-action text-right text-md">
-                {run.resumable && <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: "resume" })}>Resume</LinkButton>}
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="flex items-center gap-5 text-md">
+        <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: "continue" })}>Continue</LinkButton>
+      </div>
+      <section aria-labelledby="runs-heading" className="min-w-0">
+        <SectionHeading id="runs-heading">
+          {loading ? "Runs" : `${entries.length} ${entries.length === 1 ? "run" : "runs"}`}
+        </SectionHeading>
+        {loading && <p role="status" className="py-4 text-muted">Loading runs…</p>}
+        {error && <p role="alert" className="py-4 text-bad">{error}</p>}
+        {!loading && !error && entries.length === 0 && (
+          <p className="py-4 text-muted">No runs recorded for this branch.</p>
+        )}
+        {entries.map((entry) => <RunRow key={entry.directory} entry={entry} />)}
       </section>
     </div>
   );

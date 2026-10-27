@@ -73,7 +73,10 @@ export function applyTaskInputs(original: FactoryConfig | null, values: {
   setOptionalString(config, "jiraUrl", values.jira);
   setOptionalString(run, "query", values.task);
   setOptionalString(run, "filePrompt", values.file);
-  if (values.branch !== undefined) setOptionalString(run, "branch", values.branch.trim());
+  if (values.branch !== undefined) {
+    setOptionalString(agentSandbox, "branch", values.branch.trim());
+    delete run.branch;
+  }
 
   if (Object.keys(run).length || agentSandbox.run !== undefined) agentSandbox.run = run;
   if (Object.keys(agentSandbox).length || original?.agentSandbox !== undefined) config.agentSandbox = agentSandbox;

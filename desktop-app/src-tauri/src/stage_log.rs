@@ -16,10 +16,22 @@ pub struct StageLog {
 
 #[derive(Debug, serde::Serialize)]
 pub struct RunEntry {
-    pub name: String, 
+    pub name: String,
     pub directory: PathBuf,
     pub stages: Vec<StageStatus>,
     pub error: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RunLog {
+    pub filename: String,
+    pub content: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RunDetail {
+    pub entry: RunEntry,
+    pub logs: Vec<RunLog>,
 }
 
 impl StageLog {
@@ -29,6 +41,7 @@ impl StageLog {
         })
     }
 
+    #[cfg(test)]
     pub fn directory(&self) -> &Path {
         &self.directory
     }
@@ -177,38 +190,193 @@ impl StageLog {
         Ok(runs)
     }
 
-    pub fn list_run_entries(&self, branch: &str) -> Result<Vec<RunEntry>, String> {
-        let mut entries = Vec::new();
+    fn read_run_entry(directory: PathBuf) -> Result<RunEntry, String> {
+        let name = directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| format!("Invalid run directory: {}", directory.display()))?
+            .to_string();
 
-        for directory in self.list_runs(branch)? {
-            let name = directory
-                .file_name() 
-                .and_then(|name| name.to_str())
-                .ok_or_else(|| {
-                     format!("Invalid run directory: {}", directory.display())
-                })?
-                .to_string();
-            
-            let (stages, error) = match Self::read_stage_status(&directory) {
-                Ok(stages) => (stages, None), 
-                Err(error) => (Vec::new(), Some(error)),
+        let (stages, error) = match Self::read_stage_status(&directory) {
+            Ok(stages) => (stages, None),
+            Err(error) => (Vec::new(), Some(error)),
+        };
+
+        Ok(RunEntry {
+            name,
+            directory,
+            stages,
+            error,
+        })
+    }
+
+    pub fn list_run_entries(&self, branch: &str) -> Result<Vec<RunEntry>, String> {
+        self.list_runs(branch)?
+            .into_iter()
+            .map(Self::read_run_entry)
+            .collect()
+    }
+
+    pub fn load_run_detail(&self, branch: &str, run_id: &str) -> Result<RunDetail, String> {
+        let directory = self.run_directory(branch, run_id)?;
+        let entry = Self::read_run_entry(directory.clone())?;
+        let supported = [
+            "01-implementation.log",
+            "02-codeReview.log",
+            "03-securityReview.log",
+            "04-riskClassification.log",
+            "05-reviewChanges.log",
+            "summary.log",
+            "05-reviewChanges.md",
+        ];
+
+        let entries = fs::read_dir(&directory)
+            .map_err(|error| format!("Could not list {}: {error}", directory.display()))?;
+
+        let mut logs = Vec::new();
+
+        for entry in entries {
+            let entry =
+                entry.map_err(|error| format!("Could not read directory entry: {error}"))?;
+            let filename = entry.file_name();
+            let Some(filename) = filename.to_str() else {
+                continue;
             };
 
-            entries.push(RunEntry{
-                name,
-                directory,
-                stages,
-                error
-            });
+            if supported.contains(&filename) {
+                logs.push(Self::read_log(&directory, filename)?);
+            }
         }
 
-        Ok(entries)
+        logs.sort_by(|left, right| left.filename.cmp(&right.filename));
+        Ok(RunDetail { entry, logs })
+    }
+
+    pub fn read_log(run_directory: &Path, filename: &str) -> Result<RunLog, String> {
+        let path = run_directory.join(filename);
+
+        let content = fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+
+        Ok(RunLog {
+            filename: filename.to_string(),
+            content,
+        })
+    }
+
+    fn run_directory(&self, branch: &str, run_id: &str) -> Result<PathBuf, String> {
+        self.list_runs(branch)?
+            .into_iter()
+            .find(|directory| directory.file_name().and_then(|name| name.to_str()) == Some(run_id))
+            .ok_or_else(|| format!("Run not found: {run_id}"))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loads_available_run_logs() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+        let branch = "feature/logs";
+        let run_id = "run-2026-10-27_18-18-12";
+        let directory = logs.branch_directory(branch).unwrap().join(run_id);
+
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("summary.log"), "Run interrupted\n").unwrap();
+        fs::write(
+            directory.join("01-implementation.log"),
+            "Implementation started\n",
+        )
+        .unwrap();
+        fs::write(
+            directory.join("stage_status.txt"),
+            "implementation,FAILED\n",
+        )
+        .unwrap();
+
+        let result = logs.load_run_detail(branch, run_id).unwrap();
+
+        assert_eq!(result.entry.name, run_id);
+        assert_eq!(result.entry.directory, directory);
+        assert_eq!(result.entry.stages.len(), 1);
+        assert_eq!(result.entry.stages[0].stage, "implementation");
+        assert_eq!(result.entry.stages[0].status, "FAILED");
+        assert!(result.entry.error.is_none());
+        assert_eq!(result.logs.len(), 2);
+        assert_eq!(result.logs[0].filename, "01-implementation.log");
+        assert_eq!(result.logs[0].content, "Implementation started\n");
+        assert_eq!(result.logs[1].filename, "summary.log");
+        assert_eq!(result.logs[1].content, "Run interrupted\n");
+    }
+
+    #[test]
+    fn loads_run_detail_despite_invalid_stage_status() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+        let branch = "feature/logs";
+        let run_id = "run-selected";
+        let directory = logs.branch_directory(branch).unwrap().join(run_id);
+
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("stage_status.txt"), "broken line").unwrap();
+        fs::write(directory.join("summary.log"), "Run interrupted\n").unwrap();
+
+        let result = logs.load_run_detail(branch, run_id).unwrap();
+
+        assert_eq!(result.entry.name, run_id);
+        assert!(result.entry.stages.is_empty());
+        assert!(result.entry.error.unwrap().contains("stage_status.txt"));
+        assert_eq!(result.logs[0].content, "Run interrupted\n");
+    }
+
+    #[test]
+    fn loads_run_detail_without_status_or_logs() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+        let branch = "feature/logs";
+        let run_id = "run-empty";
+        let directory = logs.branch_directory(branch).unwrap().join(run_id);
+        fs::create_dir_all(&directory).unwrap();
+
+        let result = logs.load_run_detail(branch, run_id).unwrap();
+
+        assert_eq!(result.entry.name, run_id);
+        assert!(result.entry.stages.is_empty());
+        assert!(result.entry.error.is_none());
+        assert!(result.logs.is_empty());
+    }
+
+    #[test]
+    fn loading_logs_reports_unknown_run() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+
+        let error = logs
+            .load_run_detail("feature/logs", "run-missing")
+            .unwrap_err();
+
+        assert_eq!(error, "Run not found: run-missing");
+    }
+
+    #[test]
+    fn loading_logs_reports_unreadable_supported_file() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+        let branch = "feature/logs";
+        let run_id = "run-2026-10-27_18-18-12";
+        let directory = logs.branch_directory(branch).unwrap().join(run_id);
+
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("01-implementation.log"), [0xff]).unwrap();
+
+        let error = logs.load_run_detail(branch, run_id).unwrap_err();
+
+        assert!(error.contains("Could not read"));
+        assert!(error.contains("01-implementation.log"));
+    }
 
     #[test]
     fn reads_stage_status_file() {
@@ -347,11 +515,7 @@ mod tests {
         fs::create_dir_all(&good).unwrap();
         fs::create_dir_all(&bad).unwrap();
 
-        fs::write(
-            good.join("stage_status.txt"),
-            "implementation,SUCCEEDED\n",
-        )
-        .unwrap();
+        fs::write(good.join("stage_status.txt"), "implementation,SUCCEEDED\n").unwrap();
 
         fs::write(bad.join("stage_status.txt"), "broken line").unwrap();
 
@@ -368,4 +532,47 @@ mod tests {
         assert!(entries[1].error.is_some());
     }
 
+    #[test]
+    fn reads_log_file() {
+        let run = tempfile::tempdir().unwrap();
+
+        fs::write(
+            run.path().join("02-codeReview.log"),
+            "Starting review...\nPASS\n",
+        )
+        .unwrap();
+
+        let log = StageLog::read_log(run.path(), "02-codeReview.log").unwrap();
+
+        assert_eq!(log.filename, "02-codeReview.log");
+        assert_eq!(log.content, "Starting review...\nPASS\n");
+    }
+
+    #[test]
+    fn finds_selected_run_directory() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+
+        let branch = "feature/logs";
+        let run_id = "run-2026-10-27_18-16-30";
+        let expected = logs.branch_directory(branch).unwrap().join(run_id);
+
+        fs::create_dir_all(&expected).unwrap();
+
+        let actual = logs.run_directory(branch, run_id).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn reports_unknown_run_directory() {
+        let temporary = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temporary.path(), temporary.path()).unwrap();
+
+        let error = logs
+            .run_directory("feature/logs", "run-missing")
+            .unwrap_err();
+
+        assert_eq!(error, "Run not found: run-missing");
+    }
 }

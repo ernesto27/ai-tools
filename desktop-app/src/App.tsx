@@ -33,7 +33,10 @@ function App() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar repos={savedRepos} route={route} navigate={navigate} />
-      <main ref={mainRef} className="min-w-0 flex-auto overflow-y-auto px-14 pt-10 pb-16">
+      <main
+        ref={mainRef}
+        className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
+      >
          <Screen
           route={route}
           repoPath={
@@ -85,7 +88,18 @@ function Screen({
         <p>Repository folder not found.</p>
       );
     case "run":
-      return <RunDetail key={route.runId} repo={route.repo} branch={route.branch} navigate={navigate} />;
+      return repoPath ? (
+        <RunDetail
+          key={`${repoPath}:${route.branch}:${route.runId}`}
+          repo={route.repo}
+          repoPath={repoPath}
+          branch={route.branch}
+          runId={route.runId}
+          navigate={navigate}
+        />
+      ) : (
+        <p>Repository folder not found.</p>
+      );
     case "newRun":
       return repoPath ? (
         <NewRun

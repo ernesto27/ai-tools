@@ -24,7 +24,6 @@ struct SavedRepo {
     path: String,
 }
 
-
 #[tauri::command]
 fn inspect_folder(path: String) -> FolderInfo {
     let root = std::path::Path::new(&path)
@@ -32,7 +31,9 @@ fn inspect_folder(path: String) -> FolderInfo {
         .find(|dir| dir.join(".git").exists());
     FolderInfo {
         is_git: root.is_some(),
-        has_config: std::path::Path::new(&path).join("software-factory.json").is_file(),
+        has_config: std::path::Path::new(&path)
+            .join("software-factory.json")
+            .is_file(),
     }
 }
 
@@ -68,7 +69,6 @@ async fn sandbox_help() -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Requirement {
     name: String,
@@ -87,7 +87,6 @@ async fn check_requirements() -> Result<Vec<Requirement>, String> {
     }
     serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())
 }
-
 
 fn repos_file(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -127,39 +126,31 @@ async fn list_branches(path: String) -> Result<Vec<String>, String> {
 
     let worktrees: Option<Vec<Worktree>> =
         serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
-    Ok(worktrees.unwrap_or_default().into_iter().map(|w| w.branch).collect())
+    Ok(worktrees
+        .unwrap_or_default()
+        .into_iter()
+        .map(|w| w.branch)
+        .collect())
 }
 
-
 #[tauri::command]
-async fn create_factory_config(
-    path: String,
-    config: serde_json::Value,
-) -> Result<(), String> {
+async fn create_factory_config(path: String, config: serde_json::Value) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).create(&config))
         .await
         .map_err(|error| format!("Could not save configuration: {error}"))?
 }
 
-
 #[tauri::command]
-fn load_factory_config(
-    path: String,
-) -> Result<Option<serde_json::Value>, String> {
+fn load_factory_config(path: String) -> Result<Option<serde_json::Value>, String> {
     FactoryConfigFile::new(&path).load()
 }
 
 #[tauri::command]
-async fn update_factory_config(
-    path: String,
-    config: serde_json::Value,
-) -> Result<(), String> {
+async fn update_factory_config(path: String, config: serde_json::Value) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).update(&config))
         .await
         .map_err(|error| format!("Could not save configuration: {error}"))?
 }
-
-
 
 #[tauri::command]
 async fn start_factory_run(
@@ -203,12 +194,32 @@ async fn list_branch_runs(
     .map_err(|error| format!("Could not load runs: {error}"))?
 }
 
+#[tauri::command]
+async fn load_run_detail(
+    app: tauri::AppHandle,
+    path: String,
+    branch: String,
+    run_id: String,
+) -> Result<stage_log::RunDetail, String> {
+    let home = app
+        .path()
+        .home_dir()
+        .map_err(|error| format!("Could not resolve home directory: {error}"))?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let logs = stage_log::StageLog::new(&home, std::path::Path::new(&path))?;
+        logs.load_run_detail(&branch, &run_id)
+    })
+    .await
+    .map_err(|error| format!("Could not load run detail: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-         .invoke_handler(tauri::generate_handler![
+        .invoke_handler(tauri::generate_handler![
             greet,
             inspect_folder,
             save_repo,
@@ -217,6 +228,7 @@ pub fn run() {
             list_repos,
             list_branches,
             list_branch_runs,
+            load_run_detail,
             create_factory_config,
             load_factory_config,
             update_factory_config,

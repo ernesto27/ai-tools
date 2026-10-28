@@ -1,4 +1,5 @@
 import type { Navigate } from "../router";
+import { statusClass } from "../runStatus";
 import { useBranchRuns, type RunEntry } from "../hooks/useBranchRuns";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
 
@@ -17,18 +18,15 @@ const STAGE_LABELS: Record<string, string> = {
   reviewChanges: "Review changes",
 };
 
-const STATUS_CLASSES: Record<string, string> = {
-  SUCCEEDED: "text-ok",
-  FAILED: "text-bad",
-  RUNNING: "text-info",
-  STARTED: "text-info",
-  INTERRUPTED: "text-warn",
-  SKIPPED: "text-muted",
-};
-
-function RunRow({ entry }: { entry: RunEntry }) {
+function RunRow({ entry, onOpen }: { entry: RunEntry; onOpen: () => void }) {
   return (
-    <article className="flex min-w-0 flex-col gap-3 border-b border-line py-4">
+    <article className="relative flex min-w-0 flex-col gap-3 border-b border-line p-4 hover:bg-hover focus-within:bg-hover">
+      <button
+        type="button"
+        aria-label={`Open run ${entry.name}`}
+        onClick={onOpen}
+        className="absolute inset-0 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info"
+      />
       <h3 className="font-mono text-md break-words">{entry.name}</h3>
       <p className="font-mono text-xs break-all text-muted">{entry.directory}</p>
       {entry.error && <p role="alert" className="text-sm break-words text-bad">{entry.error}</p>}
@@ -48,7 +46,7 @@ function StageRow({ name, status }: { name: string; status: string }) {
   return (
     <>
       <dt>{STAGE_LABELS[name] ?? name}</dt>
-      <dd className={STATUS_CLASSES[status] ?? "text-muted"}>{status}</dd>
+      <dd className={statusClass(status)}>{status}</dd>
     </>
   );
 }
@@ -81,7 +79,13 @@ export function BranchRuns({ repo, repoPath, branch, navigate }: Props) {
         {!loading && !error && entries.length === 0 && (
           <p className="py-4 text-muted">No runs recorded for this branch.</p>
         )}
-        {entries.map((entry) => <RunRow key={entry.directory} entry={entry} />)}
+        {entries.map((entry) => (
+          <RunRow
+            key={entry.directory}
+            entry={entry}
+            onOpen={() => navigate({ screen: "run", ...at, runId: entry.name })}
+          />
+        ))}
       </section>
     </div>
   );

@@ -1,5 +1,86 @@
 @import "tailwindcss";
 
+.walkthrough-markdown {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.walkthrough-markdown > :first-child { margin-top: 0; }
+.walkthrough-markdown > :last-child { margin-bottom: 0; }
+
+.walkthrough-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1.5em 0.5em;
+  color: var(--color-ink-strong);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.walkthrough-markdown h1 { font-size: var(--text-3xl); }
+.walkthrough-markdown h2 { font-size: var(--text-2xl); }
+.walkthrough-markdown h3 { font-size: var(--text-xl); }
+.walkthrough-markdown :is(h4, h5, h6) { font-size: var(--text-lg); }
+
+.walkthrough-markdown :is(p, ul, ol, blockquote, pre, table) {
+  margin-block: 1em;
+}
+
+.walkthrough-markdown :is(ul, ol) { padding-left: 1.75em; }
+.walkthrough-markdown ul { list-style-type: disc; }
+.walkthrough-markdown ol { list-style-type: decimal; }
+.walkthrough-markdown li + li { margin-top: 0.25em; }
+.walkthrough-markdown li > :is(ul, ol) { margin-block: 0.25em; }
+.walkthrough-markdown .contains-task-list { list-style: none; }
+.walkthrough-markdown input[type="checkbox"] { margin-right: 0.5em; }
+
+.walkthrough-markdown a {
+  color: var(--color-info);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.walkthrough-markdown blockquote {
+  border-left: 3px solid var(--color-field-line);
+  padding-left: 1em;
+  color: var(--color-muted);
+}
+
+.walkthrough-markdown code {
+  border-radius: 4px;
+  background: var(--color-canvas);
+  padding: 0.15em 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.walkthrough-markdown pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-canvas);
+  padding: 1em;
+}
+
+.walkthrough-markdown pre code {
+  padding: 0;
+  overflow-wrap: normal;
+}
+
+.walkthrough-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.walkthrough-markdown :is(th, td) {
+  border: 1px solid var(--color-field-line);
+  padding: 0.5em 0.75em;
+}
+
+.walkthrough-markdown th { background: var(--color-selected); }
+.walkthrough-markdown hr { margin-block: 1.5em; border-color: var(--color-line); }
+.walkthrough-markdown img { max-width: 100%; height: auto; }
+
 :root {
   /* Multiplies every font size in the app; 1 = the design's original sizes. */
   --font-scale: 1.25;

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,26 +31,34 @@ func TestWorktreeListAndBranchesUseCurrentRepositoryRecords(t *testing.T) {
 
 	var out bytes.Buffer
 	require.NoError(t, WorktreeList(repoDir, &out))
-	wantOutput := "short        /worktrees/short\n" +
-		"much-longer  /worktrees/much-longer\n"
+	wantOutput := "much-longer  /worktrees/much-longer\n" +
+		"short        /worktrees/short\n"
 	require.Equal(t, wantOutput, out.String())
 
 	branches, err := WorktreeBranches(".")
 	require.NoError(t, err)
-	require.Equal(t, []string{"short", "much-longer"}, branches)
+	require.Equal(t, []string{"much-longer", "short"}, branches)
 }
 
 func TestPrintWorktrees(t *testing.T) {
-	worktrees := []worktreeRecord{
-		{Branch: "a", Path: "/worktrees/a"},
-		{Branch: "long", Path: "/worktrees/long"},
+	for _, tt := range []struct {
+		name      string
+		worktrees []worktreeRecord
+		want      string
+	}{
+		{"empty", nil, ""},
+		{"single", []worktreeRecord{{Branch: "a", Path: "/worktrees/a"}}, "a  /worktrees/a\n"},
+		{"aligned input order", []worktreeRecord{
+			{Branch: "a", Path: "/worktrees/a"},
+			{Branch: "long", Path: "/worktrees/long"},
+		}, "a     /worktrees/a\nlong  /worktrees/long\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			printWorktrees(&out, tt.worktrees)
+			require.Equal(t, tt.want, out.String())
+		})
 	}
-
-	var out bytes.Buffer
-	printWorktrees(&out, worktrees)
-
-	want := "a     /worktrees/a\nlong  /worktrees/long\n"
-	require.Equal(t, want, out.String())
 }
 
 func TestSandboxWorktreesRequiresGitRepository(t *testing.T) {
@@ -195,7 +204,7 @@ func TestWorktreeBranchesReturnsRegistryValues(t *testing.T) {
 	}
 }
 
-func TestWorktreeBranchesPreservesOrder(t *testing.T) {
+func TestWorktreeBranchesNewestFirst(t *testing.T) {
 	repoDir := setupListTestRepo(t)
 	for _, record := range []worktreeRecord{
 		{Repo: repoDir, Branch: "z-last", Path: t.TempDir()},
@@ -206,5 +215,36 @@ func TestWorktreeBranchesPreservesOrder(t *testing.T) {
 	}
 	branches, err := WorktreeBranches(".")
 	require.NoError(t, err)
-	require.Equal(t, []string{"z-last", "stale", "a-first"}, branches)
+	require.Equal(t, []string{"a-first", "stale", "z-last"}, branches)
+}
+
+func TestWorktreeListingIgnoresTimestamps(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		created []time.Time
+	}{
+		{"missing", []time.Time{{}, {}, {}}},
+		{"equal", []time.Time{time.Unix(10, 0), time.Unix(10, 0), time.Unix(10, 0)}},
+		{"out of order", []time.Time{time.Unix(30, 0), time.Unix(10, 0), time.Unix(20, 0)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repoDir := setupListTestRepo(t)
+			for i, branch := range []string{"middle", "z-last", "a-first"} {
+				require.NoError(t, recordWorktree(worktreeRecord{
+					Repo: repoDir, Branch: branch, Path: "/worktrees/" + branch, Created: tt.created[i],
+				}))
+			}
+			for range 2 {
+				branches, err := WorktreeBranches(repoDir)
+				require.NoError(t, err)
+				require.Equal(t, []string{"a-first", "z-last", "middle"}, branches)
+				var out bytes.Buffer
+				require.NoError(t, WorktreeList(repoDir, &out))
+				require.Equal(t, "a-first  /worktrees/a-first\nz-last   /worktrees/z-last\nmiddle   /worktrees/middle\n", out.String())
+			}
+			found, err := sandboxWorktrees(repoDir)
+			require.NoError(t, err)
+			require.Equal(t, "middle", found.worktrees[0].Branch)
+		})
+	}
 }

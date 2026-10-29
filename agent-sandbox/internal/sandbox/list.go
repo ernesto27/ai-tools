@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 )
 
-// WorktreeList prints branch and path for registered worktrees in dir.
+// WorktreeList prints branch and path in reverse registration order, newest first.
 // Stale records remain visible so users can find and clean them up with the
 // worktree management commands.
 func WorktreeList(dir string, out io.Writer) error {
@@ -17,11 +18,13 @@ func WorktreeList(dir string, out io.Writer) error {
 		return err
 	}
 
+	slices.Reverse(found.worktrees)
 	printWorktrees(out, found.worktrees)
 	return nil
 }
 
 // WorktreeBranches returns registered branch names for the repository containing dir.
+// Branches are in reverse registration order, newest first.
 func WorktreeBranches(dir string) ([]string, error) {
 	found, err := sandboxWorktrees(dir)
 	if err != nil {
@@ -32,6 +35,7 @@ func WorktreeBranches(dir string) ([]string, error) {
 	for _, worktree := range found.worktrees {
 		branches = append(branches, worktree.Branch)
 	}
+	slices.Reverse(branches)
 	return branches, nil
 }
 

@@ -70,7 +70,9 @@ func setupWorktreeListCLI(t *testing.T) (repo, stateFile, live, stale string) {
 func TestWorktreeListCLI(t *testing.T) {
 	for _, mode := range []string{"explicit json", "cwd json", "relative nested json", "text", "explicit false"} {
 		t.Run(mode, func(t *testing.T) {
-			repo, _, live, stale := setupWorktreeListCLI(t)
+			repo, stateFile, live, stale := setupWorktreeListCLI(t)
+			before, err := os.ReadFile(stateFile)
+			require.NoError(t, err)
 			args := []string{"worktree-list", "--repo", repo}
 			switch mode {
 			case "explicit json":
@@ -97,13 +99,18 @@ func TestWorktreeListCLI(t *testing.T) {
 			require.NoError(t, root.Execute())
 			require.Zero(t, state.status)
 			require.Empty(t, stderr.String())
+			after, err := os.ReadFile(stateFile)
+			require.NoError(t, err)
+			require.Equal(t, before, after)
 			if strings.Contains(mode, "json") {
-				require.Equal(t, "[{\"branch\":\"z-live\"},{\"branch\":\"stale\"},{\"branch\":\"file\"},{\"branch\":\"a-live\"}]\n", out.String())
+				require.Equal(t, "[{\"branch\":\"a-live\"},{\"branch\":\"file\"},{\"branch\":\"stale\"},{\"branch\":\"z-live\"}]\n", out.String())
 			} else {
-				require.Contains(t, out.String(), "z-live  "+live+"\n")
-				require.Contains(t, out.String(), "stale   "+stale+"\n")
-				require.Contains(t, out.String(), "a-live  "+live+"\n")
-				require.NotContains(t, out.String(), "other")
+				lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+				require.Len(t, lines, 4)
+				require.Equal(t, "a-live  "+live, lines[0])
+				require.True(t, strings.HasPrefix(lines[1], "file    "))
+				require.Equal(t, "stale   "+stale, lines[2])
+				require.Equal(t, "z-live  "+live, lines[3])
 			}
 		})
 	}
@@ -176,4 +183,5 @@ func TestWorktreeListUsageAndHelp(t *testing.T) {
 	require.NoError(t, root.Execute())
 	require.Contains(t, out.String(), "--repo")
 	require.Contains(t, out.String(), "--json")
+	require.Contains(t, out.String(), "newest registered first")
 }

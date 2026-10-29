@@ -59,6 +59,7 @@ func newWorktreeListCmd() *cobra.Command {
 		Short: "List the worktrees the sandbox added to a repository",
 		Long: "List sandbox worktrees for the repository containing the current directory\n" +
 			"or --repo. Text output shows branch and path, including stale records.\n" +
+			"Both formats use reverse registration order, newest registered first.\n" +
 			"With --json, return registered records as objects containing only branch.\n" +
 			"No matches returns []. Worktree directories are not checked when listing.",
 		Args: usageArgs(cobra.NoArgs),

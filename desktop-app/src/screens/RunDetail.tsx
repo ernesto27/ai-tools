@@ -5,7 +5,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useRunLogs } from "../hooks/useRunLogs";
 import { isDesktopRunActive, type DesktopRuns } from "../hooks/useDesktopRuns";
 import { STAGES, stageProgress } from "../runProgress";
-import type { Navigate } from "../router";
+import { RUN_MODE, type Navigate } from "../router";
 import { statusClass, statusLabel } from "../runStatus";
 import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
@@ -88,7 +88,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             <OutlineButton disabled={loading} onClick={refresh}>
               {loading ? "Loading…" : "Refresh"}
             </OutlineButton>
-            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({ screen: "newRun", repo, branch, mode: "continue" })}>
+            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({ screen: "newRun", repo, branch, mode: RUN_MODE.CONTINUE })}>
               Continue
             </PrimaryButton>
           </div>

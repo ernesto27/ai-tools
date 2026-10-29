@@ -3,9 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { applyTaskInputs, parseFactoryConfig, type FactoryConfig } from "../config";
 import { resumableRuns, STATUS_COLOR } from "../data";
 import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
-import { StatusMessage } from "../components/StatusMessage";
 import type { DesktopRuns } from "../hooks/useDesktopRuns";
-import type { Navigate, NewRunMode } from "../router";
+import { RUN_MODE, type Navigate, type NewRunMode } from "../router";
 import {
   Crumb,
   Field,
@@ -17,15 +16,15 @@ import {
 } from "../components/ui";
 
 const MODES = [
-  ["run", "Run"],
-  ["continue", "Continue"],
-  ["resume", "Resume"],
+  [RUN_MODE.RUN, "Run"],
+  [RUN_MODE.CONTINUE, "Continue"],
+  [RUN_MODE.RESUME, "Resume"],
 ] as const;
 
 const MODE_DESC: Record<NewRunMode, string> = {
-  run: "Full workflow: implement, review, classify risk, explain.",
-  continue: "Rerun implementation and later stages on the existing resume.branch worktree.",
-  resume: "Pick up an interrupted run from its log folder.",
+  [RUN_MODE.RUN]: "Full workflow: implement, review, classify risk, explain.",
+  [RUN_MODE.CONTINUE]: "Rerun implementation and later stages on the existing resume.branch worktree.",
+  [RUN_MODE.RESUME]: "Pick up an interrupted run from its log folder.",
 };
 
 interface Props {
@@ -47,9 +46,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const [loadedConfig, setLoadedConfig] = useState<FactoryConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [savingTask, setSavingTask] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -58,7 +55,6 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     setConfigError(null);
     setLoadedConfig(null);
     setSaveError(null);
-    setSaveMessage(null);
 
     invoke<unknown>("load_factory_config", { path: repoPath })
       .then((value) => {
@@ -86,47 +82,46 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     };
   }, [repoPath]);
 
-  const taskConfig = applyTaskInputs(loadedConfig, {
+  const inputConfig = applyTaskInputs(loadedConfig, {
     ...taskValues,
-    ...(mode === "run" ? { branch: runBranch } : {}),
+    ...(mode === RUN_MODE.RUN ? { branch: runBranch } : {}),
   });
 
-  async function saveTaskInputs() {
-    if (savingTask || loadingConfig || configError || desktopRuns.busy(repoPath)) return;
-    setSaveError(null);
-    setSaveMessage(null);
-    if (mode === "run") {
-      try {
-        const targetBranch = runBranch.trim() || branch;
-        const id = desktopRuns.start({
-          repo, repoPath, branch: targetBranch, config: taskConfig,
-          createConfig: loadedConfig === null,
-          jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
-        });
-        navigate({ screen: "run", repo, branch: targetBranch, runId: id });
-      } catch (error) {
-        setSaveError(String(error));
+  const taskConfig: FactoryConfig = mode === RUN_MODE.CONTINUE
+    ? {
+        ...inputConfig,
+        agentSandbox: {
+          ...inputConfig.agentSandbox,
+          resume: {
+            ...inputConfig.agentSandbox?.resume,
+            branch,
+          },
+        },
       }
-      return;
-    }
-    setSavingTask(true);
+    : inputConfig;
+
+  function startRun() {
+    if (mode === RUN_MODE.RESUME || loadingConfig || configError || desktopRuns.busy(repoPath)) return;
+    setSaveError(null);
+
     try {
-      await invoke(loadedConfig ? "update_factory_config" : "create_factory_config", {
-        path: repoPath, config: taskConfig,
+      const targetBranch = mode === RUN_MODE.RUN ? runBranch.trim() || branch : branch;
+      const id = desktopRuns.start({
+        mode,
+        repo, repoPath, branch: targetBranch, config: taskConfig,
+        createConfig: loadedConfig === null,
+        jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
       });
-      setLoadedConfig(taskConfig);
-      setSaveMessage("Task inputs saved to software-factory.json.");
+      navigate({ screen: "run", repo, branch: targetBranch, runId: id });
     } catch (error) {
       setSaveError(String(error));
-    } finally {
-      setSavingTask(false);
     }
   }
 
   const setMode = (m: NewRunMode) => navigate({ screen: "newRun", repo, branch, mode: m });
 
   const activeRun = desktopRuns.busy(repoPath);
-  const cta = mode === "run" ? "Start run" : mode === "continue" ? "Continue" : "Resume";
+  const cta = mode === RUN_MODE.RUN ? "Start run" : mode === RUN_MODE.CONTINUE ? "Continue" : "Resume";
 
   return (
     <div className="@container flex h-full w-full max-w-[1440px] flex-col gap-8">
@@ -139,7 +134,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 items-start gap-8 @min-[1040px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-8">
-          <fieldset disabled={savingTask} className="m-0 min-w-0 border-0 p-0">
+          <fieldset className="m-0 min-w-0 border-0 p-0">
             <Tabs label="Mode" items={MODES} value={mode} onChange={setMode} />
           </fieldset>
           <p className="-mt-3 text-base text-muted">{MODE_DESC[mode]}</p>
@@ -156,15 +151,14 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <p role="alert" className="text-sm text-bad">{configError}</p>
           )}
 
-          {mode !== "resume" && (
+          {mode !== RUN_MODE.RESUME && (
             <div className="flex flex-col gap-3">
-              <fieldset disabled={loadingConfig || savingTask || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
-                {mode === "run" && (
+              <fieldset disabled={loadingConfig || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+                {mode === RUN_MODE.RUN && (
                   <Field label="Branch name" hint="Sets the shared branch for the workflow.">
                     <Input mono large className="w-full" placeholder="feature/my-task" value={runBranch}
                       onChange={(event) => {
                         setRunBranch(event.target.value);
-                        setSaveMessage(null);
                         setSaveError(null);
                       }} />
                   </Field>
@@ -175,17 +169,15 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
                   values={taskValues}
                   onChange={(source, value) => {
                     setTaskValues((current) => ({ ...current, [source]: value }));
-                    setSaveMessage(null);
                     setSaveError(null);
                   }}
                 />
               </fieldset>
-              {saveMessage && <StatusMessage message={saveMessage} />}
               {saveError && <p role="alert" className="text-sm whitespace-pre-wrap break-words text-bad">{saveError}</p>}
             </div>
           )}
 
-          {mode === "resume" && (
+          {mode === RUN_MODE.RESUME && (
             <section aria-labelledby="rs-h" className="flex flex-col">
               <SectionHeading id="rs-h">Interrupted runs</SectionHeading>
               {resumableRuns.map((r, i) => (
@@ -218,10 +210,10 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <PrimaryButton
               size="lg"
               className="self-start"
-              disabled={!!activeRun || (mode !== "resume" && (loadingConfig || savingTask || !!configError))}
-              onClick={mode !== "resume" ? saveTaskInputs : undefined}
+              disabled={!!activeRun || (mode !== RUN_MODE.RESUME && (loadingConfig || !!configError))}
+              onClick={mode !== RUN_MODE.RESUME ? startRun : undefined}
             >
-              {savingTask ? "Saving…" : cta}
+              {cta}
             </PrimaryButton>
           </div>
         </div>
@@ -230,7 +222,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
           <section aria-labelledby="config-preview-h" className="flex h-[70dvh] min-h-[320px] min-w-0 flex-col gap-3 @min-[1040px]:h-full @min-[1040px]:min-h-0">
             <SectionHeading id="config-preview-h" plain>software-factory.json preview</SectionHeading>
             <pre className="min-h-0 flex-1 overflow-auto rounded-md bg-panel p-4 font-mono text-md whitespace-pre-wrap break-words">
-              <code>{JSON.stringify(mode === "resume" ? loadedConfig ?? {} : taskConfig, null, 2)}</code>
+              <code>{JSON.stringify(mode === RUN_MODE.RESUME ? loadedConfig ?? {} : taskConfig, null, 2)}</code>
             </pre>
           </section>
         )}

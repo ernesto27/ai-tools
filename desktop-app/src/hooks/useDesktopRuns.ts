@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { FactoryConfig } from "../config";
 import type { RunEntry } from "./useBranchRuns";
+import type { FactoryRunMode } from "../router";
 
 export interface DesktopRun {
   id: string;
@@ -15,6 +16,7 @@ export interface DesktopRun {
 }
 
 export interface StartDesktopRun {
+  mode: FactoryRunMode;
   repo: string;
   repoPath: string;
   branch: string;
@@ -66,7 +68,7 @@ export function useDesktopRuns() {
               path: input.repoPath, branch: input.branch,
             });
             const candidates = entries.filter((entry) =>
-              entry.name.startsWith("run-") && !previousDirectories.has(entry.directory));
+              entry.name.startsWith(`${input.mode}-`) && !previousDirectories.has(entry.directory));
             if (candidates.length > 1) {
               throw new Error("Multiple new run directories found. Open the run from the branch list.");
             }
@@ -101,7 +103,7 @@ export function useDesktopRuns() {
         knownDirectories = new Set(previous.map((entry) => entry.directory));
         update(id, { state: "running" });
         const completion = invoke<void>("start_factory_run", {
-          path: input.repoPath, jiraUrl: input.jiraUrl,
+          path: input.repoPath, jiraUrl: input.jiraUrl, mode: input.mode,
         });
         void pollDirectory();
         await completion;

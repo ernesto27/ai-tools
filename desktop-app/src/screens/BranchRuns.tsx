@@ -1,4 +1,4 @@
-import type { Navigate } from "../router";
+import { RUN_MODE, type Navigate } from "../router";
 import { statusClass } from "../runStatus";
 import { useBranchRuns, type RunEntry } from "../hooks/useBranchRuns";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
@@ -64,11 +64,11 @@ export function BranchRuns({ repo, repoPath, branch, navigate }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <OutlineButton onClick={refresh} disabled={loading}>{loading ? "Loading…" : "Refresh"}</OutlineButton>
-          <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: "run" })}>New run</PrimaryButton>
+          <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RUN })}>New run</PrimaryButton>
         </div>
       </header>
       <div className="flex items-center gap-5 text-md">
-        <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: "continue" })}>Continue</LinkButton>
+        <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}>Continue</LinkButton>
       </div>
       <section aria-labelledby="runs-heading" className="min-w-0">
         <SectionHeading id="runs-heading">

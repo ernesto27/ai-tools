@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { STATUS_COLOR } from "../data";
-import type { Navigate, Route } from "../router";
+import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
 import { cx } from "./ui";
 
@@ -55,7 +55,7 @@ export function Sidebar({ repos, route, navigate }: Props) {
 
   // Which branch sub-item (Runs / Continue) is current.
   const sub =
-    route.screen === "newRun" && route.mode !== "run" ? "continue" : route.screen === "newRun" ? null : "runs";
+    route.screen === "newRun" && route.mode !== RUN_MODE.RUN ? "continue" : route.screen === "newRun" ? null : "runs";
 
   return (
     <nav aria-label="Main" className="flex w-nav flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-4 py-7 text-base">
@@ -138,7 +138,7 @@ export function Sidebar({ repos, route, navigate }: Props) {
                             </NavItem>
                             <NavItem
                               aria-current={isActive && sub === "continue" ? "page" : undefined}
-                              onClick={() => navigate({ screen: "newRun", ...at, mode: "continue" })}
+                              onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}
                             >
                               Continue
                             </NavItem>
@@ -156,10 +156,10 @@ export function Sidebar({ repos, route, navigate }: Props) {
                   </NavItem>
                   <NavItem
                     className="text-md"
-                    aria-current={route.screen === "newRun" && route.mode === "run" && route.repo === repo.name ? "page" : undefined}
+                    aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
                     onClick={() => {
                       void refreshBranches(saved.path);
-                      navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: "run" });
+                      navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
                     }}
                   >
                     + New run

@@ -26,6 +26,7 @@ export interface FactoryConfig {
     pr?: boolean;
     hn?: boolean;
     run?: { branch?: string; query?: string; filePrompt?: string; [key: string]: unknown };
+    resume?: { branch?: string; [key: string]: unknown };
     [key: string]: unknown;
   };
   stages?: Record<string, StageConfig>;

@@ -24,6 +24,13 @@ struct SavedRepo {
     path: String,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum FactoryRunMode {
+    Run,
+    Continue,
+}
+
 #[tauri::command]
 fn inspect_folder(path: String) -> FolderInfo {
     let root = std::path::Path::new(&path)
@@ -153,10 +160,17 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
 }
 
 #[tauri::command]
-async fn start_factory_run(path: String, jira_url: Option<String>) -> Result<(), String> {
+async fn start_factory_run(path: String, jira_url: Option<String>, mode: FactoryRunMode) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut command = std::process::Command::new("software-factory");
         command.current_dir(&path);
+
+        match mode {
+            FactoryRunMode::Run => {}
+            FactoryRunMode::Continue => {
+                command.arg("continue");
+            }
+        }
 
         if let Some(url) = jira_url.filter(|url| !url.trim().is_empty()) {
             command.arg("--jira").arg(url.trim());

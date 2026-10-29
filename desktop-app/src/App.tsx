@@ -7,10 +7,13 @@ import { RunDetail } from "./screens/RunDetail";
 import { Config } from "./screens/Config";
 import { NewRun } from "./screens/NewRun";
 import { AddRepo } from "./screens/AddRepo";
+import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
+import { Title } from "./components/ui";
 
-const HOME: Route = { screen: "branch", repo: "soft-factory", branch: "feature-logs" };
+const HOME: Route = { screen: "home" };
 
 function App() {
+  const desktopRuns = useDesktopRuns();
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
@@ -38,9 +41,10 @@ function App() {
         className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
       >
          <Screen
+          desktopRuns={desktopRuns}
           route={route}
           repoPath={
-          route.screen !== "addRepo"
+          "repo" in route
             ? savedRepos.find((repo) => repo.name === route.repo)?.path
             : undefined
           }
@@ -57,17 +61,27 @@ function App() {
 }
 
 function Screen({
+  desktopRuns,
   route,
   navigate,
   repoAdded,
   repoPath,
 }: {
+  desktopRuns: DesktopRuns;
   route: Route;
   navigate: (r: Route) => void;
   back: () => void;
   repoAdded: () => void;
   repoPath?: string;
 }) {
+  if (route.screen === "home") {
+    return (
+      <div className="flex flex-col gap-3">
+        <Title>Select a repository</Title>
+        <p className="text-muted">Choose a repository from the sidebar to view its branches and runs.</p>
+      </div>
+    );
+  }
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
   if (route.screen === "config") {
     if (!repoPath) return <p>Repository folder not found.</p>;
@@ -90,6 +104,7 @@ function Screen({
     case "run":
       return repoPath ? (
         <RunDetail
+          desktopRuns={desktopRuns}
           key={`${repoPath}:${route.branch}:${route.runId}`}
           repo={route.repo}
           repoPath={repoPath}
@@ -103,6 +118,7 @@ function Screen({
     case "newRun":
       return repoPath ? (
         <NewRun
+          desktopRuns={desktopRuns}
           key={`${repoPath}:${route.branch}`}
           repo={route.repo}
           repoPath={repoPath}

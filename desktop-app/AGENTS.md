@@ -31,6 +31,8 @@ Match existing TypeScript style: two-space indentation, double quotes, semicolon
 
 No frontend test framework, test script, or coverage threshold is configured. Run `npm run build` and manually verify affected desktop workflows. For native changes, check repository selection, duplicate handling, CLI failures, and branch loading as applicable. Add Rust unit tests in `#[cfg(test)]` modules for new testable backend logic.
 
+Do not create ad hoc frontend `.test.mjs` files such as `tests/runProgress.test.mjs` or `tests/useDesktopRuns.test.mjs`. Do not test frontend code by reading TypeScript source, transpiling it at runtime with `ts.transpileModule`, importing generated code through data URLs, or evaluating it in a VM with hand-written React or Tauri mocks. Use the build and manual verification described above unless the user explicitly requests a properly configured frontend test framework.
+
 ## Commit & Pull Request Guidelines
 
 History uses short, descriptive subjects such as `Load sidebar repos and branches from disk`; follow that style. Keep commits focused. PRs should explain behavior changes, link relevant issues, and list validation performed. Include screenshots for UI changes and identify any new CLI, configuration, or platform requirements.

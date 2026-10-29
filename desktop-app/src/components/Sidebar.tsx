@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { STATUS_COLOR } from "../data";
 import type { Navigate, Route } from "../router";
@@ -32,21 +32,26 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
 }
 
 export function Sidebar({ repos, route, navigate }: Props) {
-  const activeRepo = route.screen === "addRepo" ? null : route.repo;
+  const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
-  const [openRepo, setOpenRepo] = useState(activeRepo ?? repos[0]?.name ?? "");
-  const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(
-    activeRepo && activeBranch ? { repo: activeRepo, branch: activeBranch } : null,
-  );
+  const [openRepo, setOpenRepo] = useState("");
+  const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(null);
   const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
+
+  const refreshBranches = useCallback(async (path: string) => {
+    try {
+      const branches = await invoke<string[]>("list_branches", { path });
+      setBranchesByPath((previous) => ({ ...previous, [path]: branches }));
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
 
   useEffect(() => {
     for (const repo of repos) {
-      invoke<string[]>("list_branches", { path: repo.path })
-        .then((branches) => setBranchesByPath((prev) => ({ ...prev, [repo.path]: branches })))
-        .catch(console.error);
+      void refreshBranches(repo.path);
     }
-  }, [repos]);
+  }, [repos, refreshBranches]);
 
   // Which branch sub-item (Runs / Continue) is current.
   const sub =
@@ -152,9 +157,10 @@ export function Sidebar({ repos, route, navigate }: Props) {
                   <NavItem
                     className="text-md"
                     aria-current={route.screen === "newRun" && route.mode === "run" && route.repo === repo.name ? "page" : undefined}
-                    onClick={() =>
-                      navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: "run" })
-                    }
+                    onClick={() => {
+                      void refreshBranches(saved.path);
+                      navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: "run" });
+                    }}
                   >
                     + New run
                   </NavItem>

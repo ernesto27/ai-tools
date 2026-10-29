@@ -153,11 +153,7 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
 }
 
 #[tauri::command]
-async fn start_factory_run(
-    path: String,
-    jira_url: Option<String>,
-    on_output: tauri::ipc::Channel<factory_process::RunOutput>,
-) -> Result<(), String> {
+async fn start_factory_run(path: String, jira_url: Option<String>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut command = std::process::Command::new("software-factory");
         command.current_dir(&path);
@@ -166,10 +162,7 @@ async fn start_factory_run(
             command.arg("--jira").arg(url.trim());
         }
 
-        factory_process::run(command, |output| {
-            // A closed debug panel must not stop draining the child process pipes.
-            let _ = on_output.send(output);
-        })
+        factory_process::run(command)
     })
     .await
     .map_err(|error| format!("Could not wait for software-factory: {error}"))?

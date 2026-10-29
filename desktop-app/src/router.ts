@@ -4,6 +4,7 @@
 export type NewRunMode = "run" | "continue" | "resume";
 
 export type Route =
+  | { screen: "home" }
   | { screen: "branch"; repo: string; branch: string }
   | { screen: "run"; repo: string; branch: string; runId: string }
   | { screen: "config"; repo: string }

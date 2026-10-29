@@ -4,6 +4,7 @@ const STATUS_CLASSES: Record<string, string> = {
   RUNNING: "text-info",
   STARTED: "text-info",
   INTERRUPTED: "text-warn",
+  UNFINISHED: "text-warn",
   SKIPPED: "text-muted",
 };
 

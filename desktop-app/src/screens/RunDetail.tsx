@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useRunLogs } from "../hooks/useRunLogs";
+import { isDesktopRunActive, type DesktopRuns } from "../hooks/useDesktopRuns";
+import { STAGES, stageProgress } from "../runProgress";
 import type { Navigate } from "../router";
 import { statusClass, statusLabel } from "../runStatus";
 import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
@@ -15,15 +17,8 @@ const TABS = [
   ["walk", "Walkthrough"],
 ] as const;
 
-const STAGES = [
-  { id: "implementation", label: "Implement", filename: "01-implementation.log" },
-  { id: "codeReview", label: "Code review", filename: "02-codeReview.log" },
-  { id: "securityReview", label: "Security review", filename: "03-securityReview.log" },
-  { id: "riskClassification", label: "Risk classification", filename: "04-riskClassification.log" },
-  { id: "reviewChanges", label: "Review changes", filename: "05-reviewChanges.log" },
-] as const;
-
 interface Props {
+  desktopRuns: DesktopRuns;
   repo: string;
   repoPath: string;
   branch: string;
@@ -31,11 +26,24 @@ interface Props {
   navigate: Navigate;
 }
 
-export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
-  const { logs, run, loading, error, refresh } = useRunLogs(repoPath, branch, runId);
+export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns }: Props) {
+  const session = desktopRuns.find(repoPath, branch, runId);
+  const live = session !== undefined && isDesktopRunActive(session);
+  const { logs, run, loading, error, refresh } = useRunLogs(repoPath, branch, runId, session);
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
   const [tab, setTab] = useState<Tab>("log");
   const [folderError, setFolderError] = useState<string | null>(null);
+
+  const [following, setFollowing] = useState(true);
+  const outputPanel = useRef<HTMLDivElement>(null);
+  const progress = stageProgress(run?.stages ?? [], logs, live, session !== undefined);
+
+  useEffect(() => {
+    if (following && progress.followStage) {
+      setSelectedStage(progress.followStage);
+      setTab("log");
+    }
+  }, [following, progress.followStage]);
 
   const stages = STAGES.filter((stage) =>
     logs.some((log) => log.filename === stage.filename)
@@ -45,6 +53,12 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
   const filename = tab === "summary" ? "summary.log"
     : tab === "walk" ? "05-reviewChanges.md" : currentStage?.filename;
   const output = logs.find((log) => log.filename === filename);
+
+  useLayoutEffect(() => {
+    if (outputPanel.current) {
+      outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
+    }
+  }, [filename, output?.content]);
 
   async function openFolder() {
     if (!run) return;
@@ -66,7 +80,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
           </LinkButton>
         </Crumb>
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0 break-words"><Title>{runId}</Title></div>
+          <div className="min-w-0 break-words"><Title>{session?.runId ?? (session ? (live ? "Starting run" : session.state === "failed" ? "Failed run" : "Completed run") : runId)}</Title></div>
           <div className="flex flex-wrap items-center gap-5 text-md">
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
               Show folder
@@ -74,29 +88,40 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
             <OutlineButton disabled={loading} onClick={refresh}>
               {loading ? "Loading…" : "Refresh"}
             </OutlineButton>
-            <PrimaryButton onClick={() => navigate({ screen: "newRun", repo, branch, mode: "continue" })}>
+            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({ screen: "newRun", repo, branch, mode: "continue" })}>
               Continue
             </PrimaryButton>
           </div>
         </div>
       </header>
 
+      {session && (
+        <div className="shrink-0 space-y-2">
+          <p role="status" className="text-sm text-muted">
+            {session.state === "starting" ? "Starting run…"
+              : live ? (session.directory ? "Live · updates every second" : "Waiting for execution log directory…")
+              : session.state === "succeeded" ? "Run completed." : "Run failed."}
+          </p>
+          {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{session.error}</p>}
+        </div>
+      )}
+
       {loading && <p role="status" className="text-muted">Loading run logs…</p>}
       {error && <p role="alert" className="break-words text-bad">{error}</p>}
       {folderError && <p role="alert" className="break-words text-bad">Could not show folder: {folderError}</p>}
 
-      {!loading && !error && (
+      {!loading && (
         <>
           {run?.error && <p role="alert" className="break-words text-bad">Could not load stage statuses: {run.error}</p>}
 
           <dl className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
-            {STAGES.slice(0, 4).map((stage) => {
-              const status = run?.stages.find((entry) => entry.stage === stage.id)?.status;
+            {STAGES.map((stage) => {
+              const status = progress.statuses.get(stage.id);
               return (
                 <div key={stage.id} className="flex flex-col gap-0.5">
                   <dt className="text-sm text-muted">{stage.label}</dt>
                   <dd className={cx("text-xl font-medium", statusClass(status))}>
-                    {statusLabel(status)}
+                    {!status && live ? "Pending" : statusLabel(status)}
                   </dd>
                 </div>
               );
@@ -109,13 +134,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
             <section aria-label="Stages" className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
               {stages.length === 0 && <p className="text-sm text-muted">No stages recorded yet.</p>}
               {stages.map((stage) => {
-                const status = run?.stages.find((entry) => entry.stage === stage.id)?.status;
+                const status = progress.statuses.get(stage.id);
                 return (
                   <button
                     key={stage.id}
                     type="button"
                     aria-pressed={currentStage?.id === stage.id}
                     onClick={() => {
+                      setFollowing(false);
                       setSelectedStage(stage.id);
                       setTab("log");
                     }}
@@ -123,7 +149,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
                   >
                     <span className="font-medium">{stage.label}</span>
                     <span className={cx("text-sm", statusClass(status))}>
-                      {statusLabel(status)}
+                      {!status && live ? "Pending" : statusLabel(status)}
                     </span>
                   </button>
                 );
@@ -132,11 +158,24 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate }: Props) {
 
             <section aria-label="Output" className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
-                <Tabs label="Views" items={TABS} value={tab} onChange={setTab} size="sm" bordered={false} />
+                <Tabs label="Views" items={TABS} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
+                {live && (
+                  <TextButton aria-pressed={following} onClick={() => {
+                    setFollowing(true);
+                    setTab("log");
+                    if (progress.followStage) setSelectedStage(progress.followStage);
+                    if (outputPanel.current) {
+                      outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
+                    }
+                  }}>
+                    {following ? "Following live" : "Follow live"}
+                  </TextButton>
+                )}
                 <span className="font-mono text-xs break-all text-muted">{filename ?? "No stage selected"}</span>
               </div>
 
               <div
+                ref={outputPanel}
                 key={filename ?? "no-file"}
                 role="region"
                 aria-label={filename ? `Contents of ${filename}` : "File contents"}

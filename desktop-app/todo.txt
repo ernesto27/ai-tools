@@ -1,25 +1,27 @@
 [] - use lang ,  english , spanish
+[] - add dark - ligth mode
 
 
 sidebar
 [] - order by new in list of branchs
+[] - Update agent-sandbox worktree-list --json to return each branch's worktree path alongside its branch name, so the desktop can display the path in the runs list.
 
 Run screen.
-[] - add input for task,  file browser, folder browser, jira url 
-[] - update file software json 
+[x] - add input for task,  file browser, folder browser, jira url 
+[x] - update file software json 
 [] - when createa a new branch , task,  update sidebar too
-[] - show a visual representation of json factory
-[] - remove this Branch
-factory-task
-Stages
-All 5
-Checks
-All passed
-$ software-factory
+[x] - show a visual representation of json factory
+
 
 config screen
 [] - i want model input to be autocomplete with options
 [] - remove input , file for task
+
+run detail
+[]  - show some gif of progress when working task is running
+[] - Stop polling finished runs: useRunLogs schedules another full read of every supported log over IPC after each request, even for completed runs or failed reads. Preserve automatic updates for reopened and CLI-started runs; gating only on the in-memory live session would break reopening. Use reliable persisted completion or process-liveness information to stop polling, since unfinished stages can remain after a crash and some stages can be disabled.
+
+
 
 
 

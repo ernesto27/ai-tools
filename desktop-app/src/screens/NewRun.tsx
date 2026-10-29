@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { applyTaskInputs, parseFactoryConfig, type FactoryConfig } from "../config";
 import { resumableRuns, STATUS_COLOR } from "../data";
 import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
 import { StatusMessage } from "../components/StatusMessage";
-import { DebugOutput } from "../components/DebugOutput";
-import { useRunDebug } from "../hooks/useRunDebug";
+import type { DesktopRuns } from "../hooks/useDesktopRuns";
 import type { Navigate, NewRunMode } from "../router";
 import {
   Crumb,
@@ -30,6 +29,7 @@ const MODE_DESC: Record<NewRunMode, string> = {
 };
 
 interface Props {
+  desktopRuns: DesktopRuns;
   repo: string;
   branch: string;
   mode: NewRunMode;
@@ -37,12 +37,7 @@ interface Props {
   repoPath: string;
 }
 
-interface RunOutputEvent {
-  stream: "stdout" | "stderr";
-  data: number[];
-}
-
-export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
+export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: Props) {
   const [source, setSource] = useState<TaskSource>("task");
   const [runBranch, setRunBranch] = useState("");
   const [taskValues, setTaskValues] = useState<Record<TaskSource, string>>({
@@ -55,7 +50,6 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
   const [savingTask, setSavingTask] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const { output: runOutput, reset: resetDebug, append: appendDebug, flush: flushDebug } = useRunDebug();
 
   useEffect(() => {
     let active = true;
@@ -65,7 +59,6 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
     setLoadedConfig(null);
     setSaveError(null);
     setSaveMessage(null);
-    resetDebug();
 
     invoke<unknown>("load_factory_config", { path: repoPath })
       .then((value) => {
@@ -91,7 +84,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
     return () => {
       active = false;
     };
-  }, [repoPath, resetDebug]);
+  }, [repoPath]);
 
   const taskConfig = applyTaskInputs(loadedConfig, {
     ...taskValues,
@@ -99,50 +92,40 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
   });
 
   async function saveTaskInputs() {
-    if (savingTask || loadingConfig || configError) return;
-
-    setSavingTask(true);
+    if (savingTask || loadingConfig || configError || desktopRuns.busy(repoPath)) return;
     setSaveError(null);
     setSaveMessage(null);
-    resetDebug("Saving configuration…\n");
-
+    if (mode === "run") {
+      try {
+        const targetBranch = runBranch.trim() || branch;
+        const id = desktopRuns.start({
+          repo, repoPath, branch: targetBranch, config: taskConfig,
+          createConfig: loadedConfig === null,
+          jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
+        });
+        navigate({ screen: "run", repo, branch: targetBranch, runId: id });
+      } catch (error) {
+        setSaveError(String(error));
+      }
+      return;
+    }
+    setSavingTask(true);
     try {
       await invoke(loadedConfig ? "update_factory_config" : "create_factory_config", {
-        path: repoPath,
-        config: taskConfig,
+        path: repoPath, config: taskConfig,
       });
       setLoadedConfig(taskConfig);
-      if (mode === "run") {
-        appendDebug("Starting Software Factory…\n");
-        const channel = new Channel<RunOutputEvent>();
-        const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
-        channel.onmessage = ({ stream, data }) => {
-          appendDebug(data.length
-            ? decoders[stream].decode(new Uint8Array(data), { stream: true })
-            : decoders[stream].decode());
-        };
-        await invoke<void>("start_factory_run", {
-          path: repoPath,
-          jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
-          onOutput: channel,
-        });
-        appendDebug("\nRun completed.\n");
-        setSaveMessage("Run completed.");
-      } else {
-        appendDebug("Task inputs saved.\n");
-        setSaveMessage("Task inputs saved to software-factory.json.");
-      }
+      setSaveMessage("Task inputs saved to software-factory.json.");
     } catch (error) {
-      appendDebug(`\n${String(error)}\n`);
       setSaveError(String(error));
     } finally {
-      flushDebug();
       setSavingTask(false);
     }
   }
 
   const setMode = (m: NewRunMode) => navigate({ screen: "newRun", repo, branch, mode: m });
 
+  const activeRun = desktopRuns.busy(repoPath);
   const cta = mode === "run" ? "Start run" : mode === "continue" ? "Continue" : "Resume";
 
   return (
@@ -224,19 +207,23 @@ export function NewRun({ repo, repoPath, branch, mode, navigate }: Props) {
             </section>
           )}
 
+          {activeRun && (
+            <button type="button" className="self-start text-sm underline" onClick={() => navigate({
+              screen: "run", repo, branch: activeRun.branch, runId: activeRun.id,
+            })}>
+              This repository has an active run. Open active run
+            </button>
+          )}
           <div className="flex border-t border-line pt-4">
             <PrimaryButton
               size="lg"
               className="self-start"
-              disabled={mode !== "resume" && (loadingConfig || savingTask || !!configError)}
+              disabled={!!activeRun || (mode !== "resume" && (loadingConfig || savingTask || !!configError))}
               onClick={mode !== "resume" ? saveTaskInputs : undefined}
             >
-              {savingTask ? (mode === "run" ? "Running…" : "Saving…") : cta}
+              {savingTask ? "Saving…" : cta}
             </PrimaryButton>
           </div>
-          {runOutput !== null && (
-            <DebugOutput output={runOutput} active={savingTask} />
-          )}
         </div>
 
         {!loadingConfig && !configError && (

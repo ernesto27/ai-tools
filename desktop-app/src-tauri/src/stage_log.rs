@@ -255,8 +255,9 @@ impl StageLog {
     pub fn read_log(run_directory: &Path, filename: &str) -> Result<RunLog, String> {
         let path = run_directory.join(filename);
 
-        let content = fs::read_to_string(&path)
+        let bytes = fs::read(&path)
             .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        let content = String::from_utf8_lossy(&bytes).into_owned();
 
         Ok(RunLog {
             filename: filename.to_string(),
@@ -370,7 +371,7 @@ mod tests {
         let directory = logs.branch_directory(branch).unwrap().join(run_id);
 
         fs::create_dir_all(&directory).unwrap();
-        fs::write(directory.join("01-implementation.log"), [0xff]).unwrap();
+        fs::create_dir(directory.join("01-implementation.log")).unwrap();
 
         let error = logs.load_run_detail(branch, run_id).unwrap_err();
 
@@ -574,5 +575,29 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error, "Run not found: run-missing");
+    }
+    #[test]
+    fn reads_growing_file_and_final_status() {
+        let temp = tempfile::tempdir().unwrap();
+        let logs = StageLog::new(temp.path(), temp.path()).unwrap();
+        let directory = logs
+            .branch_directory("new/branch")
+            .unwrap()
+            .join("run-live");
+        fs::create_dir_all(&directory).unwrap();
+        let file = directory.join("01-implementation.log");
+        fs::write(&file, b"first \xf0\x9f").unwrap();
+        let first = logs.load_run_detail("new/branch", "run-live").unwrap();
+        assert!(first.entry.stages.is_empty());
+        assert!(first.logs[0].content.starts_with("first "));
+        fs::write(&file, "first 😀\nsecond\n").unwrap();
+        fs::write(
+            directory.join("stage_status.txt"),
+            "implementation,SUCCEEDED\n",
+        )
+        .unwrap();
+        let last = logs.load_run_detail("new/branch", "run-live").unwrap();
+        assert_eq!(last.logs[0].content, "first 😀\nsecond\n");
+        assert_eq!(last.entry.stages[0].status, "SUCCEEDED");
     }
 }

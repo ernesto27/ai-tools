@@ -25,13 +25,18 @@ export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Pro
     const outside = (event: PointerEvent) => {
       if (!menu.contains(event.target as Node)) onClose();
     };
+    // Only scrolls that can move the trigger dismiss; unrelated panels such as live logs do not.
+    const scroll = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Node) || target.contains(trigger)) onClose();
+    };
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("resize", dismiss);
-    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("scroll", scroll, true);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("resize", dismiss);
-      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("scroll", scroll, true);
       if (trigger.isConnected) trigger.focus();
     };
   }, [x, y, trigger, onClose]);

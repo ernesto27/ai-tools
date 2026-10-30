@@ -26,7 +26,7 @@ function App() {
     removingRepo.current = true;
     try {
       const confirmed = await ask(
-        `Remove "${repo.name}" from Soft Factory?\n\n${repo.path}\n\nRepository files will stay on disk. Any active task will continue running.`,
+        `Are you sure to remove "${repo.name}"?`,
         { title: "Delete project", kind: "warning", okLabel: "Delete", cancelLabel: "Cancel" },
       );
       if (!confirmed) return;

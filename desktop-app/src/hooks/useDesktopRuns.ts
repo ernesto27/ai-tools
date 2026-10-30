@@ -25,6 +25,14 @@ export interface StartDesktopRun {
   jiraUrl: string | null;
 }
 
+export interface ResumeDesktopRun {
+  repo: string;
+  repoPath: string;
+  branch: string;
+  config: FactoryConfig;
+  run: RunEntry;
+}
+
 export function isDesktopRunActive(run: DesktopRun): boolean {
   return run.state === "starting" || run.state === "running";
 }
@@ -120,11 +128,37 @@ export function useDesktopRuns() {
     return id;
   }
 
+  function resume(input: ResumeDesktopRun): string {
+    if (busy(input.repoPath)) throw new Error("This repository already has an active run.");
+    const id = `desktop:${crypto.randomUUID()}`;
+    update(id, {
+      id, repo: input.repo, repoPath: input.repoPath, branch: input.branch,
+      runId: input.run.name, directory: input.run.directory, state: "starting", error: null,
+    });
+
+    void (async () => {
+      try {
+        await invoke("update_factory_config", {
+          path: input.repoPath, config: input.config,
+        });
+        update(id, { state: "running" });
+        await invoke<void>("resume_factory_run", {
+          path: input.repoPath, branch: input.branch, runId: input.run.name,
+        });
+        update(id, { state: "succeeded" });
+      } catch (error) {
+        update(id, { state: "failed", error: String(error) });
+      }
+    })();
+    return id;
+  }
+
   return {
     runs,
     start,
+    resume,
     busy,
-    find: (repoPath: string, branch: string, runId: string) => Object.values(runs).find((run) =>
+    find: (repoPath: string, branch: string, runId: string) => Object.values(runs).reverse().find((run) =>
       run.repoPath === repoPath && (run.id === runId || (run.runId === runId
         && run.directory?.split(/[\\/]/).slice(-2)[0] === branch.replace(/[^a-zA-Z0-9._-]/g, "-")))),
   };

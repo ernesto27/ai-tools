@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { applyTaskInputs, parseFactoryConfig, type FactoryConfig } from "../config";
-import { resumableRuns, STATUS_COLOR } from "../data";
+import { applyTaskInputs, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
+import { useBranchRuns } from "../hooks/useBranchRuns";
+import { statusClass, statusLabel } from "../runStatus";
 import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
 import type { DesktopRuns } from "../hooks/useDesktopRuns";
 import { RUN_MODE, type Navigate, type NewRunMode } from "../router";
@@ -20,6 +21,8 @@ const MODES = [
   [RUN_MODE.CONTINUE, "Continue"],
   [RUN_MODE.RESUME, "Resume"],
 ] as const;
+
+const RESUMABLE_STATUSES = new Set(["FAILED", "INTERRUPTED"]);
 
 const MODE_DESC: Record<NewRunMode, string> = {
   [RUN_MODE.RUN]: "Full workflow: implement, review, classify risk, explain.",
@@ -42,7 +45,13 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const [taskValues, setTaskValues] = useState<Record<TaskSource, string>>({
     task: "", file: "", folder: "", jira: "",
   });
-  const [res, setRes] = useState(0);
+  const [selectedRunName, setSelectedRunName] = useState<string | null>(null);
+  const branchRuns = useBranchRuns(repoPath, branch);
+  const resumableRuns = branchRuns.entries.filter((entry) => {
+    const lastStatus = entry.stages[entry.stages.length - 1]?.status;
+    return !entry.error && lastStatus !== undefined && RESUMABLE_STATUSES.has(lastStatus);
+  }).reverse();
+  const selectedRun = resumableRuns.find((entry) => entry.name === selectedRunName);
   const [loadedConfig, setLoadedConfig] = useState<FactoryConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -87,18 +96,11 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     ...(mode === RUN_MODE.RUN ? { branch: runBranch } : {}),
   });
 
-  const taskConfig: FactoryConfig = mode === RUN_MODE.CONTINUE
-    ? {
-        ...inputConfig,
-        agentSandbox: {
-          ...inputConfig.agentSandbox,
-          resume: {
-            ...inputConfig.agentSandbox?.resume,
-            branch,
-          },
-        },
-      }
+  const taskConfig = mode === RUN_MODE.CONTINUE
+    ? withResumeBranch(inputConfig, branch)
     : inputConfig;
+
+  const resumeConfig = withResumeBranch(loadedConfig, branch);
 
   function startRun() {
     if (mode === RUN_MODE.RESUME || loadingConfig || configError || desktopRuns.busy(repoPath)) return;
@@ -118,9 +120,25 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     }
   }
 
+  function resumeRun() {
+    if (!selectedRun || !loadedConfig || loadingConfig || configError
+      || branchRuns.loading || branchRuns.error || desktopRuns.busy(repoPath)) return;
+    setSaveError(null);
+
+    try {
+      const id = desktopRuns.resume({
+        repo, repoPath, branch, config: resumeConfig, run: selectedRun,
+      });
+      navigate({ screen: "run", repo, branch, runId: id });
+    } catch (error) {
+      setSaveError(String(error));
+    }
+  }
+
   const setMode = (m: NewRunMode) => navigate({ screen: "newRun", repo, branch, mode: m });
 
   const activeRun = desktopRuns.busy(repoPath);
+  const resumeDisabled = !loadedConfig || !selectedRun || branchRuns.loading || !!branchRuns.error;
   const cta = mode === RUN_MODE.RUN ? "Start run" : mode === RUN_MODE.CONTINUE ? "Continue" : "Resume";
 
   return (
@@ -143,7 +161,9 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <p role="status" className="text-sm text-muted">
               {loadingConfig
                 ? "Loading configuration…"
-                : "No configuration yet. Saving will create software-factory.json."}
+                : mode === RUN_MODE.RESUME
+                  ? "No configuration found. Configure this repository before resuming a run."
+                  : "No configuration yet. Saving will create software-factory.json."}
             </p>
           )}
 
@@ -173,31 +193,47 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
                   }}
                 />
               </fieldset>
-              {saveError && <p role="alert" className="text-sm whitespace-pre-wrap break-words text-bad">{saveError}</p>}
             </div>
           )}
 
           {mode === RUN_MODE.RESUME && (
             <section aria-labelledby="rs-h" className="flex flex-col">
-              <SectionHeading id="rs-h">Interrupted runs</SectionHeading>
-              {resumableRuns.map((r, i) => (
-                <label key={r.folder} className="flex min-h-14 cursor-pointer items-center gap-3 border-b border-line">
-                  <input type="radio" name="resume" className="m-0 size-4 accent-ink" checked={res === i} onChange={() => setRes(i)} />
-                  <span className="flex grow flex-col">
-                    <span className="font-medium">
-                      {r.branch} · {r.when}
+              <SectionHeading id="rs-h">Failed or interrupted runs</SectionHeading>
+              {branchRuns.loading && (
+                <p role="status" className="py-4 text-muted">Loading runs…</p>
+              )}
+              {branchRuns.error && (
+                <p role="alert" className="py-4 text-bad">{branchRuns.error}</p>
+              )}
+              {!branchRuns.loading && !branchRuns.error && resumableRuns.length === 0 && (
+                <p className="py-4 text-muted">No failed or interrupted runs recorded for this branch.</p>
+              )}
+              {resumableRuns.map((entry) => {
+                const last = entry.stages[entry.stages.length - 1];
+
+                return (
+                  <label key={entry.name} className="flex min-h-14 cursor-pointer items-center gap-3 border-b border-line py-3">
+                    <input type="radio" name="resume" className="m-0 size-4 accent-ink"
+                      checked={selectedRun?.name === entry.name}
+                      onChange={() => setSelectedRunName(entry.name)} />
+                    <span className="flex min-w-0 grow flex-col">
+                      <span className="font-mono text-sm break-all">{entry.name}</span>
+                      {entry.error ? (
+                        <span className="text-sm text-bad">{entry.error}</span>
+                      ) : (
+                        <span className="text-sm text-muted">
+                          {last ? `Last recorded stage: ${last.stage}` : "No stage results recorded."}
+                        </span>
+                      )}
                     </span>
-                    <span className="font-mono text-xs text-muted">
-                      {r.last} → {r.next}
-                    </span>
-                  </span>
-                  <span className="text-md" style={{ color: STATUS_COLOR[r.status] }}>
-                    {r.status}
-                  </span>
-                </label>
-              ))}
+                    {last && <span className={statusClass(last.status)}>{statusLabel(last.status)}</span>}
+                  </label>
+                );
+              })}
             </section>
           )}
+
+          {saveError && <p role="alert" className="text-sm whitespace-pre-wrap break-words text-bad">{saveError}</p>}
 
           {activeRun && (
             <button type="button" className="self-start text-sm underline" onClick={() => navigate({
@@ -210,8 +246,8 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <PrimaryButton
               size="lg"
               className="self-start"
-              disabled={!!activeRun || (mode !== RUN_MODE.RESUME && (loadingConfig || !!configError))}
-              onClick={mode !== RUN_MODE.RESUME ? startRun : undefined}
+              disabled={!!activeRun || loadingConfig || !!configError || (mode === RUN_MODE.RESUME && resumeDisabled)}
+              onClick={mode === RUN_MODE.RESUME ? resumeRun : startRun}
             >
               {cta}
             </PrimaryButton>
@@ -222,7 +258,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
           <section aria-labelledby="config-preview-h" className="flex h-[70dvh] min-h-[320px] min-w-0 flex-col gap-3 @min-[1040px]:h-full @min-[1040px]:min-h-0">
             <SectionHeading id="config-preview-h" plain>software-factory.json preview</SectionHeading>
             <pre className="min-h-0 flex-1 overflow-auto rounded-md bg-panel p-4 font-mono text-md whitespace-pre-wrap break-words">
-              <code>{JSON.stringify(mode === RUN_MODE.RESUME ? loadedConfig ?? {} : taskConfig, null, 2)}</code>
+              <code>{JSON.stringify(mode === RUN_MODE.RESUME ? resumeConfig : taskConfig, null, 2)}</code>
             </pre>
           </section>
         )}

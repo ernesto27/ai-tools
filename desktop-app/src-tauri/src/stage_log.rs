@@ -265,7 +265,7 @@ impl StageLog {
         })
     }
 
-    fn run_directory(&self, branch: &str, run_id: &str) -> Result<PathBuf, String> {
+    pub fn run_directory(&self, branch: &str, run_id: &str) -> Result<PathBuf, String> {
         self.list_runs(branch)?
             .into_iter()
             .find(|directory| directory.file_name().and_then(|name| name.to_str()) == Some(run_id))

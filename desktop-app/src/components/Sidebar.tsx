@@ -53,9 +53,8 @@ export function Sidebar({ repos, route, navigate }: Props) {
     }
   }, [repos, refreshBranches]);
 
-  // Which branch sub-item (Runs / Continue) is current.
-  const sub =
-    route.screen === "newRun" && route.mode !== RUN_MODE.RUN ? "continue" : route.screen === "newRun" ? null : "runs";
+  // Which branch sub-item (Runs / Continue / Resume) is current.
+  const sub = route.screen === "newRun" ? route.mode : "runs";
 
   return (
     <nav aria-label="Main" className="flex w-nav flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-4 py-7 text-base">
@@ -137,10 +136,16 @@ export function Sidebar({ repos, route, navigate }: Props) {
                               Runs
                             </NavItem>
                             <NavItem
-                              aria-current={isActive && sub === "continue" ? "page" : undefined}
+                              aria-current={isActive && sub === RUN_MODE.CONTINUE ? "page" : undefined}
                               onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}
                             >
                               Continue
+                            </NavItem>
+                            <NavItem
+                              aria-current={isActive && sub === RUN_MODE.RESUME ? "page" : undefined}
+                              onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RESUME })}
+                            >
+                              Resume
                             </NavItem>
                           </div>
                         )}

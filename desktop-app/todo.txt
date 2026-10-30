@@ -3,7 +3,7 @@
 
 
 sidebar
-[] - order by new in list of branchs
+[x] - order by new in list of branchs
 [] - Update agent-sandbox worktree-list --json to return each branch's worktree path alongside its branch name, so the desktop can display the path in the runs list.
 
 Run screen.
@@ -11,7 +11,7 @@ Run screen.
 [x] - update file software json 
 [] - when createa a new branch , task,  update sidebar too
 [x] - show a visual representation of json factory
-
+[] - button to stop run of process
 
 config screen
 [] - i want model input to be autocomplete with options

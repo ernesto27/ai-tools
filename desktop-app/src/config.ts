@@ -54,6 +54,22 @@ export interface ConfigForm {
 
 type JsonObject = Record<string, unknown>;
 
+export function withResumeBranch(
+  config: FactoryConfig | null,
+  branch: string,
+): FactoryConfig {
+  return {
+    ...config,
+    agentSandbox: {
+      ...config?.agentSandbox,
+      resume: {
+        ...config?.agentSandbox?.resume,
+        branch,
+      },
+    },
+  };
+}
+
 export function applyTaskInputs(original: FactoryConfig | null, values: {
   task: string;
   file: string;

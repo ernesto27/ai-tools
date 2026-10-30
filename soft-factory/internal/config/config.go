@@ -19,32 +19,26 @@ type Config struct {
 }
 
 type StageConfig struct {
-	Agent    string  `json:"agent,omitempty"`
-	Model    string  `json:"model,omitempty"`
-	Effort   *string `json:"effort,omitempty"`
-	Disabled bool    `json:"disabled,omitempty"`
-}
-
-// CustomSkillStageConfig adds a project skill to a review-stage selection.
-type CustomSkillStageConfig struct {
-	StageConfig
-	CustomSkill string `json:"customSkill,omitempty"`
+	Agent       string  `json:"agent,omitempty"`
+	Model       string  `json:"model,omitempty"`
+	Effort      *string `json:"effort,omitempty"`
+	Disabled    bool    `json:"disabled,omitempty"`
+	CustomSkill string  `json:"customSkill,omitempty"`
 }
 
 // SecurityReviewConfig keeps Factory's reporting option out of sandbox settings
 // and out of the other stages.
 type SecurityReviewConfig struct {
 	StageConfig
-	CustomSkill  string `json:"customSkill,omitempty"`
-	SaveFindings bool   `json:"saveFindings,omitempty"`
+	SaveFindings bool `json:"saveFindings,omitempty"`
 }
 
 type StagesConfig struct {
-	Implementation     StageConfig            `json:"implementation"`
-	CodeReview         CustomSkillStageConfig `json:"codeReview"`
-	SecurityReview     SecurityReviewConfig   `json:"securityReview"`
-	RiskClassification CustomSkillStageConfig `json:"riskClassification"`
-	ReviewChanges      CustomSkillStageConfig `json:"reviewChanges"`
+	Implementation     StageConfig          `json:"implementation"`
+	CodeReview         StageConfig          `json:"codeReview"`
+	SecurityReview     SecurityReviewConfig `json:"securityReview"`
+	RiskClassification StageConfig          `json:"riskClassification"`
+	ReviewChanges      StageConfig          `json:"reviewChanges"`
 }
 
 // Stage is a public, case-sensitive pipeline stage identifier.
@@ -119,6 +113,7 @@ func Load(path string) (Config, error) {
 
 func (c Config) Validate() error {
 	skillNames := []struct{ stage, name string }{
+		{"implementation", c.Stages.Implementation.CustomSkill},
 		{"codeReview", c.Stages.CodeReview.CustomSkill},
 		{"securityReview", c.Stages.SecurityReview.CustomSkill},
 		{"riskClassification", c.Stages.RiskClassification.CustomSkill},

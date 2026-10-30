@@ -170,7 +170,7 @@ func TestStagePromptIntegration(t *testing.T) {
 					if custom {
 						project = &ProjectSkill{Name: "project", Content: "project skill {{literal}} <code> 100%"}
 					}
-					input.CustomSkills = ProjectSkills{CodeReview: project, SecurityReview: project, RiskClassification: project, ReviewChanges: project}
+					input.CustomSkills = ProjectSkills{Implementation: project, CodeReview: project, SecurityReview: project, RiskClassification: project, ReviewChanges: project}
 					hostEvidence := ""
 					if stage == "review-changes" {
 						snapshot, err := changeEvidence(context.Background(), "main")
@@ -204,6 +204,8 @@ func TestStagePromptIntegration(t *testing.T) {
 					want := task
 					got := capture.Prompt
 					switch stage {
+					case "implementation":
+						want += additional
 					case "code-review", "security-review":
 						want = frozen("review.txt", map[string]string{"Skill": bundledSkills[stage], "AdditionalSkill": additional, "Task": task})
 						path := regexp.MustCompile(`/workspace/\.soft-factory-stage-changes-[A-Za-z0-9]+-review\.txt`).FindString(capture.Prompt)
@@ -288,6 +290,32 @@ func TestImplementationPromptModes(t *testing.T) {
 				wantArgs = []string{"resume", "-f", got.Args[2], "--branch", "main"}
 			}
 			require.Equal(t, wantArgs, got.Args)
+		})
+	}
+}
+
+func TestImplementationCustomSkillPromptModes(t *testing.T) {
+	for _, continuing := range []bool{false, true} {
+		t.Run(fmt.Sprintf("continue=%t", continuing), func(t *testing.T) {
+			path := preparePromptSandbox(t)
+			// Resume must still use the local run task as its source.
+			cfg := decodeConfig(t, `{"run":{"filePrompt":"task.txt"},"resume":{"filePrompt":"missing-resume-task.txt"}}`)
+			require.NoError(t, Run(TaskContext{
+				Branch: "main", Continue: continuing, Config: cfg,
+				CustomSkills: ProjectSkills{Implementation: &ProjectSkill{
+					Name: "implementation-guide", Content: "Follow project implementation guidance.",
+				}},
+			}))
+			got := readPromptCapture(t, path)
+			require.Equal(t, "file task {{literal}} 100%\n## Additional project skill: implementation-guide\n\nFollow project implementation guidance.\n", got.Prompt)
+			mode := "run"
+			if continuing {
+				mode = "resume"
+			}
+			require.Len(t, got.Args, 5)
+			require.Equal(t, []string{mode, "-f", got.Args[2], "--branch", "main"}, got.Args)
+			_, err := os.Stat(got.Args[2])
+			require.True(t, os.IsNotExist(err), "temporary prompt should be removed")
 		})
 	}
 }

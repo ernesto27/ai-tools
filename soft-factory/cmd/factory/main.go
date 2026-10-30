@@ -67,6 +67,7 @@ func runWorkflow(opts workflowOptions) error {
 		name   string
 		target **sandbox.ProjectSkill
 	}{
+		{stage: config.StageImplementation, name: cfg.Stages.Implementation.CustomSkill, target: &loadedSkills.Implementation},
 		{stage: config.StageCodeReview, name: cfg.Stages.CodeReview.CustomSkill, target: &loadedSkills.CodeReview},
 		{stage: config.StageSecurityReview, name: cfg.Stages.SecurityReview.CustomSkill, target: &loadedSkills.SecurityReview},
 		{stage: config.StageRiskClassification, name: cfg.Stages.RiskClassification.CustomSkill, target: &loadedSkills.RiskClassification},

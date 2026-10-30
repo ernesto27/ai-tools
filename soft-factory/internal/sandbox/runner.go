@@ -44,6 +44,7 @@ type ProjectSkill struct {
 }
 
 type ProjectSkills struct {
+	Implementation     *ProjectSkill
 	CodeReview         *ProjectSkill
 	SecurityReview     *ProjectSkill
 	RiskClassification *ProjectSkill
@@ -73,7 +74,7 @@ func Run(input TaskContext) error {
 
 	var prompt string
 	var changesFilename string
-	if input.TaskOverride != "" || input.Documents != "" || input.Log != nil || input.Continue {
+	if input.TaskOverride != "" || input.Documents != "" || input.Log != nil || input.Continue || input.CustomSkills.Implementation != nil {
 		var err error
 		if input.TaskOverride != "" || input.Documents != "" {
 			prompt, err = buildTaskPrompt(input)
@@ -85,6 +86,12 @@ func Run(input TaskContext) error {
 		if err != nil {
 			return err
 		}
+
+		additionalSkill, err := customSkillPrompt(input.CustomSkills.Implementation, false)
+		if err != nil {
+			return err
+		}
+		prompt += additionalSkill
 
 		prompt, changesFilename, err = input.Log.StageChangesPrompt(prompt)
 		if err != nil {
@@ -195,10 +202,10 @@ func ReviewChanges(input TaskContext) error {
 
 	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
 
-	args = appendStageArgs(args, input.Config.Stages.ReviewChanges.StageConfig)
+	args = appendStageArgs(args, input.Config.Stages.ReviewChanges)
 	// The walkthrough keeps subprocess output live-only, so record its
 	// configured selection before executing without a stream logger.
-	selection, agent, model, provider := selectionDetails(input.Config, args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges.StageConfig)
+	selection, agent, model, provider := selectionDetails(input.Config, args[0], config.StageReviewChanges, input.Config.Stages.ReviewChanges)
 	input.Log.Selection(selection.Agent, selection.Model)
 	input.Log.Details(agent, model, provider)
 
@@ -206,7 +213,7 @@ func ReviewChanges(input TaskContext) error {
 		Config:      input.Config,
 		BranchSet:   input.BranchSet,
 		Stage:       config.StageReviewChanges,
-		StageConfig: input.Config.Stages.ReviewChanges.StageConfig,
+		StageConfig: input.Config.Stages.ReviewChanges,
 		Args:        args,
 		Branch:      input.Branch,
 		Prompt:      prompt,
@@ -251,7 +258,7 @@ func review(input TaskContext, stage config.Stage, skillPath, additionalSkill st
 
 	switch stage {
 	case config.StageCodeReview:
-		settings = input.Config.Stages.CodeReview.StageConfig
+		settings = input.Config.Stages.CodeReview
 	case config.StageSecurityReview:
 		settings = input.Config.Stages.SecurityReview.StageConfig
 	}
@@ -675,13 +682,13 @@ func RiskClassification(input TaskContext, reportFiles []string, disabledReviews
 	defer os.Remove(path)
 
 	args := []string{"resume", "--push=false", "--pr=false", "-f", path}
-	args = appendStageArgs(args, input.Config.Stages.RiskClassification.StageConfig)
+	args = appendStageArgs(args, input.Config.Stages.RiskClassification)
 
 	options := ExecuteOptions{
 		Config:         input.Config,
 		BranchSet:      input.BranchSet,
 		Stage:          config.StageRiskClassification,
-		StageConfig:    input.Config.Stages.RiskClassification.StageConfig,
+		StageConfig:    input.Config.Stages.RiskClassification,
 		Args:           args,
 		Branch:         input.Branch,
 		Prompt:         prompt,

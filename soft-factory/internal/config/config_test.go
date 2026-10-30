@@ -49,7 +49,7 @@ func TestLoadGoogleDrive(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidCustomSkillNames(t *testing.T) {
-	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+	for _, stage := range []string{"implementation", "codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		for _, name := range []string{" ", ".", "..", "nested/skill", `nested\skill`} {
 			t.Run(stage+"/"+name, func(t *testing.T) {
 				t.Chdir(t.TempDir())
@@ -171,7 +171,7 @@ func TestLegacyOnlyDoesNotSupplyFactoryConfig(t *testing.T) {
 }
 
 func TestNestedCustomSkillConfiguration(t *testing.T) {
-	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
+	for _, stage := range []string{"implementation", "codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		for _, tc := range []struct {
 			name, value, want string
 			invalid           bool
@@ -202,17 +202,19 @@ func TestNestedCustomSkillConfiguration(t *testing.T) {
 				var selection StageConfig
 				var skill string
 				switch stage {
+				case "implementation":
+					selection, skill = cfg.Stages.Implementation, cfg.Stages.Implementation.CustomSkill
 				case "codeReview":
-					selection, skill = cfg.Stages.CodeReview.StageConfig, cfg.Stages.CodeReview.CustomSkill
+					selection, skill = cfg.Stages.CodeReview, cfg.Stages.CodeReview.CustomSkill
 				case "securityReview":
 					selection, skill = cfg.Stages.SecurityReview.StageConfig, cfg.Stages.SecurityReview.CustomSkill
 				case "riskClassification":
-					selection, skill = cfg.Stages.RiskClassification.StageConfig, cfg.Stages.RiskClassification.CustomSkill
+					selection, skill = cfg.Stages.RiskClassification, cfg.Stages.RiskClassification.CustomSkill
 				case "reviewChanges":
-					selection, skill = cfg.Stages.ReviewChanges.StageConfig, cfg.Stages.ReviewChanges.CustomSkill
+					selection, skill = cfg.Stages.ReviewChanges, cfg.Stages.ReviewChanges.CustomSkill
 				}
 				require.Equal(t, tc.want, skill)
-				require.Equal(t, StageConfig{Agent: "codex", Model: "stage-model"}, selection)
+				require.Equal(t, StageConfig{Agent: "codex", Model: "stage-model", CustomSkill: tc.want}, selection)
 			})
 		}
 	}
@@ -229,19 +231,6 @@ func TestTopLevelCustomSkillsIgnored(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, nested, cfg.Stages.CodeReview.CustomSkill)
 			}
-		})
-	}
-}
-
-func TestImplementationCustomSkillIgnored(t *testing.T) {
-	for _, value := range []string{`"../invalid"`, `[]`, `{}`, `1`, `true`, `null`} {
-		t.Run(value, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			data := `{"agentSandbox":{},"stages":{"implementation":{"agent":"codex","model":"stage-model","customSkill":` + value + `}}}`
-			require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
-			cfg, err := Load("software-factory.json")
-			require.NoError(t, err)
-			require.Equal(t, StageConfig{Agent: "codex", Model: "stage-model"}, cfg.Stages.Implementation)
 		})
 	}
 }
@@ -275,10 +264,10 @@ func TestStageEffortConfiguration(t *testing.T) {
 				require.NoError(t, err)
 				settings := map[Stage]StageConfig{
 					StageImplementation:     cfg.Stages.Implementation,
-					StageCodeReview:         cfg.Stages.CodeReview.StageConfig,
+					StageCodeReview:         cfg.Stages.CodeReview,
 					StageSecurityReview:     cfg.Stages.SecurityReview.StageConfig,
-					StageRiskClassification: cfg.Stages.RiskClassification.StageConfig,
-					StageReviewChanges:      cfg.Stages.ReviewChanges.StageConfig,
+					StageRiskClassification: cfg.Stages.RiskClassification,
+					StageReviewChanges:      cfg.Stages.ReviewChanges,
 				}[stage]
 				require.Equal(t, "claude", settings.Agent)
 				require.Equal(t, "existing-model", settings.Model)

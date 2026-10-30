@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 import type { Route } from "./router";
 import { Sidebar, type SavedRepo } from "./components/Sidebar";
 import { BranchRuns } from "./screens/BranchRuns";
@@ -18,6 +19,27 @@ function App() {
   const lastBranchRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
   const [savedRepos, setSavedRepos] = useState<SavedRepo[]>([]);
+  const removingRepo = useRef(false);
+
+  const removeRepo = async (repo: SavedRepo) => {
+    if (removingRepo.current) return;
+    removingRepo.current = true;
+    try {
+      const confirmed = await ask(
+        `Are you sure to remove "${repo.name}"?`,
+        { title: "Delete project", kind: "warning", okLabel: "Delete", cancelLabel: "Cancel" },
+      );
+      if (!confirmed) return;
+      await invoke<void>("remove_repo", { path: repo.path });
+      setSavedRepos((previous) => previous.filter((saved) => saved.path !== repo.path));
+      if ("repo" in lastBranchRoute.current && lastBranchRoute.current.repo === repo.name) {
+        lastBranchRoute.current = HOME;
+      }
+      setRoute((current) => "repo" in current && current.repo === repo.name ? HOME : current);
+    } finally {
+      removingRepo.current = false;
+    }
+  };
 
   const loadRepos = () => {
     invoke<SavedRepo[]>("list_repos").then(setSavedRepos).catch(console.error);
@@ -35,7 +57,7 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar repos={savedRepos} route={route} navigate={navigate} />
+      <Sidebar repos={savedRepos} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
       <main
         ref={mainRef}
         className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}

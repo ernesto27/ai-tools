@@ -116,6 +116,26 @@ fn list_repos(app: tauri::AppHandle) -> Result<Vec<SavedRepo>, String> {
     read_repos(&repos_file(&app)?)
 }
 
+fn remove_saved_repo(repos: &mut Vec<SavedRepo>, path: &str) -> bool {
+    let previous_len = repos.len();
+    repos.retain(|repo| repo.path != path);
+    repos.len() != previous_len
+}
+
+fn remove_repo_from_file(file: &std::path::Path, path: &str) -> Result<(), String> {
+    let mut repos = read_repos(file)?;
+    if !remove_saved_repo(&mut repos, path) {
+        return Ok(());
+    }
+    let text = serde_json::to_string_pretty(&repos).map_err(|e| e.to_string())?;
+    std::fs::write(file, text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_repo(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    remove_repo_from_file(&repos_file(&app)?, &path)
+}
+
 #[derive(serde::Deserialize)]
 struct Worktree {
     branch: String,
@@ -252,6 +272,7 @@ pub fn run() {
             sandbox_help,
             check_requirements,
             list_repos,
+            remove_repo,
             list_branches,
             list_branch_runs,
             load_run_detail,
@@ -263,4 +284,91 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod repo_removal_tests {
+    use super::*;
+
+    fn repo(name: &str, path: &str) -> SavedRepo {
+        SavedRepo {
+            name: name.into(),
+            path: path.into(),
+        }
+    }
+
+    #[test]
+    fn removes_only_the_exact_path_even_when_names_match() {
+        let mut repos = vec![repo("app", "/one/app"), repo("app", "/two/app")];
+        assert!(remove_saved_repo(&mut repos, "/one/app"));
+        assert_eq!(repos.len(), 1);
+        assert_eq!(repos[0].path, "/two/app");
+        assert!(!remove_saved_repo(&mut repos, "/one/app"));
+        assert!(remove_saved_repo(&mut repos, "/two/app"));
+        assert!(repos.is_empty());
+    }
+
+    #[test]
+    fn persists_removal_and_preserves_project_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let project = temp.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let marker = project.join("software-factory.json");
+        std::fs::write(&marker, "project config sentinel").unwrap();
+        let path = project.to_str().unwrap();
+        let file = temp.path().join("repos.json");
+        let initial = vec![repo("project", path), repo("other", "/other")];
+        std::fs::write(&file, serde_json::to_string(&initial).unwrap()).unwrap();
+        remove_repo_from_file(&file, path).unwrap();
+        let remaining = read_repos(&file).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].name, "other");
+        assert_eq!(remaining[0].path, "/other");
+        assert_eq!(
+            std::fs::read_to_string(&marker).unwrap(),
+            "project config sentinel"
+        );
+        remove_repo_from_file(&file, "/other").unwrap();
+        assert!(read_repos(&file).unwrap().is_empty());
+    }
+
+    #[test]
+    fn absent_target_does_not_rewrite_or_create_registry() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("repos.json");
+        remove_repo_from_file(&file, "/missing").unwrap();
+        assert!(!file.exists());
+        let original = "[ {\"name\":\"other\",\"path\":\"/other\"} ]";
+        std::fs::write(&file, original).unwrap();
+        remove_repo_from_file(&file, "/missing").unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+    }
+
+    #[test]
+    fn invalid_or_unreadable_registry_returns_error_without_replacement() {
+        let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("repos.json");
+        std::fs::write(&file, "invalid JSON").unwrap();
+        assert!(remove_repo_from_file(&file, "/project").is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "invalid JSON");
+        assert!(remove_repo_from_file(temp.path(), "/project").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_write_returns_error() {
+        use std::os::unix::fs::PermissionsExt;
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let file = temp.path().join("repos.json");
+        let original = r#"[{"name":"project","path":"/project"}]"#;
+        std::fs::write(&file, original).unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let result = remove_repo_from_file(&file, "/project");
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+    }
 }

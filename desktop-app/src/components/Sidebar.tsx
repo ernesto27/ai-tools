@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { STATUS_COLOR } from "../data";
 import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
 import { cx } from "./ui";
+import { RepoContextMenu } from "./RepoContextMenu";
 
 interface Props {
   repos: SavedRepo[];
   route: Route;
   navigate: Navigate;
+  onRemoveRepo: (repo: SavedRepo) => Promise<void>;
 }
 
 export interface SavedRepo {
@@ -31,21 +33,54 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ repos, route, navigate }: Props) {
+export function Sidebar({ repos, route, navigate, onRemoveRepo }: Props) {
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState("");
   const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(null);
   const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
+  const savedPaths = useRef(new Set<string>());
+  savedPaths.current = new Set(repos.map((repo) => repo.path));
+  const [repoMenu, setRepoMenu] = useState<{
+    repo: SavedRepo;
+    x: number;
+    y: number;
+    trigger: HTMLButtonElement;
+  } | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const closeRepoMenu = useCallback(() => setRepoMenu(null), []);
+
+  const deleteFromMenu = () => {
+    if (!repoMenu) return;
+    const { repo } = repoMenu;
+    closeRepoMenu();
+    setRemoveError(null);
+    void onRemoveRepo(repo).catch((error: unknown) => {
+      setRemoveError(`Could not delete "${repo.name}": ${String(error)}`);
+    });
+  };
 
   const refreshBranches = useCallback(async (path: string) => {
     try {
       const branches = await invoke<string[]>("list_branches", { path });
-      setBranchesByPath((previous) => ({ ...previous, [path]: branches }));
+      setBranchesByPath((previous) => savedPaths.current.has(path)
+        ? { ...previous, [path]: branches }
+        : previous);
     } catch (error) {
       console.error(error);
     }
   }, []);
+
+  useEffect(() => {
+    const paths = new Set(repos.map((repo) => repo.path));
+    const names = new Set(repos.map((repo) => repo.name));
+    setBranchesByPath((previous) => Object.fromEntries(
+      Object.entries(previous).filter(([path]) => paths.has(path)),
+    ));
+    setOpenRepo((previous) => names.has(previous) ? previous : "");
+    setOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
+    setRepoMenu((previous) => previous && paths.has(previous.repo.path) ? previous : null);
+  }, [repos]);
 
   useEffect(() => {
     for (const repo of repos) {
@@ -73,6 +108,19 @@ export function Sidebar({ repos, route, navigate }: Props) {
             <div key={saved.path} className="flex flex-col">
               <button
                 type="button"
+                aria-haspopup="menu"
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  setRemoveError(null);
+                  setRepoMenu({ repo: saved, x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+                  event.preventDefault();
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  setRemoveError(null);
+                  setRepoMenu({ repo: saved, x: bounds.left, y: bounds.bottom, trigger: event.currentTarget });
+                }}
                 aria-expanded={isOpen}
                 onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
                 className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
@@ -175,6 +223,18 @@ export function Sidebar({ repos, route, navigate }: Props) {
           );
         })}
       </div>
+      {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{removeError}</p>}
+      {repoMenu && (
+        <RepoContextMenu
+          key={repoMenu.repo.path}
+          label={repoMenu.repo.name}
+          x={repoMenu.x}
+          y={repoMenu.y}
+          trigger={repoMenu.trigger}
+          onDelete={deleteFromMenu}
+          onClose={closeRepoMenu}
+        />
+      )}
     </nav>
   );
 }

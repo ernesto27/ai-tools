@@ -5,6 +5,7 @@ mod factory_run;
 mod stage_log;
 
 use factory_config::FactoryConfigFile;
+use factory_process::{RunOutcome, RunProcesses};
 use factory_run::FactoryRun;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -182,21 +183,45 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
 }
 
 #[tauri::command]
-async fn start_factory_run(
+async fn start_tracked_factory_run(
+    app: tauri::AppHandle,
+    run_id: String,
     path: String,
     jira_url: Option<String>,
     mode: FactoryRunMode,
-) -> Result<(), String> {
+) -> Result<RunOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let processes = app.state::<RunProcesses>();
         let workflow = FactoryRun::new(path);
 
         match mode {
-            FactoryRunMode::Run => workflow.run(jira_url.as_deref()),
-            FactoryRunMode::Continue => workflow.continue_run(jira_url.as_deref()),
+            FactoryRunMode::Run => workflow.run_tracked(&processes, run_id, jira_url.as_deref()),
+            FactoryRunMode::Continue => {
+                workflow.continue_tracked(&processes, run_id, jira_url.as_deref())
+            }
         }
     })
     .await
     .map_err(|error| format!("Could not wait for software-factory: {error}"))?
+}
+
+#[tauri::command]
+fn supports_factory_stop() -> bool {
+    cfg!(unix)
+}
+
+#[tauri::command]
+fn stop_factory_run(app: tauri::AppHandle, run_id: String) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        app.state::<RunProcesses>().request_stop(&run_id)
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = (app, run_id);
+        Err("Stopping runs is supported only on Unix platforms.".to_string())
+    }
 }
 
 #[tauri::command]
@@ -244,7 +269,8 @@ async fn resume_factory_run(
     path: String,
     branch: String,
     run_id: String,
-) -> Result<(), String> {
+    execution_id: String,
+) -> Result<RunOutcome, String> {
     let home = app
         .path()
         .home_dir()
@@ -253,8 +279,9 @@ async fn resume_factory_run(
     tauri::async_runtime::spawn_blocking(move || {
         let logs = stage_log::StageLog::new(&home, std::path::Path::new(&path))?;
         let directory = logs.run_directory(&branch, &run_id)?;
+        let processes = app.state::<RunProcesses>();
 
-        FactoryRun::new(path).resume(&directory)
+        FactoryRun::new(path).resume(&processes, execution_id, &directory)
     })
     .await
     .map_err(|error| format!("Could not wait for resume: {error}"))?
@@ -263,6 +290,7 @@ async fn resume_factory_run(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(RunProcesses::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -279,8 +307,10 @@ pub fn run() {
             create_factory_config,
             load_factory_config,
             update_factory_config,
-            start_factory_run,
-            resume_factory_run
+            start_tracked_factory_run,
+            supports_factory_stop,
+            resume_factory_run,
+            stop_factory_run
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

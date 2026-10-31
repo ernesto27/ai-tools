@@ -1,17 +1,20 @@
 [] - use lang ,  english , spanish
 [] - add dark - ligth mode
+[] - add githuaction to run tests
 
 
 sidebar
 [x] - order by new in list of branchs
+
 [] - Update agent-sandbox worktree-list --json to return each branch's worktree path alongside its branch name, so the desktop can display the path in the runs list.
 
 Run screen.
-[x] - add input for task,  file browser, folder browser, jira url 
-[x] - update file software json 
+[x] - add input for task,  file browser, folder browser, jira url
+[x] - update file software json
 [] - when createa a new branch , task,  update sidebar too
 [x] - show a visual representation of json factory
-[] - button to stop run of process
+[x] - button to stop run of process
+[] - Proposed improvement (deferred): replace the Rust process tracker's 50 ms try_wait polling loop with Tokio async process waiting. Keep the current polling implementation for now. Let one async task own each child and use tokio::select! to await process exit or a Stop message; store Stop message senders in the shared registry. Preserve graceful SIGINT cleanup, truthful stop acknowledgements and retries on signal failure, successful-exit precedence, registry cleanup, Linux/macOS support, and execution surviving desktop exit. Update Tauri commands and process tests when implementing; this is separate from frontend log polling.
 
 config screen
 [] - i want model input to be autocomplete with options
@@ -29,7 +32,7 @@ run detail
 
 add respostory
 
-- save list of projects repo in desktop config folder -  desktop 
-- by default do not show checks,  only show after add a folder  - desktop 
+- save list of projects repo in desktop config folder -  desktop
+- by default do not show checks,  only show after add a folder  - desktop
 - softwre factory shuld be create with default values,  only agent be select here
-- logs folder should be save in .config/factor not in repo 
+- logs folder should be save in .config/factor not in repo

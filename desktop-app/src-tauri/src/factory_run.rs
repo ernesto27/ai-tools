@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::factory_process;
+use crate::factory_process::{RunOutcome, RunProcesses};
 
 pub struct FactoryRun {
     repository: PathBuf,
@@ -14,26 +14,41 @@ impl FactoryRun {
         }
     }
 
-    pub fn run(&self, jira_url: Option<&str>) -> Result<(), String> {
+    pub fn run_tracked(
+        &self,
+        processes: &RunProcesses,
+        run_id: String,
+        jira_url: Option<&str>,
+    ) -> Result<RunOutcome, String> {
         let mut command = self.command();
         Self::add_jira(&mut command, jira_url);
 
-        factory_process::run(command)
+        processes.run(run_id, command)
     }
 
-    pub fn continue_run(&self, jira_url: Option<&str>) -> Result<(), String> {
+    pub fn continue_tracked(
+        &self,
+        processes: &RunProcesses,
+        run_id: String,
+        jira_url: Option<&str>,
+    ) -> Result<RunOutcome, String> {
         let mut command = self.command();
         command.arg("continue");
         Self::add_jira(&mut command, jira_url);
 
-        factory_process::run(command)
+        processes.run(run_id, command)
     }
 
-    pub fn resume(&self, directory: &Path) -> Result<(), String> {
+    pub fn resume(
+        &self,
+        processes: &RunProcesses,
+        execution_id: String,
+        directory: &Path,
+    ) -> Result<RunOutcome, String> {
         let mut command = self.command();
         command.arg("resume").arg(directory);
 
-        factory_process::run(command)
+        processes.run(execution_id, command)
     }
 
     fn command(&self) -> Command {

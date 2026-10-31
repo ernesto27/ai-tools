@@ -23,17 +23,12 @@ impl FactoryConfigFile {
                 return Ok(None);
             }
             Err(error) => {
-                return Err(format!(
-                    "Could not read {}: {error}",
-                    self.path.display()
-                ));
+                return Err(format!("Could not read {}: {error}", self.path.display()));
             }
         };
 
         let config: Value = serde_json::from_str(&text)
-            .map_err(|error| {
-                format!("Invalid JSON in {}: {error}", self.path.display())
-            })?;
+            .map_err(|error| format!("Invalid JSON in {}: {error}", self.path.display()))?;
 
         Self::validate(&config)?;
 
@@ -46,16 +41,12 @@ impl FactoryConfigFile {
         temporary
             .persist_noclobber(&self.path)
             .map(|_| ())
-            .map_err(|error| {
-                format!("Could not create {}: {error}", self.path.display())
-            })
+            .map_err(|error| format!("Could not create {}: {error}", self.path.display()))
     }
 
     pub fn update(&self, config: &Value) -> Result<(), String> {
         let metadata = fs::metadata(&self.path)
-            .map_err(|error| {
-                format!("Could not open {}: {error}", self.path.display())
-            })?;
+            .map_err(|error| format!("Could not open {}: {error}", self.path.display()))?;
 
         if !metadata.is_file() {
             return Err(format!("{} is not a file.", self.path.display()));
@@ -66,16 +57,12 @@ impl FactoryConfigFile {
         temporary
             .as_file()
             .set_permissions(metadata.permissions())
-            .map_err(|error| {
-                format!("Could not preserve file permissions: {error}")
-            })?;
+            .map_err(|error| format!("Could not preserve file permissions: {error}"))?;
 
         temporary
             .persist(&self.path)
             .map(|_| ())
-            .map_err(|error| {
-                format!("Could not update {}: {error}", self.path.display())
-            })
+            .map_err(|error| format!("Could not update {}: {error}", self.path.display()))
     }
 
     fn validate(config: &Value) -> Result<(), String> {
@@ -89,30 +76,25 @@ impl FactoryConfigFile {
     fn prepare_write(&self, config: &Value) -> Result<NamedTempFile, String> {
         Self::validate(config)?;
 
-        let mut bytes = serde_json::to_vec_pretty(config)
-            .map_err(|error| error.to_string())?;
+        let mut bytes = serde_json::to_vec_pretty(config).map_err(|error| error.to_string())?;
         bytes.push(b'\n');
 
-        let directory = self.path.parent()
+        let directory = self
+            .path
+            .parent()
             .ok_or("Configuration path has no parent directory.")?;
 
         let mut temporary = NamedTempFile::new_in(directory)
-            .map_err(|error| {
-                format!("Could not create temporary config: {error}")
-            })?;
+            .map_err(|error| format!("Could not create temporary config: {error}"))?;
 
         temporary
             .write_all(&bytes)
-            .map_err(|error| {
-                format!("Could not write temporary config: {error}")
-            })?;
+            .map_err(|error| format!("Could not write temporary config: {error}"))?;
 
         temporary
             .as_file()
             .sync_all()
-            .map_err(|error| {
-                format!("Could not sync temporary config: {error}")
-            })?;
+            .map_err(|error| format!("Could not sync temporary config: {error}"))?;
 
         Ok(temporary)
     }

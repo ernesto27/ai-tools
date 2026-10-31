@@ -3,7 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useRunLogs } from "../hooks/useRunLogs";
-import { isDesktopRunActive, type DesktopRuns } from "../hooks/useDesktopRuns";
+import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDesktopRuns";
 import { STAGES, stageProgress } from "../runProgress";
 import { RUN_MODE, type Navigate } from "../router";
 import { statusClass, statusLabel } from "../runStatus";
@@ -29,10 +29,26 @@ interface Props {
 export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns }: Props) {
   const session = desktopRuns.find(repoPath, branch, runId);
   const live = session !== undefined && isDesktopRunActive(session);
+  const showStop = desktopRuns.supportsStop
+    && session !== undefined
+    && live;
   const { logs, run, loading, error, refresh } = useRunLogs(repoPath, branch, runId, session);
+  const interrupted = session?.state === RUN_STATE.INTERRUPTED
+    || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
+  const title = session?.runId ?? (
+    session
+      ? session.state === RUN_STATE.STOPPING ? "Stopping run"
+        : interrupted ? "Stopped run"
+        : live ? "Starting run"
+        : session.state === RUN_STATE.FAILED ? "Failed run"
+        : "Completed run"
+      : runId
+  );
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
   const [tab, setTab] = useState<Tab>("log");
   const [folderError, setFolderError] = useState<string | null>(null);
+  const [stopDialogError, setStopDialogError] = useState<string | null>(null);
+  const stopConfirmationPending = useRef(false);
 
   const [following, setFollowing] = useState(true);
   const outputPanel = useRef<HTMLDivElement>(null);
@@ -60,6 +76,24 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     }
   }, [filename, output?.content]);
 
+  async function stopRun() {
+    if (!session || session.state !== RUN_STATE.RUNNING || stopConfirmationPending.current) return;
+
+    stopConfirmationPending.current = true;
+    setStopDialogError(null);
+    try {
+      // Tauri's dialog plugin makes window.confirm asynchronous.
+      const confirmed = await window.confirm("Stop this run? You can resume it later.");
+      if (confirmed) {
+        await desktopRuns.stop(session.id);
+      }
+    } catch (error) {
+      setStopDialogError(`Could not confirm stopping the run: ${String(error)}`);
+    } finally {
+      stopConfirmationPending.current = false;
+    }
+  }
+
   async function openFolder() {
     if (!run) return;
     setFolderError(null);
@@ -80,7 +114,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           </LinkButton>
         </Crumb>
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0 break-words"><Title>{session?.runId ?? (session ? (live ? "Starting run" : session.state === "failed" ? "Failed run" : "Completed run") : runId)}</Title></div>
+          <div className="min-w-0 break-words"><Title>{title}</Title></div>
           <div className="flex flex-wrap items-center gap-5 text-md">
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
               Show folder
@@ -88,8 +122,20 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             <OutlineButton disabled={loading} onClick={refresh}>
               {loading ? "Loading…" : "Refresh"}
             </OutlineButton>
-            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({ screen: "newRun", repo, branch, mode: RUN_MODE.CONTINUE })}>
-              Continue
+            {showStop && (
+              <OutlineButton
+                disabled={session.state !== RUN_STATE.RUNNING}
+                onClick={() => void stopRun()}
+                className="text-bad disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {session.state === RUN_STATE.STOPPING ? "Stopping…" : "Stop"}
+              </OutlineButton>
+            )}
+            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({
+              screen: "newRun", repo, branch,
+              mode: interrupted ? RUN_MODE.RESUME : RUN_MODE.CONTINUE,
+            })}>
+              {interrupted ? "Resume" : "Continue"}
             </PrimaryButton>
           </div>
         </div>
@@ -98,17 +144,24 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
       {session && (
         <div className="shrink-0 space-y-2">
           <p role="status" className="text-sm text-muted">
-            {session.state === "starting" ? "Starting run…"
+            {session.state === RUN_STATE.STARTING ? "Starting run…"
+              : session.state === RUN_STATE.STOPPING ? "Stopping run… Waiting for cleanup."
               : live ? (session.directory ? "Live · updates every second" : "Waiting for execution log directory…")
-              : session.state === "succeeded" ? "Run completed." : "Run failed."}
+              : session.state === RUN_STATE.SUCCEEDED ? "Run completed."
+              : session.state === RUN_STATE.INTERRUPTED ? "Run stopped. Use Resume to continue."
+              : "Run failed."}
           </p>
           {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{session.error}</p>}
+          {session.stopError && (
+            <p role="alert" className="whitespace-pre-wrap break-words text-bad">{session.stopError}</p>
+          )}
         </div>
       )}
 
       {loading && <p role="status" className="text-muted">Loading run logs…</p>}
       {error && <p role="alert" className="break-words text-bad">{error}</p>}
       {folderError && <p role="alert" className="break-words text-bad">Could not show folder: {folderError}</p>}
+      {stopDialogError && <p role="alert" className="break-words text-bad">{stopDialogError}</p>}
 
       {!loading && (
         <>

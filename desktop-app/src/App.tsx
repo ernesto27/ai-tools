@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import type { Route } from "./router";
@@ -14,11 +14,50 @@ import { Title } from "./components/ui";
 const HOME: Route = { screen: "home" };
 
 function App() {
-  const desktopRuns = useDesktopRuns();
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
   const [savedRepos, setSavedRepos] = useState<SavedRepo[]>([]);
+  const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
+  const savedPaths = useRef(new Set<string>());
+  const branchRequests = useRef(new Map<string, symbol>());
+  savedPaths.current = new Set(savedRepos.map((repo) => repo.path));
+
+  const refreshBranches = useCallback(async (path: string) => {
+    const request = Symbol();
+    branchRequests.current.set(path, request);
+    try {
+      const branches = await invoke<string[]>("list_branches", { path });
+      if (savedPaths.current.has(path) && branchRequests.current.get(path) === request) {
+        setBranchesByPath((previous) => ({ ...previous, [path]: branches }));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  function addBranch(path: string, branch: string) {
+    if (!savedPaths.current.has(path)) return;
+    branchRequests.current.delete(path);
+    setBranchesByPath((previous) => {
+      const branches = previous[path] ?? [];
+      return branches.includes(branch) ? previous : { ...previous, [path]: [branch, ...branches] };
+    });
+  }
+
+  useEffect(() => {
+    savedPaths.current = new Set(savedRepos.map((repo) => repo.path));
+    setBranchesByPath((previous) => Object.fromEntries(
+      Object.entries(previous).filter(([path]) => savedPaths.current.has(path)),
+    ));
+    for (const repo of savedRepos) void refreshBranches(repo.path);
+    return () => {
+      savedPaths.current.clear();
+      branchRequests.current.clear();
+    };
+  }, [savedRepos, refreshBranches]);
+
+  const desktopRuns = useDesktopRuns(addBranch);
   const removingRepo = useRef(false);
 
   const removeRepo = async (repo: SavedRepo) => {
@@ -57,7 +96,7 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar repos={savedRepos} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
+      <Sidebar repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
       <main
         ref={mainRef}
         className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}

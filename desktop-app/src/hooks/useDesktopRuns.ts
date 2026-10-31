@@ -52,7 +52,7 @@ export function isDesktopRunActive(run: DesktopRun): boolean {
     || run.state === RUN_STATE.STOPPING;
 }
 
-export function useDesktopRuns() {
+export function useDesktopRuns(onBranchCreated: (path: string, branch: string) => void) {
   const sessions = useRef<Record<string, DesktopRun>>({});
   const [runs, setRuns] = useState<Record<string, DesktopRun>>({});
   const [supportsStop, setSupportsStop] = useState(false);
@@ -100,6 +100,23 @@ export function useDesktopRuns() {
       let timer: ReturnType<typeof setTimeout> | undefined;
       let discovery = Promise.resolve();
       let knownDirectories: Set<string> | undefined;
+      let branchFound = false;
+      let branchDiscovery = Promise.resolve();
+      function discoverBranch() {
+        branchDiscovery = branchDiscovery.then(async () => {
+          if (!knownDirectories || branchFound) return;
+          try {
+            const branches = await invoke<string[]>("list_branches", { path: input.repoPath });
+            if (branches.includes(input.branch)) {
+              branchFound = true;
+              onBranchCreated(input.repoPath, input.branch);
+            }
+          } catch (error) {
+            console.error("Could not check run branch:", error);
+          }
+        });
+        return branchDiscovery;
+      }
       function discoverDirectory() {
         discovery = discovery.then(async () => {
           const previousDirectories = knownDirectories;
@@ -129,8 +146,8 @@ export function useDesktopRuns() {
         return discovery;
       }
       async function pollDirectory() {
-        await discoverDirectory();
-        if (!stopped && !sessions.current[id].directory) {
+        await Promise.all([discoverDirectory(), discoverBranch()]);
+        if (!stopped && (!sessions.current[id].directory || !branchFound)) {
           timer = setTimeout(() => void pollDirectory(), 1000);
         }
       }
@@ -141,6 +158,12 @@ export function useDesktopRuns() {
         const previous = await invoke<RunEntry[]>("list_branch_runs", {
           path: input.repoPath, branch: input.branch,
         });
+        try {
+          const branches = await invoke<string[]>("list_branches", { path: input.repoPath });
+          branchFound = branches.includes(input.branch);
+        } catch (error) {
+          console.error("Could not check existing run branch:", error);
+        }
         knownDirectories = new Set(previous.map((entry) => entry.directory));
         update(id, { state: RUN_STATE.RUNNING });
         const completion = invoke<RunOutcome>(
@@ -162,6 +185,7 @@ export function useDesktopRuns() {
         if (timer !== undefined) clearTimeout(timer);
         // A short run can finish before the first directory poll completes.
         await discoverDirectory();
+        await discoverBranch();
       }
     })();
     return id;

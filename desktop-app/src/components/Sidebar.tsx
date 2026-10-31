@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { STATUS_COLOR } from "../data";
 import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
@@ -8,6 +7,8 @@ import { RepoContextMenu } from "./RepoContextMenu";
 
 interface Props {
   repos: SavedRepo[];
+  branchesByPath: Record<string, string[]>;
+  onRefreshBranches: (path: string) => Promise<void>;
   route: Route;
   navigate: Navigate;
   onRemoveRepo: (repo: SavedRepo) => Promise<void>;
@@ -33,14 +34,11 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ repos, route, navigate, onRemoveRepo }: Props) {
+export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState("");
   const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(null);
-  const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
-  const savedPaths = useRef(new Set<string>());
-  savedPaths.current = new Set(repos.map((repo) => repo.path));
   const [repoMenu, setRepoMenu] = useState<{
     repo: SavedRepo;
     x: number;
@@ -60,33 +58,13 @@ export function Sidebar({ repos, route, navigate, onRemoveRepo }: Props) {
     });
   };
 
-  const refreshBranches = useCallback(async (path: string) => {
-    try {
-      const branches = await invoke<string[]>("list_branches", { path });
-      setBranchesByPath((previous) => savedPaths.current.has(path)
-        ? { ...previous, [path]: branches }
-        : previous);
-    } catch (error) {
-      console.error(error);
-    }
-  }, []);
-
   useEffect(() => {
     const paths = new Set(repos.map((repo) => repo.path));
     const names = new Set(repos.map((repo) => repo.name));
-    setBranchesByPath((previous) => Object.fromEntries(
-      Object.entries(previous).filter(([path]) => paths.has(path)),
-    ));
     setOpenRepo((previous) => names.has(previous) ? previous : "");
     setOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
     setRepoMenu((previous) => previous && paths.has(previous.repo.path) ? previous : null);
   }, [repos]);
-
-  useEffect(() => {
-    for (const repo of repos) {
-      void refreshBranches(repo.path);
-    }
-  }, [repos, refreshBranches]);
 
   // Which branch sub-item (Runs / Continue / Resume) is current.
   const sub = route.screen === "newRun" ? route.mode : "runs";
@@ -211,7 +189,7 @@ export function Sidebar({ repos, route, navigate, onRemoveRepo }: Props) {
                     className="text-md"
                     aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
                     onClick={() => {
-                      void refreshBranches(saved.path);
+                      void onRefreshBranches(saved.path);
                       navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
                     }}
                   >

@@ -23,19 +23,40 @@ func WorktreeList(dir string, out io.Writer) error {
 	return nil
 }
 
-// WorktreeBranches returns registered branch names for the repository containing dir.
-// Branches are in reverse registration order, newest first.
-func WorktreeBranches(dir string) ([]string, error) {
+// WorktreeEntry identifies a registered branch and its recorded worktree path.
+type WorktreeEntry struct {
+	Branch string
+	Path   string
+}
+
+// WorktreeEntries returns registered branches and paths, newest registered first.
+// Paths are returned as recorded so stale worktrees remain visible for cleanup.
+func WorktreeEntries(dir string) ([]WorktreeEntry, error) {
 	found, err := sandboxWorktrees(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var branches []string
+	entries := make([]WorktreeEntry, 0, len(found.worktrees))
 	for _, worktree := range found.worktrees {
-		branches = append(branches, worktree.Branch)
+		entries = append(entries, WorktreeEntry{Branch: worktree.Branch, Path: worktree.Path})
 	}
-	slices.Reverse(branches)
+	slices.Reverse(entries)
+	return entries, nil
+}
+
+// WorktreeBranches returns registered branch names for the repository containing dir.
+// Branches are in reverse registration order, newest first.
+func WorktreeBranches(dir string) ([]string, error) {
+	entries, err := WorktreeEntries(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []string
+	for _, entry := range entries {
+		branches = append(branches, entry.Branch)
+	}
 	return branches, nil
 }
 

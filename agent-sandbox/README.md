@@ -443,7 +443,7 @@ they do not affect manually created worktrees.
 # Show registered worktrees for the current repository.
 agent-sandbox worktree-list
 
-# Get branch objects for a repository selected by a GUI or script.
+# Get branch and path objects for a repository selected by a GUI or script.
 agent-sandbox worktree-list --repo /path/to/repository --json
 
 # Open a registered worktree in VS Code.
@@ -466,10 +466,12 @@ agent-sandbox worktree-delete-all --yes
 inside a Git repository and resolves its root. Without `--repo`, it uses the
 current directory. Only records belonging to that repository are selected.
 
-`--json` returns an array containing only branch names as objects, for example
-`[{"branch":"fix-login"},{"branch":"add-tests"}]`, in registry order. It includes
-all registered records for that repository without checking their worktree
-paths. No matches returns `[]`. Without `--json` (or with `--json=false`), text
+`--json` returns an array of objects containing `branch` and `path`, for example
+`[{"branch":"fix-login","path":"/home/user/.config/agent-sandbox/worktrees/repo-hash/fix-login"}]`,
+in reverse registration order, newest registered first. The path is the recorded
+worktree directory; sandbox-created worktrees have absolute paths. It includes
+all registered records for that repository without checking or resolving their
+worktree paths. No matches returns `[]`. Without `--json` (or with `--json=false`), text
 output retains the branch/path columns. Both formats include stale records;
 subsequent actions handle invalid worktree paths. Errors retain stderr diagnostics and
 nonzero exit status rather than returning JSON error objects.

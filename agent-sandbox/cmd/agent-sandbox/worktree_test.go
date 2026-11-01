@@ -11,32 +11,34 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/sandbox"
 )
 
-func TestWriteWorktreeBranchesJSON(t *testing.T) {
+func TestWriteWorktreeEntriesJSON(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		branches []string
-		want     string
+		name    string
+		entries []sandbox.WorktreeEntry
+		want    string
 	}{
 		{"nil", nil, "[]"},
-		{"empty", []string{}, "[]"},
-		{"branches", []string{"z", "a"}, `[{"branch":"z"},{"branch":"a"}]`},
-		{"escaping", []string{`quote"back\slash`}, `[{"branch":"quote\"back\\slash"}]`},
+		{"empty", []sandbox.WorktreeEntry{}, "[]"},
+		{"entries", []sandbox.WorktreeEntry{{Branch: "z", Path: "/worktrees/z"}, {Branch: "a", Path: "/worktrees/a"}}, `[{"branch":"z","path":"/worktrees/z"},{"branch":"a","path":"/worktrees/a"}]`},
+		{"escaping", []sandbox.WorktreeEntry{{Branch: `quote"back\slash`, Path: "/work trees/quote\"back\\slash\n"}}, `[{"branch":"quote\"back\\slash","path":"/work trees/quote\"back\\slash\n"}]`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			require.NoError(t, writeWorktreeBranchesJSON(&out, tt.branches))
+			require.NoError(t, writeWorktreeEntriesJSON(&out, tt.entries))
 			require.JSONEq(t, tt.want, out.String())
 			require.True(t, strings.HasSuffix(out.String(), "\n"))
 		})
 	}
-	require.ErrorIs(t, writeWorktreeBranchesJSON(doctorFailingWriter{}, []string{"feature"}), io.ErrClosedPipe)
+	require.ErrorIs(t, writeWorktreeEntriesJSON(doctorFailingWriter{}, []sandbox.WorktreeEntry{{Branch: "feature", Path: "/worktrees/feature"}}), io.ErrClosedPipe)
 }
 
 // The registry is isolated from the user's configuration. Real Git resolves the
 // repository; worktree paths are returned from the registry without inspection.
-func setupWorktreeListCLI(t *testing.T) (repo, stateFile, live, stale string) {
+func setupWorktreeListCLI(t *testing.T) (repo, stateFile, live, stale, regular string) {
 	t.Helper()
 	repo = t.TempDir()
 	output, err := exec.Command("git", "-C", repo, "init", "--quiet").CombinedOutput()
@@ -47,7 +49,7 @@ func setupWorktreeListCLI(t *testing.T) (repo, stateFile, live, stale string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(stateFile), 0o755))
 	live = t.TempDir()
 	stale = filepath.Join(t.TempDir(), "missing")
-	regular := filepath.Join(t.TempDir(), "regular")
+	regular = filepath.Join(t.TempDir(), "regular")
 	require.NoError(t, os.WriteFile(regular, nil, 0o600))
 	var registry bytes.Buffer
 	encoder := json.NewEncoder(&registry)
@@ -70,7 +72,7 @@ func setupWorktreeListCLI(t *testing.T) (repo, stateFile, live, stale string) {
 func TestWorktreeListCLI(t *testing.T) {
 	for _, mode := range []string{"explicit json", "cwd json", "relative nested json", "text", "explicit false"} {
 		t.Run(mode, func(t *testing.T) {
-			repo, stateFile, live, stale := setupWorktreeListCLI(t)
+			repo, stateFile, live, stale, regular := setupWorktreeListCLI(t)
 			before, err := os.ReadFile(stateFile)
 			require.NoError(t, err)
 			args := []string{"worktree-list", "--repo", repo}
@@ -103,7 +105,16 @@ func TestWorktreeListCLI(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, before, after)
 			if strings.Contains(mode, "json") {
-				require.Equal(t, "[{\"branch\":\"a-live\"},{\"branch\":\"file\"},{\"branch\":\"stale\"},{\"branch\":\"z-live\"}]\n", out.String())
+				want := []map[string]string{
+					{"branch": "a-live", "path": live},
+					{"branch": "file", "path": regular},
+					{"branch": "stale", "path": stale},
+					{"branch": "z-live", "path": live},
+				}
+				var got []map[string]string
+				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+				require.Equal(t, want, got)
+				require.True(t, strings.HasSuffix(out.String(), "\n"))
 			} else {
 				lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
 				require.Len(t, lines, 4)
@@ -119,7 +130,7 @@ func TestWorktreeListCLI(t *testing.T) {
 func TestWorktreeListCLIEmptyAndErrors(t *testing.T) {
 	for _, kind := range []string{"empty", "missing registry", "all stale", "non Git", "missing repo", "registry error", "symlink loop"} {
 		t.Run(kind, func(t *testing.T) {
-			repo, stateFile, _, stale := setupWorktreeListCLI(t)
+			repo, stateFile, _, stale, _ := setupWorktreeListCLI(t)
 			switch kind {
 			case "empty":
 				require.NoError(t, os.WriteFile(stateFile, nil, 0o600))
@@ -147,7 +158,9 @@ func TestWorktreeListCLIEmptyAndErrors(t *testing.T) {
 			cmd, err := root.ExecuteC()
 			if kind == "all stale" || kind == "symlink loop" {
 				require.NoError(t, err)
-				require.Equal(t, "[{\"branch\":\"stale\"}]\n", out.String())
+				var got []map[string]string
+				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+				require.Equal(t, []map[string]string{{"branch": "stale", "path": stale}}, got)
 			} else if kind == "empty" || kind == "missing registry" {
 				require.NoError(t, err)
 				require.Equal(t, "[]\n", out.String())
@@ -184,4 +197,5 @@ func TestWorktreeListUsageAndHelp(t *testing.T) {
 	require.Contains(t, out.String(), "--repo")
 	require.Contains(t, out.String(), "--json")
 	require.Contains(t, out.String(), "newest registered first")
+	require.Contains(t, out.String(), "branch and path")
 }

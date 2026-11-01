@@ -200,6 +200,13 @@ func TestWorktreeBranchesReturnsRegistryValues(t *testing.T) {
 			branches, err := WorktreeBranches(repoDir)
 			require.NoError(t, err)
 			require.Equal(t, want, branches)
+			entries, err := WorktreeEntries(repoDir)
+			require.NoError(t, err)
+			if len(want) == 0 {
+				require.Empty(t, entries)
+			} else {
+				require.Equal(t, []WorktreeEntry{{Branch: record.Branch, Path: path}}, entries)
+			}
 		})
 	}
 }
@@ -235,6 +242,13 @@ func TestWorktreeListingIgnoresTimestamps(t *testing.T) {
 				}))
 			}
 			for range 2 {
+				entries, err := WorktreeEntries(repoDir)
+				require.NoError(t, err)
+				require.Equal(t, []WorktreeEntry{
+					{Branch: "a-first", Path: "/worktrees/a-first"},
+					{Branch: "z-last", Path: "/worktrees/z-last"},
+					{Branch: "middle", Path: "/worktrees/middle"},
+				}, entries)
 				branches, err := WorktreeBranches(repoDir)
 				require.NoError(t, err)
 				require.Equal(t, []string{"a-first", "z-last", "middle"}, branches)

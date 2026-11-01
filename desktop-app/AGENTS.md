@@ -35,4 +35,4 @@ Do not create ad hoc frontend `.test.mjs` files such as `tests/runProgress.test.
 
 ## Commit & Pull Request Guidelines
 
-History uses short, descriptive subjects such as `Load sidebar repos and branches from disk`; follow that style. Keep commits focused. PRs should explain behavior changes, link relevant issues, and list validation performed. Include screenshots for UI changes and identify any new CLI, configuration, or platform requirements.
+Prefix every commit subject with `desktop:` and use a short, descriptive subject, such as `desktop: Load sidebar repos and branches from disk`. Keep commits focused. PRs should explain behavior changes, link relevant issues, and list validation performed. Include screenshots for UI changes and identify any new CLI, configuration, or platform requirements.

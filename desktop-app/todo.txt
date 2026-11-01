@@ -5,8 +5,7 @@
 
 sidebar
 [x] - order by new in list of branchs
-
-[] - Update agent-sandbox worktree-list --json to return each branch's worktree path alongside its branch name, so the desktop can display the path in the runs list.
+[x] - Update agent-sandbox worktree-list --json to return each branch's worktree path alongside its branch name, so the desktop can display the path in the runs list.
 
 Run screen.
 [x] - add input for task,  file browser, folder browser, jira url

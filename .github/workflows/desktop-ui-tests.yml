@@ -49,7 +49,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            webkit2gtk-driver \
+            webkitgtk-webdriver \
             xvfb \
             xauth
 

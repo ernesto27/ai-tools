@@ -11,7 +11,7 @@ jobs:
   test:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      startsWith(github.event.head_commit.message, 'desktop:')
+      startsWith(github.event.head_commit.message, 'desktop')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

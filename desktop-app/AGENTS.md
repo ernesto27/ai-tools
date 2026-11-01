@@ -29,7 +29,7 @@ Match existing TypeScript style: two-space indentation, double quotes, semicolon
 
 ## Testing Guidelines
 
-No frontend unit-test framework or coverage threshold is configured. Run `npm run build` and manually verify affected desktop workflows beyond the launch check described below. For native changes, check repository selection, duplicate handling, CLI failures, and branch loading as applicable. Add Rust unit tests in `#[cfg(test)]` modules for new testable backend logic.
+No frontend unit-test framework or coverage threshold is configured. Run `npm run build` and manually verify affected desktop workflows beyond the navigation and text checks described below. For native changes, check repository selection, duplicate handling, CLI failures, and branch loading as applicable. Add Rust unit tests in `#[cfg(test)]` modules for new testable backend logic.
 
 The Linux desktop integration suite lives in `e2e/` and uses Node's standard test
 runner with WebdriverIO against the actual built Tauri application. Install its
@@ -37,7 +37,15 @@ locked dependencies with `npm ci --prefix e2e`, then run `npm run test:desktop`
 with an X11 display or `xvfb-run -a npm run test:desktop`. It requires installed real
 `software-factory`, `agent-sandbox`, `tauri-driver`, and `WebKitWebDriver` executables.
 Keep desktop UI checks in this real integration suite; do not replace native
-commands with mocks. See README.md for setup and current coverage limits.
+commands with mocks. See `e2e/launch.spec.js` for setup and
+`e2e/navigationChecks.js` for current coverage.
+
+The suite checks all screens, including New run's Run/Continue/Resume modes.
+Use real Git worktrees and prepared configuration/registry/log files read by the
+native backend. Keep test registry/app data temporary, create project logs only
+in an exclusively owned fixture directory, and remove all owned data in teardown.
+Run detail coverage opens its initial view only; do not start workflows or agents
+as part of basic navigation tests.
 
 Do not create ad hoc frontend `.test.mjs` files such as `tests/runProgress.test.mjs` or `tests/useDesktopRuns.test.mjs`. Do not test frontend code by reading TypeScript source, transpiling it at runtime with `ts.transpileModule`, importing generated code through data URLs, or evaluating it in a VM with hand-written React or Tauri mocks. Use the build and manual verification described above unless the user explicitly requests a properly configured frontend test framework.
 

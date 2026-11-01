@@ -15,6 +15,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { remote } from "webdriverio";
+import { prepareNavigationFixture } from "./navigationFixture.js";
+import { runNavigationChecks } from "./navigationChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(testDirectory, "..");
@@ -69,8 +71,9 @@ function signalGroup(child, signal) {
   }
 }
 
-test("launch shows Select a repository", { timeout: 900_000 }, async (t) => {
+test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
   let fixture;
+  let projectLogs;
   let driver;
   let browser;
   let artifacts;
@@ -90,6 +93,11 @@ test("launch shows Select a repository", { timeout: 900_000 }, async (t) => {
         await delay(500);
         signalGroup(driver, "SIGKILL");
       }
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      if (projectLogs) rmSync(projectLogs, { recursive: true, force: true });
     } catch (error) {
       failures.push(error);
     }
@@ -121,31 +129,10 @@ test("launch shows Select a repository", { timeout: 900_000 }, async (t) => {
 
     fixture = mkdtempSync(join(tmpdir(), "soft-factory-desktop-e2e-"));
     t.diagnostic(`Temporary desktop test fixture: ${fixture}`);
-    const repo = join(fixture, "launch-repository");
-    mkdirSync(repo);
-    command("git", ["init", "--initial-branch=main", repo]);
-    writeFileSync(join(repo, "README.md"), "# Desktop launch test repository\n");
-    command("git", ["-C", repo, "add", "README.md"]);
-    command("git", [
-      "-C", repo,
-      "-c", "user.name=Desktop UI Test",
-      "-c", "user.email=desktop-ui-test@example.invalid",
-      "-c", "commit.gpgsign=false",
-      "-c", "core.hooksPath=/dev/null",
-      "commit", "-m", "Initial desktop UI fixture",
-    ]);
-
-    const dataHome = join(fixture, "data");
-    const appData = join(dataHome, "com.ernesto.desktop-app");
-    mkdirSync(appData, { recursive: true });
-    writeFileSync(join(appData, "repos.json"), JSON.stringify([
-      { name: "launch-repository", path: repo },
-    ], null, 2));
-    const environment = { ...process.env, XDG_DATA_HOME: dataHome, GDK_BACKEND: "x11" };
-    const branches = JSON.parse(command(
-      "agent-sandbox", ["worktree-list", "--json", "--repo", repo], { env: environment },
-    ));
-    assert.ok(branches === null || Array.isArray(branches), "agent-sandbox must return a worktree array or null.");
+    const navigationFixture = prepareNavigationFixture(fixture, command);
+    projectLogs = navigationFixture.projectLogs;
+    const environment = navigationFixture.environment;
+    t.diagnostic(`Temporary project run logs: ${projectLogs}`);
 
     mkdirSync(join(testDirectory, "artifacts"), { recursive: true });
     artifacts = mkdtempSync(join(testDirectory, "artifacts", "launch-"));
@@ -188,9 +175,7 @@ test("launch shows Select a repository", { timeout: 900_000 }, async (t) => {
         },
       },
     });
-    const heading = await browser.$("main h1");
-    await heading.waitForDisplayed({ timeout: 15_000 });
-    assert.equal(await heading.getText(), "Select a repository");
+    await runNavigationChecks(t, browser, navigationFixture, artifacts);
   } catch (error) {
     if (browser && artifacts) {
       const results = await Promise.allSettled([

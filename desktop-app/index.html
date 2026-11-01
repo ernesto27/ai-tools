@@ -5,7 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Soft Factory</title>
-    <style>html,body{background:#111110}</style>
+    <script>
+      (() => {
+        let saved = null;
+        try { saved = localStorage.getItem("soft-factory.theme"); } catch {}
+        const theme = saved === "light" || saved === "dark"
+          ? saved
+          : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <style>
+      html,body{background:#111110}
+      html[data-theme="light"],html[data-theme="light"] body{background:#ffffff}
+    </style>
   </head>
 
   <body>

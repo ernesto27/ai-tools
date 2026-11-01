@@ -9,6 +9,7 @@ import { Config } from "./screens/Config";
 import { NewRun } from "./screens/NewRun";
 import { AddRepo } from "./screens/AddRepo";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
+import { useTheme } from "./hooks/useTheme";
 import { Title } from "./components/ui";
 
 import type { BranchWorktree } from "./worktrees";
@@ -16,6 +17,7 @@ import type { BranchWorktree } from "./worktrees";
 const HOME: Route = { screen: "home" };
 
 function App() {
+  const { theme, toggleTheme } = useTheme();
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
@@ -104,7 +106,7 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
+      <Sidebar theme={theme} onToggleTheme={toggleTheme} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
       <main
         ref={mainRef}
         className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}

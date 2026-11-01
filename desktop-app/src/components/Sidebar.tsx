@@ -1,3 +1,4 @@
+import type { BranchWorktree } from "../worktrees";
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { STATUS_COLOR } from "../data";
 import { RUN_MODE, type Navigate, type Route } from "../router";
@@ -7,7 +8,7 @@ import { RepoContextMenu } from "./RepoContextMenu";
 
 interface Props {
   repos: SavedRepo[];
-  branchesByPath: Record<string, string[]>;
+  branchesByPath: Record<string, BranchWorktree[]>;
   onRefreshBranches: (path: string) => Promise<void>;
   route: Route;
   navigate: Navigate;
@@ -79,7 +80,7 @@ export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navig
       <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">Repositories</span>
       <div className="flex flex-col gap-2">
         {repos.map((saved) => {
-          const branches = (branchesByPath[saved.path] ?? []).map((name) => ({ name, status: "idle" as const }));
+          const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
           const repo = { name: saved.name, status: "idle" as const, branches };
           const isOpen = openRepo === repo.name;
           return (

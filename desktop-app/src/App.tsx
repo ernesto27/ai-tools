@@ -11,6 +11,8 @@ import { AddRepo } from "./screens/AddRepo";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
 import { Title } from "./components/ui";
 
+import type { BranchWorktree } from "./worktrees";
+
 const HOME: Route = { screen: "home" };
 
 function App() {
@@ -18,7 +20,7 @@ function App() {
   const lastBranchRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
   const [savedRepos, setSavedRepos] = useState<SavedRepo[]>([]);
-  const [branchesByPath, setBranchesByPath] = useState<Record<string, string[]>>({});
+  const [branchesByPath, setBranchesByPath] = useState<Record<string, BranchWorktree[]>>({});
   const savedPaths = useRef(new Set<string>());
   const branchRequests = useRef(new Map<string, symbol>());
   savedPaths.current = new Set(savedRepos.map((repo) => repo.path));
@@ -27,7 +29,7 @@ function App() {
     const request = Symbol();
     branchRequests.current.set(path, request);
     try {
-      const branches = await invoke<string[]>("list_branches", { path });
+      const branches = await invoke<BranchWorktree[]>("list_branches", { path });
       if (savedPaths.current.has(path) && branchRequests.current.get(path) === request) {
         setBranchesByPath((previous) => ({ ...previous, [path]: branches }));
       }
@@ -36,12 +38,18 @@ function App() {
     }
   }, []);
 
-  function addBranch(path: string, branch: string) {
+  function addBranch(path: string, worktree: BranchWorktree) {
     if (!savedPaths.current.has(path)) return;
     branchRequests.current.delete(path);
     setBranchesByPath((previous) => {
       const branches = previous[path] ?? [];
-      return branches.includes(branch) ? previous : { ...previous, [path]: [branch, ...branches] };
+      const exists = branches.some((entry) => entry.branch === worktree.branch);
+      return {
+        ...previous,
+        [path]: exists
+          ? branches.map((entry) => entry.branch === worktree.branch ? worktree : entry)
+          : [worktree, ...branches],
+      };
     });
   }
 
@@ -103,6 +111,7 @@ function App() {
       >
          <Screen
           desktopRuns={desktopRuns}
+          branchesByPath={branchesByPath}
           route={route}
           repoPath={
           "repo" in route
@@ -123,12 +132,14 @@ function App() {
 
 function Screen({
   desktopRuns,
+  branchesByPath,
   route,
   navigate,
   repoAdded,
   repoPath,
 }: {
   desktopRuns: DesktopRuns;
+  branchesByPath: Record<string, BranchWorktree[]>;
   route: Route;
   navigate: (r: Route) => void;
   back: () => void;
@@ -157,6 +168,7 @@ function Screen({
           repo={route.repo}
           repoPath={repoPath}
           branch={route.branch}
+          worktreePath={branchesByPath[repoPath]?.find((entry) => entry.branch === route.branch)?.path}
           navigate={navigate}
         />
       ) : (

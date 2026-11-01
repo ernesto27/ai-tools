@@ -1,3 +1,4 @@
+import type { BranchWorktree } from "../worktrees";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { FactoryConfig } from "../config";
@@ -52,7 +53,7 @@ export function isDesktopRunActive(run: DesktopRun): boolean {
     || run.state === RUN_STATE.STOPPING;
 }
 
-export function useDesktopRuns(onBranchCreated: (path: string, branch: string) => void) {
+export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchWorktree) => void) {
   const sessions = useRef<Record<string, DesktopRun>>({});
   const [runs, setRuns] = useState<Record<string, DesktopRun>>({});
   const [supportsStop, setSupportsStop] = useState(false);
@@ -106,10 +107,11 @@ export function useDesktopRuns(onBranchCreated: (path: string, branch: string) =
         branchDiscovery = branchDiscovery.then(async () => {
           if (!knownDirectories || branchFound) return;
           try {
-            const branches = await invoke<string[]>("list_branches", { path: input.repoPath });
-            if (branches.includes(input.branch)) {
+            const branches = await invoke<BranchWorktree[]>("list_branches", { path: input.repoPath });
+            const worktree = branches.find((entry) => entry.branch === input.branch);
+            if (worktree) {
               branchFound = true;
-              onBranchCreated(input.repoPath, input.branch);
+              onBranchCreated(input.repoPath, worktree);
             }
           } catch (error) {
             console.error("Could not check run branch:", error);
@@ -159,8 +161,10 @@ export function useDesktopRuns(onBranchCreated: (path: string, branch: string) =
           path: input.repoPath, branch: input.branch,
         });
         try {
-          const branches = await invoke<string[]>("list_branches", { path: input.repoPath });
-          branchFound = branches.includes(input.branch);
+          const branches = await invoke<BranchWorktree[]>("list_branches", { path: input.repoPath });
+          const worktree = branches.find((entry) => entry.branch === input.branch);
+          branchFound = Boolean(worktree);
+          if (worktree) onBranchCreated(input.repoPath, worktree);
         } catch (error) {
           console.error("Could not check existing run branch:", error);
         }

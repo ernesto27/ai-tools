@@ -1,3 +1,4 @@
+import { WorktreePath } from "../components/WorktreePath";
 import { RUN_MODE, type Navigate } from "../router";
 import { statusClass } from "../runStatus";
 import { useBranchRuns, type RunEntry } from "../hooks/useBranchRuns";
@@ -7,6 +8,7 @@ interface Props {
   repo: string;
   repoPath: string;
   branch: string;
+  worktreePath?: string;
   navigate: Navigate;
 }
 
@@ -51,16 +53,17 @@ function StageRow({ name, status }: { name: string; status: string }) {
   );
 }
 
-export function BranchRuns({ repo, repoPath, branch, navigate }: Props) {
+export function BranchRuns({ repo, repoPath, branch, worktreePath, navigate }: Props) {
   const { entries, loading, error, refresh } = useBranchRuns(repoPath, branch);
   const at = { repo, branch };
 
   return (
     <div className="flex max-w-[1080px] flex-col gap-8" aria-busy={loading}>
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
+      <header className="flex min-w-0 flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 max-w-full flex-1 flex-col gap-1">
           <Crumb>{repo} / branch</Crumb>
           <Title><span className="font-mono font-medium">{branch}</span></Title>
+          {worktreePath !== undefined && <WorktreePath key={worktreePath} path={worktreePath} />}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <OutlineButton onClick={refresh} disabled={loading}>{loading ? "Loading…" : "Refresh"}</OutlineButton>

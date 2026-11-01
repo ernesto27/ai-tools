@@ -137,13 +137,20 @@ fn remove_repo(app: tauri::AppHandle, path: String) -> Result<(), String> {
     remove_repo_from_file(&repos_file(&app)?, &path)
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct Worktree {
     branch: String,
+    path: String,
+}
+
+fn parse_worktrees(bytes: &[u8]) -> Result<Vec<Worktree>, String> {
+    let worktrees: Option<Vec<Worktree>> =
+        serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    Ok(worktrees.unwrap_or_default())
 }
 
 #[tauri::command]
-async fn list_branches(path: String) -> Result<Vec<String>, String> {
+async fn list_branches(path: String) -> Result<Vec<Worktree>, String> {
     let output = std::process::Command::new("agent-sandbox")
         .args(["worktree-list", "--json", "--repo"])
         .arg(&path)
@@ -154,13 +161,7 @@ async fn list_branches(path: String) -> Result<Vec<String>, String> {
         return Err(String::from_utf8_lossy(&output.stderr).into_owned());
     }
 
-    let worktrees: Option<Vec<Worktree>> =
-        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
-    Ok(worktrees
-        .unwrap_or_default()
-        .into_iter()
-        .map(|w| w.branch)
-        .collect())
+    parse_worktrees(&output.stdout)
 }
 
 #[tauri::command]
@@ -293,6 +294,7 @@ pub fn run() {
         .manage(RunProcesses::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             inspect_folder,
@@ -400,5 +402,44 @@ mod repo_removal_tests {
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert!(result.is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+    }
+}
+
+#[cfg(test)]
+mod worktree_tests {
+    use super::parse_worktrees;
+
+    #[test]
+    fn preserves_exact_branches_and_paths() {
+        let entries = parse_worktrees(
+            r#"[{"branch":"feature/a","path":"/tmp/project space/árbol"},{"branch":"other","path":"/tmp/other"}]"#.as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].branch, "feature/a");
+        assert_eq!(entries[0].path, "/tmp/project space/árbol");
+        let value = serde_json::to_value(&entries).unwrap();
+        assert_eq!(value[1]["branch"], "other");
+        assert_eq!(value[1]["path"], "/tmp/other");
+    }
+
+    #[test]
+    fn supports_empty_output() {
+        assert!(parse_worktrees(b"null").unwrap().is_empty());
+        assert!(parse_worktrees(b"[]").unwrap().is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_or_wrongly_typed_output() {
+        for bytes in [
+            &b"invalid"[..],
+            &br#"{}"#[..],
+            &br#"[{"path":"/tmp/no-branch"}]"#[..],
+            &br#"[{"branch":"missing-path"}]"#[..],
+            &br#"[{"branch":"null-path","path":null}]"#[..],
+            &br#"[{"branch":"a","path":42}]"#[..],
+        ] {
+            assert!(parse_worktrees(bytes).is_err());
+        }
     }
 }

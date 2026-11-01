@@ -112,6 +112,11 @@
   background-position: right 12px center;
 }
 
+/* Light theme chevron uses the light --color-muted (#626262) for contrast on white fields. */
+:root[data-theme="light"] .config-form select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23626262' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}
+
 .config-form input[type="text"]:hover,
 .config-form select:enabled:hover {
   border-color: var(--color-muted);

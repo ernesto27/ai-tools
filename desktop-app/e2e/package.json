@@ -1,0 +1,14 @@
+{
+  "name": "soft-factory-desktop-e2e",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 launch.spec.js"
+  },
+  "devDependencies": {
+    "webdriverio": "10.1.0"
+  }
+}

@@ -1,0 +1,90 @@
+name: Desktop UI tests
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'desktop:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: desktop-app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            desktop-app/package-lock.json
+            desktop-app/e2e/package-lock.json
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup default 1.99.1
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            pkg-config \
+            curl \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            webkit2gtk-driver \
+            xvfb \
+            xauth
+
+      - name: Install Agent Sandbox
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/agent-sandbox/install.sh | bash
+
+      - name: Install Software Factory
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/soft-factory/install.sh | bash
+
+      - name: Add installed binaries to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify installed binaries
+        run: |
+          agent-sandbox --version
+          software-factory --version
+
+      - name: Install Tauri driver
+        run: cargo install tauri-driver --version 2.1.0 --locked
+
+      - name: Install application and test dependencies
+        run: |
+          npm ci
+          npm ci --prefix e2e
+
+      - name: Run desktop launch test
+        run: xvfb-run -a npm run test:desktop
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-ui-diagnostics
+          path: desktop-app/e2e/artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

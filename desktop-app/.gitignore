@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local desktop integration test diagnostics
+e2e/artifacts/

@@ -134,6 +134,23 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
 
                 {isOpen && (
                   <div className="flex flex-col gap-px pl-3">
+                    <NavItem
+                      className="text-md"
+                      aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
+                      onClick={() => navigate({ screen: "config", repo: repo.name })}
+                    >
+                      Config
+                    </NavItem>
+                    <NavItem
+                      className="text-md"
+                      aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
+                      onClick={() => {
+                        void onRefreshBranches(saved.path);
+                        navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
+                      }}
+                    >
+                      New run
+                    </NavItem>
                     {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">No branches yet</span>}
                     {repo.branches.map((b) => {
                       const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
@@ -187,23 +204,6 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                         </div>
                       );
                     })}
-                    <NavItem
-                      className="text-md"
-                      aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
-                      onClick={() => navigate({ screen: "config", repo: repo.name })}
-                    >
-                      Config
-                    </NavItem>
-                    <NavItem
-                      className="text-md"
-                      aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
-                      onClick={() => {
-                        void onRefreshBranches(saved.path);
-                        navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
-                      }}
-                    >
-                      + New run
-                    </NavItem>
                   </div>
                 )}
               </div>

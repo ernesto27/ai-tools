@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 
 export async function runNavigationChecks(t, browser, fixture, artifacts) {
   const { repoName, branch, runId, logText } = fixture;
@@ -149,6 +150,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await text("main h1", "Config");
     await text('//main//h2[normalize-space(.)="Agent defaults"]', "Agent defaults");
     await text('main header [role="status"]', "Saved");
+    await runModelAutocompleteChecks(browser, fixture, artifacts);
   });
 
   await screen("Branch runs", async () => {
@@ -159,7 +161,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
 
   await screen("New run Run", async () => {
     await openRepo();
-    await click(navButton("+ New run"));
+    await click(navButton("New run"));
     await mode("Run", "Full workflow: implement, review, classify risk, explain.");
   });
 

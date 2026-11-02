@@ -25,3 +25,8 @@ dist-ssr
 
 # Local desktop integration test diagnostics
 e2e/artifacts/
+
+task.txt
+software-factory.json 
+
+

@@ -4,6 +4,7 @@ import { Checkbox, Crumb, Field, Input, OutlineButton, PrimaryButton, SectionHea
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusMessage } from "../components/StatusMessage";
+import { ModelAutocomplete } from "../components/ModelAutocomplete";
 import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from "../config";
 import type { FactoryConfig, StageSettings, TaskSource } from "../config";
 
@@ -222,7 +223,15 @@ export function Config({ repo, repoPath }: Props) {
               </Select>
             </Field>
             <Field label="Model">
-              <Input value={model} placeholder="agent default" onChange={(e) => edit(setModel)(e.target.value)} />
+              <ModelAutocomplete
+                key={agent}
+                id="default-model"
+                agent={agent}
+                value={model}
+                placeholder="agent default"
+                disabled={saving || loading || !!loadError}
+                onChange={edit(setModel)}
+              />
             </Field>
             <Field label="Effort">
               <Select value={effort} onChange={(e) => edit(setEffort)(e.target.value)}>
@@ -314,7 +323,14 @@ export function Config({ repo, repoPath }: Props) {
                     </Select>
                   </Field>
                   <Field label="Model">
-                    <Input className="min-w-0 w-full" value={stageSettings[s.key].model} onChange={(e) => editStage(s.key, "model", e.target.value)} />
+                    <ModelAutocomplete
+                      key={stageSettings[s.key].agent || agent}
+                      id={`${s.key}-model`}
+                      agent={stageSettings[s.key].agent || agent}
+                      value={stageSettings[s.key].model}
+                      disabled={saving || loading || !!loadError || !!off[s.key]}
+                      onChange={(value) => editStage(s.key, "model", value)}
+                    />
                   </Field>
                   <Field label="Effort">
                     <Select className="min-w-0 w-full" value={stageSettings[s.key].effort} onChange={(e) => editStage(s.key, "effort", e.target.value)}>

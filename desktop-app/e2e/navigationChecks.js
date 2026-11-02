@@ -84,6 +84,21 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await t.test(name, { timeout: 60_000 }, async (screenContext) => {
       try {
         await check();
+        const toggle = await browser.$('nav [role="switch"][aria-label="Dark mode"]');
+        const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
+        for (const theme of ["light", "dark"]) {
+          if (await browser.execute(() => document.documentElement.dataset.theme) !== theme) {
+            await toggle.click();
+          }
+          await browser.waitUntil(async () =>
+            await browser.execute(() => document.documentElement.dataset.theme) === theme,
+            { timeout: 5_000 });
+          await browser.saveScreenshot(join(artifacts,
+            `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${theme}.png`));
+        }
+        if (await browser.execute(() => document.documentElement.dataset.theme) !== startingTheme) {
+          await toggle.click();
+        }
         const alerts = await browser.$$("main [role=alert]");
         for (const alert of alerts) {
           assert.equal(await alert.isDisplayed(), false,

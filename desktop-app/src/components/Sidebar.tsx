@@ -5,8 +5,12 @@ import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
 import { cx } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
+import type { Theme } from "../theme";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
+  theme: Theme;
+  onToggleTheme: () => void;
   repos: SavedRepo[];
   branchesByPath: Record<string, BranchWorktree[]>;
   onRefreshBranches: (path: string) => Promise<void>;
@@ -35,7 +39,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
+export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState("");
@@ -71,138 +75,143 @@ export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navig
   const sub = route.screen === "newRun" ? route.mode : "runs";
 
   return (
-    <nav aria-label="Main" className="flex w-nav flex-none flex-col gap-0.5 overflow-y-auto border-r border-line px-4 py-7 text-base">
-      <span className="px-2 pb-7 font-mono text-md font-medium">soft·factory</span>
-      <NavItem tall aria-current={route.screen === "addRepo" ? "page" : undefined} onClick={() => navigate({ screen: "addRepo" })}>
-        Add repository
-      </NavItem>
-
-      <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">Repositories</span>
-      <div className="flex flex-col gap-2">
-        {repos.map((saved) => {
-          const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
-          const repo = { name: saved.name, status: "idle" as const, branches };
-          const isOpen = openRepo === repo.name;
-          return (
-            <div key={saved.path} className="flex flex-col">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  setRemoveError(null);
-                  setRepoMenu({ repo: saved, x: event.clientX, y: event.clientY, trigger: event.currentTarget });
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-                  event.preventDefault();
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  setRemoveError(null);
-                  setRepoMenu({ repo: saved, x: bounds.left, y: bounds.bottom, trigger: event.currentTarget });
-                }}
-                aria-expanded={isOpen}
-                onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
-                className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={cx("size-3.5 shrink-0", isOpen && "rotate-90")}
-                  >
-                    <path d="m6 4 4 4-4 4" />
-                  </svg>
-                  <span className="min-w-0 truncate" title={repo.name}>
-                    {repo.name}
-                  </span>
-                </span>
-                <Dot color={STATUS_COLOR[repo.status]} />
-              </button>
-
-              {isOpen && (
-                <div className="flex flex-col gap-px pl-3">
-                  {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">No branches yet</span>}
-                  {repo.branches.map((b) => {
-                    const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
-                    const isActive = activeRepo === repo.name && activeBranch === b.name;
-                    const at = { repo: repo.name, branch: b.name };
-                    return (
-                      <div key={b.name} className="flex flex-col">
-                        <NavItem
-                          className="font-mono text-sm"
-                          title={b.name}
-                          aria-expanded={expanded}
-                          onClick={() => {
-                            setOpenBranch(expanded ? null : at);
-                            if (!expanded) navigate({ screen: "branch", ...at });
-                          }}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className={cx("size-3.5 shrink-0", expanded && "rotate-90")}
-                          >
-                            <path d="m6 4 4 4-4 4" />
-                          </svg>
-                          <Dot color={STATUS_COLOR[b.status]} />
-                          <span className="min-w-0 truncate">{b.name}</span>
-                        </NavItem>
-                        {expanded && (
-                          <div className="ml-[11px] flex flex-col gap-px border-l border-line pl-2.5 text-md">
-                            <NavItem aria-current={isActive && sub === "runs" ? "page" : undefined} onClick={() => navigate({ screen: "branch", ...at })}>
-                              Runs
-                            </NavItem>
-                            <NavItem
-                              aria-current={isActive && sub === RUN_MODE.CONTINUE ? "page" : undefined}
-                              onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}
-                            >
-                              Continue
-                            </NavItem>
-                            <NavItem
-                              aria-current={isActive && sub === RUN_MODE.RESUME ? "page" : undefined}
-                              onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RESUME })}
-                            >
-                              Resume
-                            </NavItem>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <NavItem
-                    className="text-md"
-                    aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
-                    onClick={() => navigate({ screen: "config", repo: repo.name })}
-                  >
-                    Config
-                  </NavItem>
-                  <NavItem
-                    className="text-md"
-                    aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
-                    onClick={() => {
-                      void onRefreshBranches(saved.path);
-                      navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
-                    }}
-                  >
-                    + New run
-                  </NavItem>
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <nav aria-label="Main" className="flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-7 text-base">
+      <div className="flex shrink-0 flex-col gap-3 pb-5">
+        <span className="px-2 font-mono text-md font-medium">soft·factory</span>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
-      {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{removeError}</p>}
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <NavItem tall aria-current={route.screen === "addRepo" ? "page" : undefined} onClick={() => navigate({ screen: "addRepo" })}>
+          Add repository
+        </NavItem>
+
+        <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">Repositories</span>
+        <div className="flex flex-col gap-2">
+          {repos.map((saved) => {
+            const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
+            const repo = { name: saved.name, status: "idle" as const, branches };
+            const isOpen = openRepo === repo.name;
+            return (
+              <div key={saved.path} className="flex flex-col">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setRemoveError(null);
+                    setRepoMenu({ repo: saved, x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+                    event.preventDefault();
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    setRemoveError(null);
+                    setRepoMenu({ repo: saved, x: bounds.left, y: bounds.bottom, trigger: event.currentTarget });
+                  }}
+                  aria-expanded={isOpen}
+                  onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
+                  className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={cx("size-3.5 shrink-0", isOpen && "rotate-90")}
+                    >
+                      <path d="m6 4 4 4-4 4" />
+                    </svg>
+                    <span className="min-w-0 truncate" title={repo.name}>
+                      {repo.name}
+                    </span>
+                  </span>
+                  <Dot color={STATUS_COLOR[repo.status]} />
+                </button>
+
+                {isOpen && (
+                  <div className="flex flex-col gap-px pl-3">
+                    {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">No branches yet</span>}
+                    {repo.branches.map((b) => {
+                      const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
+                      const isActive = activeRepo === repo.name && activeBranch === b.name;
+                      const at = { repo: repo.name, branch: b.name };
+                      return (
+                        <div key={b.name} className="flex flex-col">
+                          <NavItem
+                            className="font-mono text-sm"
+                            title={b.name}
+                            aria-expanded={expanded}
+                            onClick={() => {
+                              setOpenBranch(expanded ? null : at);
+                              if (!expanded) navigate({ screen: "branch", ...at });
+                            }}
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className={cx("size-3.5 shrink-0", expanded && "rotate-90")}
+                            >
+                              <path d="m6 4 4 4-4 4" />
+                            </svg>
+                            <Dot color={STATUS_COLOR[b.status]} />
+                            <span className="min-w-0 truncate">{b.name}</span>
+                          </NavItem>
+                          {expanded && (
+                            <div className="ml-[11px] flex flex-col gap-px border-l border-line pl-2.5 text-md">
+                              <NavItem aria-current={isActive && sub === "runs" ? "page" : undefined} onClick={() => navigate({ screen: "branch", ...at })}>
+                                Runs
+                              </NavItem>
+                              <NavItem
+                                aria-current={isActive && sub === RUN_MODE.CONTINUE ? "page" : undefined}
+                                onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}
+                              >
+                                Continue
+                              </NavItem>
+                              <NavItem
+                                aria-current={isActive && sub === RUN_MODE.RESUME ? "page" : undefined}
+                                onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RESUME })}
+                              >
+                                Resume
+                              </NavItem>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <NavItem
+                      className="text-md"
+                      aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
+                      onClick={() => navigate({ screen: "config", repo: repo.name })}
+                    >
+                      Config
+                    </NavItem>
+                    <NavItem
+                      className="text-md"
+                      aria-current={route.screen === "newRun" && route.mode === RUN_MODE.RUN && route.repo === repo.name ? "page" : undefined}
+                      onClick={() => {
+                        void onRefreshBranches(saved.path);
+                        navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
+                      }}
+                    >
+                      + New run
+                    </NavItem>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{removeError}</p>}
+      </div>
       {repoMenu && (
         <RepoContextMenu
           key={repoMenu.repo.path}

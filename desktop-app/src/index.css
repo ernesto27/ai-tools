@@ -112,6 +112,11 @@
   background-position: right 12px center;
 }
 
+/* Light theme chevron uses the light --color-muted (#626262) for contrast on white fields. */
+:root[data-theme="light"] .config-form select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23626262' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}
+
 .config-form input[type="text"]:hover,
 .config-form select:enabled:hover {
   border-color: var(--color-muted);
@@ -174,6 +179,24 @@
   --spacing-stage-extra: calc(104px * var(--font-scale));
 }
 
+:root[data-theme="light"] {
+  --color-canvas: #ffffff;
+  --color-ink: #242424;
+  --color-ink-strong: #111110;
+  --color-muted: #626262;
+  --color-faint: #686868;
+  --color-line: #dedede;
+  --color-field-line: #828282;
+  --color-field: #ffffff;
+  --color-panel: #f5f5f5;
+  --color-selected: #e8e8e8;
+  --color-hover: #f0f0f0;
+  --color-ok: #247346;
+  --color-bad: #b33328;
+  --color-warn: #875800;
+  --color-info: #285db0;
+}
+
 @layer base {
   html,
   body,
@@ -187,7 +210,6 @@
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     line-height: 1.5;
-    color-scheme: dark;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;

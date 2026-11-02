@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { remote } from "webdriverio";
 import { prepareNavigationFixture } from "./navigationFixture.js";
 import { runNavigationChecks } from "./navigationChecks.js";
+import { runThemeChecks } from "./themeChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(testDirectory, "..");
@@ -175,6 +176,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
         },
       },
     });
+    await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
   } catch (error) {
     if (browser && artifacts) {

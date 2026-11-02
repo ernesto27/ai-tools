@@ -54,9 +54,9 @@ A successful command exit does not guarantee every finding was resolved.
 Inspect the stage log and `summary.log` in the printed execution-log directory.
 Set `resume.branch` to that run's branch, then use
 `software-factory resume <path>` with the invocation directory to recover from
-the last saved stage. Keep the task in `run.filePrompt`, or pass `--jira` again
-for a Jira task. Recovery needs the original summary, stage status, and any
-earlier review evidence needed for risk classification.
+the last saved stage. Keep the task in `run.query` or `run.filePrompt`, or pass
+`--jira` again for a Jira task. Recovery needs the original summary, stage
+status, and any earlier review evidence needed for risk classification.
 
 If those files are unavailable, use `software-factory continue` to run
 implementation and subsequent enabled stages in a new invocation.

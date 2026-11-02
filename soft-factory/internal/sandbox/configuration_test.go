@@ -99,6 +99,28 @@ func TestUnifiedTaskAndSelection(t *testing.T) {
 	assertNoConfigArtifacts(t)
 }
 
+func TestReadTaskSource(t *testing.T) {
+	t.Run("query takes precedence over file prompt", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("task.txt", []byte("file task"), 0600))
+		cfg := decodeConfig(t, `{"run":{"query":"inline task","filePrompt":"task.txt"}}`)
+
+		got, err := readTaskFile(cfg.AgentSandbox)
+		require.NoError(t, err)
+		require.Equal(t, "inline task", got)
+	})
+
+	t.Run("file prompt is used when query is absent", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("task.txt", []byte("file task"), 0600))
+		cfg := decodeConfig(t, `{"run":{"filePrompt":"task.txt"}}`)
+
+		got, err := readTaskFile(cfg.AgentSandbox)
+		require.NoError(t, err)
+		require.Equal(t, "file task", got)
+	})
+}
+
 func TestExecutionFailureAndCancellation(t *testing.T) {
 	for _, mode := range []string{"child failure", "cancel", "setup failure"} {
 		t.Run(mode, func(t *testing.T) {

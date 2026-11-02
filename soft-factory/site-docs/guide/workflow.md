@@ -39,8 +39,9 @@ creates missing folders and keeps its files separate from earlier invocations.
 See [execution logs](reports.md#execution-logs) for identity and collision
 details. It runs implementation again rather than resuming at the last failed stage.
 
-Keep the original task in `run.filePrompt`, or supply `--jira` again when
-continuing a Jira task. Supporting documents and enabled stages still apply.
+Keep the original task in `run.query` or `run.filePrompt`, or supply `--jira`
+again when continuing a Jira task. Supporting documents and enabled stages
+still apply.
 See [configuration](configuration.md#disabling-stages) to skip selected stages.
 
 ## Resume a failed or interrupted run

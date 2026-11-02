@@ -357,13 +357,16 @@ func buildTaskPrompt(input TaskContext) (string, error) {
 }
 
 func readTaskFile(settings sandboxconfig.Config) (string, error) {
-	if settings.Run != nil && settings.Run.Query != nil {
-		return *settings.Run.Query, nil
+	if query, ok := configuredQuery(settings.Run); ok {
+		return query, nil
 	}
 
 	var taskPath string
 	if settings.Run != nil && settings.Run.FilePrompt != nil {
 		taskPath = *settings.Run.FilePrompt
+	}
+	if taskPath == "" {
+		return "", errors.New("read software-factory.json: agentSandbox.run.query or agentSandbox.run.filePrompt is required")
 	}
 
 	task, err := os.ReadFile(taskPath)

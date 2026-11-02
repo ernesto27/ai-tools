@@ -47,7 +47,7 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 ## Configuration & Reports
 
-Create local `software-factory.json`, for example `{"documents":[],"agentSandbox":{"agent":"codex","branch":"factory-task","run":{"filePrompt":"task.txt"}}}`. It is the only workflow configuration source. Preserve all existing stage assignments when migrating. Document and sandbox paths retain project-root context. The local task always comes from `agentSandbox.run.filePrompt`, including resume-mode workflows.
+Create local `software-factory.json`, for example `{"documents":[],"agentSandbox":{"agent":"codex","branch":"factory-task","run":{"filePrompt":"task.txt"}}}`. It is the only workflow configuration source. Preserve all existing stage assignments when migrating. Document and sandbox paths retain project-root context. The local task comes from `agentSandbox.run.query` when configured, otherwise `agentSandbox.run.filePrompt`, including resume-mode workflows.
 
 Factory forwards supported settings as CLI flags, never sandbox configuration JSON. Section `apiKey` and `reviewers` are temporarily ignored without forwarding or logging; use host authentication.
 

@@ -317,7 +317,7 @@ Example for a local task:
 Choose a new `run.branch` for each new task. For `continue`, use an
 existing sandbox branch in `resume.branch`; list available branches with
 `agent-sandbox worktree-list`. Even for `continue`, the local task is read from
-`run.filePrompt` unless you supply `--jira`.
+`run.query` when configured, otherwise `run.filePrompt`, unless you supply `--jira`.
 
 Example for a Jira task, where `--jira` supplies the task instead of a local file:
 

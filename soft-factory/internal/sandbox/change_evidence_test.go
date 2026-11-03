@@ -15,6 +15,9 @@ import (
 
 func TestChangeEvidenceIncludesBranchAndWorktreeChanges(t *testing.T) {
 	root := t.TempDir()
+	// Git reports canonical worktree paths; macOS temporary directories use /var symlinks.
+	root, err := filepath.EvalSymlinks(root)
+	require.NoError(t, err)
 	repo := filepath.Join(root, "repo")
 	worktree := filepath.Join(root, "feature")
 	git := func(dir string, args ...string) {

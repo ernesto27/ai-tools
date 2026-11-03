@@ -14,6 +14,8 @@ process's `PATH`. Check them from the terminal you will use to launch the app:
 export PATH="$HOME/.local/bin:$PATH"
 software-factory --version
 agent-sandbox --version
+
+
 ```
 
 The Software Factory public installer currently supports Linux only. Preparing

@@ -289,26 +289,27 @@ API keys, versions, or Docker daemon access.
 
 ## Installation
 
-For Linux x86_64, run [install.sh](https://github.com/ernesto27/ai-tools/blob/master/soft-factory/install.sh) with curl:
+For Linux x86_64 or macOS (Intel and Apple Silicon), run [install.sh](https://github.com/ernesto27/ai-tools/blob/master/soft-factory/install.sh) with curl:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/soft-factory/install.sh | bash
 ```
 
-The installer downloads `software-factory_linux_amd64.tar.gz` from the latest Software Factory release, verifies its SHA-256 checksum, and installs `software-factory` in `~/.local/bin`. Set `INSTALL_DIR` to choose a different destination. Add that directory to your `PATH` if needed.
+The installer downloads the archive for your platform from the latest stable Software Factory release, verifies its SHA-256 checksum, and installs `software-factory` in `~/.local/bin`. Set `INSTALL_DIR` to choose a different destination. Add that directory to your `PATH` if needed.
 
 Alternatively, build from this folder:
 
 ```bash
 go build -o /tmp/software-factory ./cmd/factory
-install -Dm755 /tmp/software-factory "$HOME/.local/bin/software-factory"
+mkdir -p "$HOME/.local/bin"
+install -m 755 /tmp/software-factory "$HOME/.local/bin/software-factory"
 ```
 
 Run `software-factory` from the project you want to work on. Create the configuration and task files there as described below. Review skills are bundled in the binary; files at `skills/<skill-name>/SKILL.md` in the working directory override the bundled instructions.
 
 Run `software-factory -v` or `software-factory --version` to print the binary's release tag. Binaries built locally without an injected release tag print `dev`. These flags do not require configuration files.
 
-The repository-root GitHub workflows run tests, vet, formatting checks, and a CLI build for `soft-factory/`. Pushing a tag matching `software-factory-v*` builds and publishes the Linux x86_64 archive and checksum after tests and vet pass.
+The repository-root GitHub workflows run tests, vet, formatting checks, and a CLI build for `soft-factory/`. Pushing a tag matching `software-factory-v*` builds and verifies Linux x86_64, macOS Intel, and macOS Apple Silicon archives on native runners, then publishes all three archives and their checksums after tests and vet pass. A final installation job checks the public installer on each platform.
 
 ## Getting started
 

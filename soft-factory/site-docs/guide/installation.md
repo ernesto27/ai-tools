@@ -2,7 +2,7 @@
 
 ## What you need
 
-Soft Factory supports **Linux x86_64**.
+Soft Factory supports **Linux x86_64** and **macOS on Intel and Apple Silicon**.
 
 - Git installed and a project to work on.
 - [Agent Sandbox installed and configured](https://ernesto27.github.io/ai-tools/installation.html).

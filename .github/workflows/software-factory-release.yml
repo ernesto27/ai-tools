@@ -1,0 +1,165 @@
+name: Release Software Factory
+
+on:
+  push:
+    tags:
+      - "software-factory-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            host_os: Linux
+            host_arch: x86_64
+          - runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+            host_os: Darwin
+            host_arch: x86_64
+          - runner: macos-15
+            goos: darwin
+            goarch: arm64
+            host_os: Darwin
+            host_arch: arm64
+    defaults:
+      run:
+        working-directory: soft-factory
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: soft-factory/go.mod
+          cache: true
+          cache-dependency-path: soft-factory/go.sum
+
+      - name: Verify release
+        env:
+          HOST_OS: ${{ matrix.host_os }}
+          HOST_ARCH: ${{ matrix.host_arch }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^software-factory-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(uname -s)" = "$HOST_OS"
+          test "$(uname -m)" = "$HOST_ARCH"
+          go vet ./...
+          bash -n install.sh
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Build and verify archive
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist/package
+          go build -trimpath -ldflags="-s -w -X main.version=${RELEASE_TAG}" -o dist/package/software-factory ./cmd/factory
+          dist/package/software-factory -h > dist/help.txt
+          grep -F 'Usage:' dist/help.txt
+          test "$(dist/package/software-factory -v)" = "${RELEASE_TAG}"
+          test "$(dist/package/software-factory --version)" = "${RELEASE_TAG}"
+          ASSET="software-factory_${GOOS}_${GOARCH}.tar.gz"
+          tar -C dist/package -czf "dist/$ASSET" software-factory
+          cd dist
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$ASSET" > "$ASSET.sha256"
+          else
+            shasum -a 256 "$ASSET" > "$ASSET.sha256"
+          fi
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-factory-${{ matrix.goos }}-${{ matrix.goarch }}
+          if-no-files-found: error
+          path: |
+            soft-factory/dist/*.tar.gz
+            soft-factory/dist/*.sha256
+
+  release:
+    name: Publish verified release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release candidates
+        uses: actions/download-artifact@v4
+        with:
+          pattern: software-factory-*
+          merge-multiple: true
+          path: dist
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/software-factory_linux_amd64.tar.gz
+            dist/software-factory_linux_amd64.tar.gz.sha256
+            dist/software-factory_darwin_amd64.tar.gz
+            dist/software-factory_darwin_amd64.tar.gz.sha256
+            dist/software-factory_darwin_arm64.tar.gz
+            dist/software-factory_darwin_arm64.tar.gz.sha256
+
+  install:
+    name: Public curl installation on ${{ matrix.runner }}
+    needs: release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            host_os: Linux
+            host_arch: x86_64
+          - runner: macos-15-intel
+            host_os: Darwin
+            host_arch: x86_64
+          - runner: macos-15
+            host_os: Darwin
+            host_arch: arm64
+    steps:
+      # A public install must use the published script and assets, not checkout files.
+      - name: Install the public release and verify help
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          HOST_OS: ${{ matrix.host_os }}
+          HOST_ARCH: ${{ matrix.host_arch }}
+        run: |
+          test "$(uname -s)" = "$HOST_OS"
+          test "$(uname -m)" = "$HOST_ARCH"
+          test ! -e "$HOME/.local/bin/software-factory"
+          unset INSTALL_DIR
+          # Restrict macOS installation to stock tools even if the image has Homebrew.
+          if [ "$HOST_OS" = Darwin ]; then
+            export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          fi
+          curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/soft-factory/install.sh | /bin/bash
+          export PATH="$HOME/.local/bin:$PATH"
+          test "$(command -v software-factory)" = "$HOME/.local/bin/software-factory"
+          cd "$RUNNER_TEMP"
+          software-factory -h > help.txt
+          grep -F 'Usage:' help.txt
+          test "$(software-factory --version)" = "${RELEASE_TAG}"

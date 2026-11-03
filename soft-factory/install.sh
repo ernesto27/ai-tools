@@ -6,48 +6,57 @@ REPO="ernesto27/ai-tools"
 BINARY="software-factory"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
 
-# --- OS check ---
+# --- Platform check ---
 OS="$(uname -s)"
-if [ "$OS" != "Linux" ]; then
-	echo "error: only Linux is supported at this time (detected: $OS)" >&2
-	exit 1
-fi
-
-# --- Architecture check ---
 ARCH="$(uname -m)"
-case "$ARCH" in
-	x86_64) ASSET="software-factory_linux_amd64.tar.gz" ;;
-	*)
-		echo "error: unsupported architecture '$ARCH' (only x86_64 is available)" >&2
-		exit 1
-		;;
+case "$OS/$ARCH" in
+    Linux/x86_64) ASSET="software-factory_linux_amd64.tar.gz" ;;
+    Darwin/x86_64) ASSET="software-factory_darwin_amd64.tar.gz" ;;
+    Darwin/arm64) ASSET="software-factory_darwin_arm64.tar.gz" ;;
+    *)
+        echo "error: unsupported platform '$OS/$ARCH' (supported: Linux/x86_64, Darwin/x86_64, Darwin/arm64)" >&2
+        exit 1
+        ;;
 esac
 
 # --- Downloader ---
 if command -v curl >/dev/null 2>&1; then
-	DOWNLOAD=(curl -fsSL)
+    DOWNLOAD=(curl -fsSL)
 elif command -v wget >/dev/null 2>&1; then
-	DOWNLOAD=(wget -qO-)
+    DOWNLOAD=(wget -qO-)
 else
-	echo "error: curl or wget is required" >&2
-	exit 1
+    echo "error: curl or wget is required" >&2
+    exit 1
 fi
 
-if ! command -v sha256sum >/dev/null 2>&1; then
-	echo "error: sha256sum is required" >&2
-	exit 1
+if command -v sha256sum >/dev/null 2>&1; then
+    CHECKSUM=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+    CHECKSUM=(shasum -a 256)
+else
+    echo "error: sha256sum or shasum is required" >&2
+    exit 1
 fi
 
-# --- Resolve the newest release carrying this component's asset ---
-# /releases/latest can point to agent-sandbox in this shared repository.
+# --- Resolve the newest release asset through the GitHub API ---
+# The repository releases more than one component, so /releases/latest may well
+# point at something other than software-factory.
+echo "Resolving latest ${BINARY} release for ${REPO} ..."
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 "${DOWNLOAD[@]}" "https://api.github.com/repos/${REPO}/releases?per_page=100" > "$TMP_DIR/releases.json"
-ASSET_LINE="$(grep -m1 -oE "\"browser_download_url\"[[:space:]]*:[[:space:]]*\"https://[^\"]*/${ASSET}\"" "$TMP_DIR/releases.json" || true)"
-DOWNLOAD_URL="$(printf '%s\n' "$ASSET_LINE" | sed -E 's/.*"(https:[^"]+)".*/\1/')"
+# GitHub's response order is not a semantic version order. Compare the numeric
+# components of this project's stable release tags before choosing an asset.
+ASSET_LINES="$(grep -oE "\"browser_download_url\"[[:space:]]*:[[:space:]]*\"https://github.com/${REPO}/releases/download/software-factory-v[0-9]+\\.[0-9]+\\.[0-9]+/${ASSET}\"" "$TMP_DIR/releases.json" || true)"
+DOWNLOAD_URL="$(printf '%s\n' "$ASSET_LINES" |
+    sed -nE 's@.*"(https:[^"]*/software-factory-v([0-9]+)\.([0-9]+)\.([0-9]+)/[^"]+)".*@\2 \3 \4 \1@p' |
+    sort -k1,1n -k2,2n -k3,3n |
+    tail -n 1 |
+    awk '{print $4}')"
+
 if [ -z "$DOWNLOAD_URL" ]; then
-	echo "error: could not find asset '${ASSET}' in recent releases of ${REPO}" >&2
-	exit 1
+    echo "error: could not find asset '${ASSET}' in recent releases of ${REPO}" >&2
+    exit 1
 fi
 
 # --- Download and extract ---
@@ -55,12 +64,13 @@ echo "Downloading ${BINARY} from ${DOWNLOAD_URL} ..."
 "${DOWNLOAD[@]}" "$DOWNLOAD_URL" > "$TMP_DIR/$ASSET"
 "${DOWNLOAD[@]}" "${DOWNLOAD_URL}.sha256" > "$TMP_DIR/$ASSET.sha256"
 
-# Compare the digest directly; do not let a downloaded checksum choose file paths.
 EXPECTED_SHA="$(awk 'NR == 1 {print $1}' "$TMP_DIR/$ASSET.sha256")"
-ACTUAL_SHA="$(sha256sum "$TMP_DIR/$ASSET")"
-if [[ ! "$EXPECTED_SHA" =~ ^[[:xdigit:]]{64}$ ]] || [[ "${EXPECTED_SHA,,}" != "${ACTUAL_SHA%% *}" ]]; then
-	echo "error: release archive checksum verification failed" >&2
-	exit 1
+ACTUAL_SHA="$("${CHECKSUM[@]}" "$TMP_DIR/$ASSET")"
+# macOS ships Bash 3.2, which does not support lowercase parameter expansion.
+EXPECTED_SHA_LOWER="$(printf '%s' "$EXPECTED_SHA" | tr '[:upper:]' '[:lower:]')"
+if [[ ! "$EXPECTED_SHA" =~ ^[[:xdigit:]]{64}$ ]] || [[ "$EXPECTED_SHA_LOWER" != "${ACTUAL_SHA%% *}" ]]; then
+    echo "error: release archive checksum verification failed" >&2
+    exit 1
 fi
 tar -xzf "$TMP_DIR/$ASSET" -C "$TMP_DIR" -- "$BINARY"
 
@@ -72,7 +82,7 @@ echo
 echo "${BINARY} installed to ${INSTALL_DIR}/${BINARY}"
 
 if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
-	echo
-	echo "Add this to your shell profile:"
-	printf 'export PATH=%q:"$PATH"\n' "$INSTALL_DIR"
+    echo
+    echo "Add this to your shell profile:"
+    printf 'export PATH=%q:"$PATH"\n' "$INSTALL_DIR"
 fi

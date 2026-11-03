@@ -2,6 +2,7 @@
 [x] - add dark - ligth mode
 [x] - add githuaction to run tests
 [x] - create release for linux and mac
+[] - show version app 
 
 
 sidebar

@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
+          - runner: ubuntu-24.04
             platform: linux
             arch: amd64
             host_arch: x86_64
@@ -189,7 +189,7 @@ jobs:
             Install `software-factory` and `agent-sandbox` separately before using desktop.
             They must be on the desktop process's PATH. CLI installers are not included.
 
-            - Linux x64: download the AppImage, run `chmod +x` on it, and launch it from a terminal with the CLIs on PATH. Built on GitHub's `ubuntu-latest` runner; compatibility with older distributions depends on their runtime libraries. If FUSE is unavailable, try `APPIMAGE_EXTRACT_AND_RUN=1 ./soft-factory_*.AppImage`.
+            - Linux x64: download the AppImage, run `chmod +x` on it, and launch it from a terminal with the CLIs on PATH. Built on Ubuntu 24.04 (glibc 2.39); older distributions are unsupported. If FUSE is unavailable, try `APPIMAGE_EXTRACT_AND_RUN=1 ./soft-factory_*.AppImage`.
             - macOS Apple Silicon (ARM64): download `darwin_arm64.dmg`. Requires macOS 11 or later. Drag Soft Factory to Applications. The app is ad hoc signed without Apple notarization; approve it in System Settings > Privacy & Security > Open Anyway after the first blocked launch.
             - For CLI discovery on macOS, launch the installed executable from a configured terminal: `env PATH="$HOME/.local/bin:$PATH" "/Applications/Soft Factory.app/Contents/MacOS/desktop-app"`.
 

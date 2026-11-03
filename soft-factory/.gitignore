@@ -19,3 +19,5 @@ task.txt
 .agents/skills/test-review-changes/
 .claude/skills/claude-review/
 *.pdf
+software-factory.custom.example.json
+software-factory.simple.example.json

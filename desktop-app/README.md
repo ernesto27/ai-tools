@@ -33,10 +33,9 @@ filename.
 
 ### Linux
 
-AppImages are built on GitHub's `ubuntu-latest` runner. The build environment
-changes as GitHub updates that runner; compatibility with older distributions
-depends on their runtime libraries and desktop environment. The initial release
-targets x64 only.
+AppImages are built on Ubuntu 24.04 with glibc 2.39. Older distributions are
+unsupported; compatibility with other distributions depends on their runtime
+libraries and desktop environment. The initial release targets x64 only.
 
 For example, after downloading version 0.1.0:
 

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -7,6 +8,7 @@ import { BranchRuns } from "./screens/BranchRuns";
 import { RunDetail } from "./screens/RunDetail";
 import { Config } from "./screens/Config";
 import { NewRun } from "./screens/NewRun";
+import { Settings } from "./screens/Settings";
 import { AddRepo } from "./screens/AddRepo";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
 import { useTheme } from "./hooks/useTheme";
@@ -17,6 +19,7 @@ import type { BranchWorktree } from "./worktrees";
 const HOME: Route = { screen: "home" };
 
 function App() {
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
@@ -75,8 +78,8 @@ function App() {
     removingRepo.current = true;
     try {
       const confirmed = await ask(
-        `Are you sure to remove "${repo.name}"?`,
-        { title: "Delete project", kind: "warning", okLabel: "Delete", cancelLabel: "Cancel" },
+        t('Are you sure to remove "{{name}}"?', { name: repo.name }),
+        { title: t("Delete project"), kind: "warning", okLabel: t("Delete"), cancelLabel: t("Cancel") },
       );
       if (!confirmed) return;
       await invoke<void>("remove_repo", { path: repo.path });
@@ -99,7 +102,7 @@ function App() {
   }, []);
 
   const navigate = (next: Route) => {
-    if (route.screen !== "addRepo" && route.screen !== "config") lastBranchRoute.current = route;
+    if (route.screen !== "addRepo" && route.screen !== "config" && route.screen !== "settings") lastBranchRoute.current = route;
     setRoute(next);
     mainRef.current?.scrollTo({ top: 0 });
   };
@@ -148,17 +151,19 @@ function Screen({
   repoAdded: () => void;
   repoPath?: string;
 }) {
+  const { t } = useTranslation();
+  if (route.screen === "settings") return <Settings />;
   if (route.screen === "home") {
     return (
       <div className="flex flex-col gap-3">
-        <Title>Select a repository</Title>
-        <p className="text-muted">Choose a repository from the sidebar to view its branches and runs.</p>
+        <Title>{t("Select a repository")}</Title>
+        <p className="text-muted">{t("Choose a repository from the sidebar to view its branches and runs.")}</p>
       </div>
     );
   }
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
   if (route.screen === "config") {
-    if (!repoPath) return <p>Repository folder not found.</p>;
+    if (!repoPath) return <p>{t("Repository folder not found.")}</p>;
     return <Config key={repoPath} repo={route.repo} repoPath={repoPath} />;
   }
 
@@ -174,7 +179,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>Repository folder not found.</p>
+        <p>{t("Repository folder not found.")}</p>
       );
     case "run":
       return repoPath ? (
@@ -188,7 +193,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>Repository folder not found.</p>
+        <p>{t("Repository folder not found.")}</p>
       );
     case "newRun":
       return repoPath ? (
@@ -202,7 +207,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>Repository folder not found.</p>
+        <p>{t("Repository folder not found.")}</p>
       );
   }
 }

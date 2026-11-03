@@ -12,6 +12,7 @@ export type FactoryRunMode = typeof RUN_MODE.RUN | typeof RUN_MODE.CONTINUE;
 
 export type Route =
   | { screen: "home" }
+  | { screen: "settings" }
   | { screen: "branch"; repo: string; branch: string }
   | { screen: "run"; repo: string; branch: string; runId: string }
   | { screen: "config"; repo: string }

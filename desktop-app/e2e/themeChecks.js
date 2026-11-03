@@ -10,14 +10,14 @@ export async function runThemeChecks(browser, artifacts) {
     scheme: getComputedStyle(document.documentElement).colorScheme,
   }));
   const ready = async () => {
-    await (await browser.$('nav [role="switch"][aria-label="Dark mode"]'))
+    await (await browser.$('[data-testid="theme-toggle"]'))
       .waitForDisplayed({ timeout: 15_000 });
   };
   const expectTheme = async (theme) => {
     await browser.waitUntil(async () => (await state()).theme === theme,
       { timeout: 5_000 });
     assert.equal((await state()).scheme, theme);
-    const toggle = await browser.$('nav [role="switch"][aria-label="Dark mode"]');
+    const toggle = await browser.$('[data-testid="theme-toggle"]');
     assert.equal(await toggle.getAttribute("aria-checked"), String(theme === "dark"));
     assert.equal((await state()).background,
       theme === "dark" ? "rgb(17, 17, 16)" : "rgb(255, 255, 255)");
@@ -30,7 +30,7 @@ export async function runThemeChecks(browser, artifacts) {
     await expectTheme("dark");
     await browser.saveScreenshot(join(artifacts, "theme-dark.png"));
 
-    await (await browser.$('nav [role="switch"][aria-label="Dark mode"]')).click();
+    await (await browser.$('[data-testid="theme-toggle"]')).click();
     await expectTheme("light");
     assert.equal(await browser.execute((name) => localStorage.getItem(name), key), "light");
     await browser.saveScreenshot(join(artifacts, "theme-light.png"));
@@ -38,7 +38,7 @@ export async function runThemeChecks(browser, artifacts) {
     await ready();
     await expectTheme("light");
 
-    await (await browser.$('nav [role="switch"][aria-label="Dark mode"]')).click();
+    await (await browser.$('[data-testid="theme-toggle"]')).click();
     await expectTheme("dark");
     assert.equal(await browser.execute((name) => localStorage.getItem(name), key), "dark");
     await browser.refresh();

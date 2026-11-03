@@ -6,7 +6,7 @@ import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 export async function runNavigationChecks(t, browser, fixture, artifacts) {
   const { repoName, branch, runId, logText } = fixture;
   const navButton = (text) =>
-    `//nav[@aria-label="Main"]//button[normalize-space(.)="${text}"]`;
+    `//nav[@data-testid="main-nav"]//button[normalize-space(.)="${text}"]`;
 
   async function visible(selector) {
     const element = await browser.$(selector);
@@ -47,7 +47,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
   }
 
   async function openRepo() {
-    const selector = 'nav[aria-label="Main"] button[aria-haspopup="menu"]';
+    const selector = 'nav[data-testid="main-nav"] button[aria-haspopup="menu"]';
     await text(`${selector} span[title="${repoName}"]`, repoName);
     if (await (await browser.$(selector)).getAttribute("aria-expanded") !== "true") {
       await click(selector);
@@ -56,7 +56,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
 
   async function openBranch() {
     await openRepo();
-    const selector = `nav[aria-label="Main"] button[title="${branch}"]`;
+    const selector = `nav[data-testid="main-nav"] button[title="${branch}"]`;
     await visible(selector);
     if (await (await browser.$(selector)).getAttribute("aria-expanded") !== "true") {
       await click(selector);
@@ -85,7 +85,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await t.test(name, { timeout: 60_000 }, async (screenContext) => {
       try {
         await check();
-        const toggle = await browser.$('nav [role="switch"][aria-label="Dark mode"]');
+        const toggle = await browser.$('[data-testid="theme-toggle"]');
         const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
         for (const theme of ["light", "dark"]) {
           if (await browser.execute(() => document.documentElement.dataset.theme) !== theme) {
@@ -133,7 +133,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await mainHasText(
       "Choose a repository from the sidebar to view its branches and runs.",
     );
-    await text(`nav[aria-label="Main"] span[title="${repoName}"]`, repoName);
+    await text(`nav[data-testid="main-nav"] span[title="${repoName}"]`, repoName);
   });
 
   await screen("Add repository", async () => {

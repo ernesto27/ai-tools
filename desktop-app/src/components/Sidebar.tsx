@@ -1,3 +1,5 @@
+import { messageText, type UiMessage } from "../messages";
+import { useTranslation } from "react-i18next";
 import type { BranchWorktree } from "../worktrees";
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { STATUS_COLOR } from "../data";
@@ -40,6 +42,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
 }
 
 export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
+  const { t } = useTranslation();
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState("");
@@ -50,7 +53,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
     y: number;
     trigger: HTMLButtonElement;
   } | null>(null);
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<UiMessage | null>(null);
   const closeRepoMenu = useCallback(() => setRepoMenu(null), []);
 
   const deleteFromMenu = () => {
@@ -59,7 +62,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
     closeRepoMenu();
     setRemoveError(null);
     void onRemoveRepo(repo).catch((error: unknown) => {
-      setRemoveError(`Could not delete "${repo.name}": ${String(error)}`);
+      setRemoveError({ key: 'Could not delete "{{name}}": {{error}}', values: { name: repo.name, error: String(error) } });
     });
   };
 
@@ -75,17 +78,22 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
   const sub = route.screen === "newRun" ? route.mode : "runs";
 
   return (
-    <nav aria-label="Main" className="flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-7 text-base">
+    <nav data-testid="main-nav" aria-label={t("Main")} className="flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-7 text-base">
       <div className="flex shrink-0 flex-col gap-3 pb-5">
         <span className="px-2 font-mono text-md font-medium">soft·factory</span>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+        <NavItem tall data-testid="nav-settings"
+          aria-current={route.screen === "settings" ? "page" : undefined}
+          onClick={() => navigate({ screen: "settings" })}>
+          {t("Settings")}
+        </NavItem>
         <NavItem tall aria-current={route.screen === "addRepo" ? "page" : undefined} onClick={() => navigate({ screen: "addRepo" })}>
-          Add repository
+          {t("Add repository")}
         </NavItem>
 
-        <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">Repositories</span>
+        <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">{t("Repositories")}</span>
         <div className="flex flex-col gap-2">
           {repos.map((saved) => {
             const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
@@ -139,7 +147,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                       aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
                       onClick={() => navigate({ screen: "config", repo: repo.name })}
                     >
-                      Config
+                      {t("Config")}
                     </NavItem>
                     <NavItem
                       className="text-md"
@@ -149,9 +157,9 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                         navigate({ screen: "newRun", repo: repo.name, branch: repo.branches[0]?.name ?? "factory-task", mode: RUN_MODE.RUN });
                       }}
                     >
-                      New run
+                      {t("New run")}
                     </NavItem>
-                    {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">No branches yet</span>}
+                    {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">{t("No branches yet")}</span>}
                     {repo.branches.map((b) => {
                       const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
                       const isActive = activeRepo === repo.name && activeBranch === b.name;
@@ -185,19 +193,19 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                           {expanded && (
                             <div className="ml-[11px] flex flex-col gap-px border-l border-line pl-2.5 text-md">
                               <NavItem aria-current={isActive && sub === "runs" ? "page" : undefined} onClick={() => navigate({ screen: "branch", ...at })}>
-                                Runs
+                                {t("Runs")}
                               </NavItem>
                               <NavItem
                                 aria-current={isActive && sub === RUN_MODE.CONTINUE ? "page" : undefined}
                                 onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}
                               >
-                                Continue
+                                {t("Continue")}
                               </NavItem>
                               <NavItem
                                 aria-current={isActive && sub === RUN_MODE.RESUME ? "page" : undefined}
                                 onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RESUME })}
                               >
-                                Resume
+                                {t("Resume")}
                               </NavItem>
                             </div>
                           )}
@@ -210,7 +218,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
             );
           })}
         </div>
-        {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{removeError}</p>}
+        {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{messageText(removeError, t)}</p>}
       </div>
       {repoMenu && (
         <RepoContextMenu

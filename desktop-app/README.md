@@ -66,6 +66,13 @@ installed CLIs available, launch the installed executable from a configured term
 env PATH="$HOME/.local/bin:$PATH" "/Applications/Soft Factory.app/Contents/MacOS/desktop-app"
 ```
 
+## Desktop language
+
+Open **Settings → Language** in the sidebar and choose **English** or
+**Español (Argentina)**. The change applies immediately and is remembered on
+this device. English is the default. Interface translations work offline;
+CLI output, logs, and agent-generated content keep their original language.
+
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)

@@ -1,3 +1,4 @@
+import { AppMessageError, toUiMessage, type UiMessage } from "../messages";
 import type { BranchWorktree } from "../worktrees";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -25,8 +26,8 @@ export interface DesktopRun {
   runId: string | null;
   directory: string | null;
   state: RunState;
-  error: string | null;
-  stopError: string | null;
+  error: UiMessage | null;
+  stopError: UiMessage | null;
 }
 
 export interface StartDesktopRun {
@@ -88,7 +89,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
   }
 
   function start(input: StartDesktopRun): string {
-    if (busy(input.repoPath)) throw new Error("This repository already has an active run.");
+    if (busy(input.repoPath)) throw new AppMessageError({ key: "This repository already has an active run." });
     const id = `desktop:${crypto.randomUUID()}`;
     update(id, {
       id, repo: input.repo, repoPath: input.repoPath, branch: input.branch,
@@ -130,7 +131,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
             const candidates = entries.filter((entry) =>
               entry.name.startsWith(`${input.mode}-`) && !previousDirectories.has(entry.directory));
             if (candidates.length > 1) {
-              throw new Error("Multiple new run directories found. Open the run from the branch list.");
+              throw new AppMessageError({ key: "Multiple new run directories found. Open the run from the branch list." });
             }
             if (candidates.length === 1) {
               const entry = candidates[0];
@@ -141,7 +142,8 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
             }
           } catch (error) {
             if (isDesktopRunActive(sessions.current[id])) {
-              update(id, { error: `Could not locate run logs: ${String(error)}` });
+              update(id, { error: error instanceof AppMessageError ? error.descriptor
+                : { key: "Could not locate run logs: {{error}}", values: { error: String(error) } } });
             }
           }
         });
@@ -183,7 +185,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
         const outcome = await completion;
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        update(id, { state: RUN_STATE.FAILED, error: String(error), stopError: null });
+        update(id, { state: RUN_STATE.FAILED, error: toUiMessage(error), stopError: null });
       } finally {
         stopped = true;
         if (timer !== undefined) clearTimeout(timer);
@@ -196,7 +198,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
   }
 
   function resume(input: ResumeDesktopRun): string {
-    if (busy(input.repoPath)) throw new Error("This repository already has an active run.");
+    if (busy(input.repoPath)) throw new AppMessageError({ key: "This repository already has an active run." });
     const id = `desktop:${crypto.randomUUID()}`;
     update(id, {
       id, repo: input.repo, repoPath: input.repoPath, branch: input.branch,
@@ -216,7 +218,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
         });
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        update(id, { state: RUN_STATE.FAILED, error: String(error), stopError: null });
+        update(id, { state: RUN_STATE.FAILED, error: toUiMessage(error), stopError: null });
       }
     })();
     return id;
@@ -242,7 +244,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
       if (sessions.current[id]?.state === RUN_STATE.STOPPING) {
         update(id, {
           state: RUN_STATE.RUNNING,
-          stopError: `Could not stop run: ${String(error)}`,
+          stopError: { key: "Could not stop run: {{error}}", values: { error: String(error) } },
         });
       }
     }

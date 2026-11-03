@@ -195,5 +195,7 @@
   "couldNotStopRunError": "No se pudo detener la ejecución: {{error}}",
   "runCountOne": "{{count}} ejecución",
   "runCountOther": "{{count}} ejecuciones",
-  "googleDrive": "Google Drive"
+  "googleDrive": "Google Drive",
+  "durationUnavailable": "Duración no disponible",
+  "stageDuration": "Duración de {{stage}}"
 }

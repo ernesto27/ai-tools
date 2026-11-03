@@ -9,6 +9,7 @@ import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDes
 import { STAGES, stageProgress } from "../runProgress";
 import { RUN_MODE, type Navigate } from "../router";
 import { statusClass, statusLabel } from "../runStatus";
+import { StageSummary } from "../components/StageSummary";
 import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
 type Tab = "log" | "summary" | "walk";
@@ -170,19 +171,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
         <>
           {run?.error && <p role="alert" className="break-words text-bad">{t("couldNotLoadStageStatusesError", { error: run.error })}</p>}
 
-          <dl className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
-            {STAGES.map((stage) => {
-              const status = progress.statuses.get(stage.id);
-              return (
-                <div key={stage.id} className="flex flex-col gap-0.5">
-                  <dt className="text-sm text-muted">{t(stage.label)}</dt>
-                  <dd className={cx("text-xl font-medium", statusClass(status))}>
-                    {!status && live ? t("pending") : statusLabel(status, t)}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
+          <StageSummary statuses={progress.statuses} logs={logs} live={live} />
 
           {logs.length === 0 && <p role="status" className="text-muted">{t("noLogFilesRecordedForThisRunYet")}</p>}
 

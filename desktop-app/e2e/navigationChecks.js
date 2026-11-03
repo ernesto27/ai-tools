@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
+import { runStageTimingChecks } from "./stageTimingChecks.js";
 
 export async function runNavigationChecks(t, browser, fixture, artifacts) {
   const { repoName, branch, runId, logText } = fixture;
@@ -188,6 +189,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
       `//span[text()="${logText}"]`,
       logText,
     );
-    await text('//main//dl/div[dt[normalize-space(.)="Implement"]]/dd', "Failed");
+    await text('//main//dl/div[dt[normalize-space(.)="Implement"]]/dd[1]', "Failed");
+    await runStageTimingChecks(browser, fixture, artifacts, { text, openRuns, click });
   });
 }

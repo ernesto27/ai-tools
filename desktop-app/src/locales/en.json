@@ -195,5 +195,7 @@
   "couldNotStopRunError": "Could not stop run: {{error}}",
   "runCountOne": "{{count}} run",
   "runCountOther": "{{count}} runs",
-  "googleDrive": "Google Drive"
+  "googleDrive": "Google Drive",
+  "durationUnavailable": "Duration unavailable",
+  "stageDuration": "{{stage}} duration"
 }

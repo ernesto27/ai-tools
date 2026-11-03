@@ -1,3 +1,5 @@
+import { messageText, type UiMessage } from "../messages";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { TextButton } from "./ui";
@@ -6,9 +8,10 @@ interface Props {
   path: string;
 }
 
-type CopyStatus = "idle" | "copying" | "copied" | { error: string };
+type CopyStatus = "idle" | "copying" | "copied" | { error: UiMessage };
 
 export function WorktreePath({ path }: Props) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<CopyStatus>("idle");
 
   useEffect(() => {
@@ -23,7 +26,7 @@ export function WorktreePath({ path }: Props) {
       await writeText(path);
       setStatus("copied");
     } catch (error) {
-      setStatus({ error: `Could not copy path: ${String(error)}` });
+      setStatus({ error: { key: "couldNotCopyPathError", values: { error: String(error) } } });
     }
   }
 
@@ -33,8 +36,8 @@ export function WorktreePath({ path }: Props) {
         <p className="min-w-0 font-mono text-xs break-all text-muted">{path}</p>
         <TextButton
           tone="muted"
-          aria-label="Copy worktree path"
-          title="Copy worktree path"
+          aria-label={t("copyWorktreePath")}
+          title={t("copyWorktreePath")}
           disabled={status === "copying"}
           onClick={() => void copyPath()}
           className="flex size-7 shrink-0 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info disabled:opacity-40"
@@ -45,9 +48,9 @@ export function WorktreePath({ path }: Props) {
           </svg>
         </TextButton>
       </div>
-      <span role="status" className="text-xs text-muted">{status === "copied" ? "Copied" : ""}</span>
+      <span role="status" className="text-xs text-muted">{status === "copied" ? t("copied") : ""}</span>
       {typeof status === "object" && (
-        <p role="alert" className="text-xs break-words text-bad">{status.error}</p>
+        <p role="alert" className="text-xs break-words text-bad">{messageText(status.error, t)}</p>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { Input, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -20,6 +21,7 @@ interface Requirement {
 
 
 export function AddRepo({ onDone }: Props) {
+  const { t } = useTranslation();
   const [path, setPath] = useState("");
   const [info, setInfo] = useState<FolderInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +38,16 @@ export function AddRepo({ onDone }: Props) {
 
   const checks = [
     info?.isGit
-      ? { ok: true, text: "git repository" }
-      : { ok: false, text: "not a git repository" },
+      ? { ok: true, text: t("gitRepository") }
+      : { ok: false, text: t("notAGitRepository") },
     hasConfig
-      ? { ok: true, text: "software-factory.json found" }
-      : { ok: false, text: "no software-factory.json — create it in the repository's Config section" },
+      ? { ok: true, text: t("softwareFactoryJsonFound") }
+      : { ok: false, text: t("noSoftwareFactoryJsonCreateItInTheRepositorySConfigSection") },
     ...(sandboxError
       ? [{ ok: false, text: sandboxError }]
       : requirements.map((r) => ({
           ok: r.installed,
-          text: r.installed ? `${r.name} installed` : `${r.name} not installed`,
+          text: r.installed ? t("nameInstalled", { name: r.name }) : t("nameNotInstalled", { name: r.name }),
         }))),
   ];
 
@@ -74,17 +76,17 @@ export function AddRepo({ onDone }: Props) {
   return (
     <div className="flex max-w-[680px] flex-col gap-9">
       <header className="flex flex-col gap-1">
-        <Title>Add repository</Title>
-        <span className="text-base text-muted">Point Soft Factory at a git repository on this machine.</span>
+        <Title>{t("addRepository")}</Title>
+        <span className="text-base text-muted">{t("pointSoftFactoryAtAGitRepositoryOnThisMachine")}</span>
       </header>
 
       <section aria-labelledby="folder-h" className="flex flex-col gap-2.5">
         <SectionHeading id="folder-h" plain>
-          Folder
+          {t("folder")}
         </SectionHeading>
         <div className="flex gap-2">
           <label className="sr-only" htmlFor="folder">
-            Repository folder
+            {t("repositoryFolder")}
           </label>
           <Input
             id="folder"
@@ -93,16 +95,16 @@ export function AddRepo({ onDone }: Props) {
             readOnly
             className="min-w-0 grow"
             value={path}
-            placeholder="/path/to/repository"
+            placeholder={t("pathToRepository")}
           />
-          <OutlineButton onClick={browse}>Browse</OutlineButton>
+          <OutlineButton onClick={browse}>{t("browse")}</OutlineButton>
         </div>
       </section>
 
       {info && (
         <section aria-labelledby="chk-h" className="flex flex-col gap-1.5">
           <SectionHeading id="chk-h" plain className="mb-1">
-            Checks
+            {t("checks")}
           </SectionHeading>
           {checks.map((c) => (
             <span key={c.text} className="font-mono text-sm whitespace-pre">
@@ -116,7 +118,7 @@ export function AddRepo({ onDone }: Props) {
 
       <div className="flex items-center gap-5 border-t border-line pt-2">
         <PrimaryButton size="lg" disabled={!info?.isGit} onClick={addRepo}>
-          Add repository
+          {t("addRepository")}
         </PrimaryButton>
         {error && (
           <span role="alert" className="text-base text-warn">

@@ -1,3 +1,5 @@
+import { messageText, type UiMessage } from "../messages";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Field, Input, OutlineButton, SectionHeading, Textarea, TextTabs } from "./ui";
@@ -8,9 +10,10 @@ interface TaskInputProps {
 }
 
 function TaskTextInput({ value, onChange }: TaskInputProps) {
+  const { t } = useTranslation();
   return (
-    <Field label="Task instructions">
-      <Textarea rows={7} placeholder="Describe what you want to implement…" value={value}
+    <Field label={t("taskInstructions")}>
+      <Textarea rows={7} placeholder={t("describeWhatYouWantToImplement")} value={value}
         onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
@@ -21,8 +24,9 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
   label: string;
   placeholder: string;
 }) {
+  const { t } = useTranslation();
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiMessage | null>(null);
 
   async function browse() {
     if (opening) return;
@@ -32,7 +36,7 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
       const path = await open({ directory, multiple: false });
       if (path) onChange(path);
     } catch (error) {
-      setError(`Could not open the browser: ${String(error)}`);
+      setError({ key: "couldNotOpenTheBrowserError", values: { error: String(error) } });
     } finally {
       setOpening(false);
     }
@@ -47,26 +51,29 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
               onChange={(event) => onChange(event.target.value)} />
           </Field>
         </div>
-        <OutlineButton onClick={browse} disabled={opening} aria-label={`Browse for ${label.toLowerCase()}`}>
-          {opening ? "Opening…" : "Browse"}
+        <OutlineButton onClick={browse} disabled={opening} aria-label={t("browseForLabel", { label })}>
+          {opening ? t("opening") : t("browse")}
         </OutlineButton>
       </div>
-      {error && <p role="alert" className="text-sm text-bad">{error}</p>}
+      {error && <p role="alert" className="text-sm text-bad">{messageText(error, t)}</p>}
     </div>
   );
 }
 
 function TaskFileInput(props: TaskInputProps) {
-  return <TaskPathInput {...props} directory={false} label="Task file" placeholder="Path to your task file" />;
+  const { t } = useTranslation();
+  return <TaskPathInput {...props} directory={false} label={t("taskFile")} placeholder={t("pathToYourTaskFile")} />;
 }
 
 function TaskFolderInput(props: TaskInputProps) {
-  return <TaskPathInput {...props} directory label="Task folder" placeholder="Folder with task and context files" />;
+  const { t } = useTranslation();
+  return <TaskPathInput {...props} directory label={t("taskFolder")} placeholder={t("folderWithTaskAndContextFiles")} />;
 }
 
 function JiraUrlInput({ value, onChange }: TaskInputProps) {
+  const { t } = useTranslation();
   return (
-    <Field label="Jira issue URL">
+    <Field label={t("jiraIssueUrl")}>
       <Input type="url" mono large placeholder="https://your-team.atlassian.net/browse/SF-142" value={value}
         onChange={(event) => onChange(event.target.value)} />
     </Field>
@@ -74,16 +81,15 @@ function JiraUrlInput({ value, onChange }: TaskInputProps) {
 }
 
 const TASK_SOURCES = {
-  task: { label: "Task", component: TaskTextInput },
-  file: { label: "File", component: TaskFileInput },
-  folder: { label: "Folder", component: TaskFolderInput },
-  jira: { label: "Jira URL", component: JiraUrlInput },
+  task: { label: "task", component: TaskTextInput },
+  file: { label: "file", component: TaskFileInput },
+  folder: { label: "folder", component: TaskFolderInput },
+  jira: { label: "jiraUrl", component: JiraUrlInput },
 } as const;
 
 export type TaskSource = keyof typeof TASK_SOURCES;
 
 const sourceKeys = Object.keys(TASK_SOURCES) as TaskSource[];
-const sourceTabs = sourceKeys.map((key) => [key, TASK_SOURCES[key].label] as const);
 
 export function RunTaskInput({ source, onSourceChange, values, onChange }: {
   source: TaskSource;
@@ -91,13 +97,15 @@ export function RunTaskInput({ source, onSourceChange, values, onChange }: {
   values: Record<TaskSource, string>;
   onChange: (source: TaskSource, value: string) => void;
 }) {
+  const { t } = useTranslation();
+  const sourceTabs = sourceKeys.map((key) => [key, t(TASK_SOURCES[key].label)] as const);
   const ActiveInput = TASK_SOURCES[source].component;
 
   return (
     <section aria-labelledby="task-h" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionHeading id="task-h" plain>Task</SectionHeading>
-        <TextTabs label="Task source" items={sourceTabs} value={source} onChange={onSourceChange} />
+        <SectionHeading id="task-h" plain>{t("task")}</SectionHeading>
+        <TextTabs label={t("taskSource")} items={sourceTabs} value={source} onChange={onSourceChange} />
       </div>
       <ActiveInput key={source} value={values[source]} onChange={(value) => onChange(source, value)} />
     </section>

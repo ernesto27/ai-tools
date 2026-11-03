@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Props) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
 
@@ -45,7 +47,7 @@ export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Pro
     <div
       ref={menuRef}
       role="menu"
-      aria-label={`${label} options`}
+      aria-label={t("nameOptions", { name: label })}
       style={{ left: x, top: y }}
       className="fixed z-50 min-w-40 rounded-md border border-line bg-panel p-1 shadow-lg"
       onContextMenu={(event) => event.preventDefault()}
@@ -66,7 +68,7 @@ export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Pro
         className="min-h-9 w-full rounded px-3 text-left text-bad hover:bg-selected focus:bg-selected"
         onClick={onDelete}
       >
-        Delete
+        {t("delete")}
       </button>
     </div>,
     document.body,

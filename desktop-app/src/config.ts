@@ -1,3 +1,4 @@
+import { AppMessageError } from "./messages";
 import { CONFIG_STAGES } from "./data";
 
 export type TaskSource = "file" | "folder" | "drive";
@@ -106,20 +107,20 @@ function isObject(value: unknown): value is JsonObject {
 }
 
 function requireObject(value: unknown, path: string): asserts value is JsonObject {
-  if (!isObject(value)) throw new Error(`${path} must be a JSON object.`);
+  if (!isObject(value)) throw new AppMessageError({ key: "pathMustBeAJsonObject", values: { path } });
 }
 
 function checkFields(object: JsonObject, fields: string[], type: "string" | "boolean", path: string) {
   for (const field of fields) {
     if (object[field] !== undefined && typeof object[field] !== type) {
-      throw new Error(`${path}.${field} must be a ${type}.`);
+      throw new AppMessageError({ key: "pathFieldMustBeAType", values: { path, field, type } });
     }
   }
 }
 
 function checkStringList(value: unknown, path: string) {
   if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== "string"))) {
-    throw new Error(`${path} must be a list of strings.`);
+    throw new AppMessageError({ key: "pathMustBeAListOfStrings", values: { path } });
   }
 }
 

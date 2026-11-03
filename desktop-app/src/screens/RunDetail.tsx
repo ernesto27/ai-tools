@@ -1,3 +1,5 @@
+import { messageText, type UiMessage } from "../messages";
+import { useTranslation } from "react-i18next";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,9 +14,9 @@ import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, 
 type Tab = "log" | "summary" | "walk";
 
 const TABS = [
-  ["log", "Log"],
-  ["summary", "Summary"],
-  ["walk", "Walkthrough"],
+  ["log", "log"],
+  ["summary", "summary"],
+  ["walk", "walkthrough"],
 ] as const;
 
 interface Props {
@@ -27,6 +29,7 @@ interface Props {
 }
 
 export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns }: Props) {
+  const { t } = useTranslation();
   const session = desktopRuns.find(repoPath, branch, runId);
   const live = session !== undefined && isDesktopRunActive(session);
   const showStop = desktopRuns.supportsStop
@@ -37,17 +40,17 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
   const title = session?.runId ?? (
     session
-      ? session.state === RUN_STATE.STOPPING ? "Stopping run"
-        : interrupted ? "Stopped run"
-        : live ? "Starting run"
-        : session.state === RUN_STATE.FAILED ? "Failed run"
-        : "Completed run"
+      ? session.state === RUN_STATE.STOPPING ? t("stoppingRun")
+        : interrupted ? t("stoppedRun")
+        : live ? t("startingRun")
+        : session.state === RUN_STATE.FAILED ? t("failedRun")
+        : t("completedRun")
       : runId
   );
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
   const [tab, setTab] = useState<Tab>("log");
   const [folderError, setFolderError] = useState<string | null>(null);
-  const [stopDialogError, setStopDialogError] = useState<string | null>(null);
+  const [stopDialogError, setStopDialogError] = useState<UiMessage | null>(null);
   const stopConfirmationPending = useRef(false);
 
   const [following, setFollowing] = useState(true);
@@ -83,12 +86,12 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     setStopDialogError(null);
     try {
       // Tauri's dialog plugin makes window.confirm asynchronous.
-      const confirmed = await window.confirm("Stop this run? You can resume it later.");
+      const confirmed = await window.confirm(t("stopThisRunYouCanResumeItLater"));
       if (confirmed) {
         await desktopRuns.stop(session.id);
       }
     } catch (error) {
-      setStopDialogError(`Could not confirm stopping the run: ${String(error)}`);
+      setStopDialogError({ key: "couldNotConfirmStoppingTheRunError", values: { error: String(error) } });
     } finally {
       stopConfirmationPending.current = false;
     }
@@ -117,10 +120,10 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           <div className="min-w-0 break-words"><Title>{title}</Title></div>
           <div className="flex flex-wrap items-center gap-5 text-md">
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
-              Show folder
+              {t("showFolder")}
             </TextButton>
             <OutlineButton disabled={loading} onClick={refresh}>
-              {loading ? "Loading…" : "Refresh"}
+              {loading ? t("loading") : t("refresh")}
             </OutlineButton>
             {showStop && (
               <OutlineButton
@@ -128,14 +131,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 onClick={() => void stopRun()}
                 className="text-bad disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {session.state === RUN_STATE.STOPPING ? "Stopping…" : "Stop"}
+                {session.state === RUN_STATE.STOPPING ? t("stopping") : t("stop")}
               </OutlineButton>
             )}
             <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({
               screen: "newRun", repo, branch,
               mode: interrupted ? RUN_MODE.RESUME : RUN_MODE.CONTINUE,
             })}>
-              {interrupted ? "Resume" : "Continue"}
+              {interrupted ? t("resume") : t("continue")}
             </PrimaryButton>
           </div>
         </div>
@@ -144,48 +147,48 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
       {session && (
         <div className="shrink-0 space-y-2">
           <p role="status" className="text-sm text-muted">
-            {session.state === RUN_STATE.STARTING ? "Starting run…"
-              : session.state === RUN_STATE.STOPPING ? "Stopping run… Waiting for cleanup."
-              : live ? (session.directory ? "Live · updates every second" : "Waiting for execution log directory…")
-              : session.state === RUN_STATE.SUCCEEDED ? "Run completed."
-              : session.state === RUN_STATE.INTERRUPTED ? "Run stopped. Use Resume to continue."
-              : "Run failed."}
+            {session.state === RUN_STATE.STARTING ? t("startingRunProgress")
+              : session.state === RUN_STATE.STOPPING ? t("stoppingRunWaitingForCleanup")
+              : live ? (session.directory ? t("liveUpdatesEverySecond") : t("waitingForExecutionLogDirectory"))
+              : session.state === RUN_STATE.SUCCEEDED ? t("runCompleted")
+              : session.state === RUN_STATE.INTERRUPTED ? t("runStoppedUseResumeToContinue")
+              : t("runFailed")}
           </p>
-          {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{session.error}</p>}
+          {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{messageText(session.error, t)}</p>}
           {session.stopError && (
-            <p role="alert" className="whitespace-pre-wrap break-words text-bad">{session.stopError}</p>
+            <p role="alert" className="whitespace-pre-wrap break-words text-bad">{messageText(session.stopError, t)}</p>
           )}
         </div>
       )}
 
-      {loading && <p role="status" className="text-muted">Loading run logs…</p>}
+      {loading && <p role="status" className="text-muted">{t("loadingRunLogs")}</p>}
       {error && <p role="alert" className="break-words text-bad">{error}</p>}
-      {folderError && <p role="alert" className="break-words text-bad">Could not show folder: {folderError}</p>}
-      {stopDialogError && <p role="alert" className="break-words text-bad">{stopDialogError}</p>}
+      {folderError && <p role="alert" className="break-words text-bad">{t("couldNotShowFolderError", { error: folderError })}</p>}
+      {stopDialogError && <p role="alert" className="break-words text-bad">{messageText(stopDialogError, t)}</p>}
 
       {!loading && (
         <>
-          {run?.error && <p role="alert" className="break-words text-bad">Could not load stage statuses: {run.error}</p>}
+          {run?.error && <p role="alert" className="break-words text-bad">{t("couldNotLoadStageStatusesError", { error: run.error })}</p>}
 
           <dl className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
             {STAGES.map((stage) => {
               const status = progress.statuses.get(stage.id);
               return (
                 <div key={stage.id} className="flex flex-col gap-0.5">
-                  <dt className="text-sm text-muted">{stage.label}</dt>
+                  <dt className="text-sm text-muted">{t(stage.label)}</dt>
                   <dd className={cx("text-xl font-medium", statusClass(status))}>
-                    {!status && live ? "Pending" : statusLabel(status)}
+                    {!status && live ? t("pending") : statusLabel(status, t)}
                   </dd>
                 </div>
               );
             })}
           </dl>
 
-          {logs.length === 0 && <p role="status" className="text-muted">No log files recorded for this run yet.</p>}
+          {logs.length === 0 && <p role="status" className="text-muted">{t("noLogFilesRecordedForThisRunYet")}</p>}
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(140px,220px)_minmax(0,1fr)] gap-6 lg:gap-10">
-            <section aria-label="Stages" className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
-              {stages.length === 0 && <p className="text-sm text-muted">No stages recorded yet.</p>}
+            <section aria-label={t("stages")} className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
+              {stages.length === 0 && <p className="text-sm text-muted">{t("noStagesRecordedYet")}</p>}
               {stages.map((stage) => {
                 const status = progress.statuses.get(stage.id);
                 return (
@@ -200,18 +203,18 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                     }}
                     className="flex min-h-13 w-full shrink-0 flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left hover:bg-hover aria-pressed:bg-selected"
                   >
-                    <span className="font-medium">{stage.label}</span>
+                    <span className="font-medium">{t(stage.label)}</span>
                     <span className={cx("text-sm", statusClass(status))}>
-                      {!status && live ? "Pending" : statusLabel(status)}
+                      {!status && live ? t("pending") : statusLabel(status, t)}
                     </span>
                   </button>
                 );
               })}
             </section>
 
-            <section aria-label="Output" className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+            <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
-                <Tabs label="Views" items={TABS} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
+                <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
                 {live && (
                   <TextButton aria-pressed={following} onClick={() => {
                     setFollowing(true);
@@ -221,28 +224,28 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                       outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
                     }
                   }}>
-                    {following ? "Following live" : "Follow live"}
+                    {following ? t("followingLive") : t("followLive")}
                   </TextButton>
                 )}
-                <span className="font-mono text-xs break-all text-muted">{filename ?? "No stage selected"}</span>
+                <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
               </div>
 
               <div
                 ref={outputPanel}
                 key={filename ?? "no-file"}
                 role="region"
-                aria-label={filename ? `Contents of ${filename}` : "File contents"}
+                aria-label={filename ? t("contentsOfFilename", { filename }) : t("fileContents")}
                 tabIndex={0}
                 className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-panel"
               >
                 {!output ? (
                   <p role="status" className="rounded-md bg-panel p-4 text-muted">
-                    {tab === "summary" ? "No summary recorded for this run yet."
-                      : tab === "walk" ? "No walkthrough recorded for this run yet."
-                      : "No log recorded for this stage yet."}
+                    {tab === "summary" ? t("noSummaryRecordedForThisRunYet")
+                      : tab === "walk" ? t("noWalkthroughRecordedForThisRunYet")
+                      : t("noLogRecordedForThisStageYet")}
                   </p>
                 ) : output.content.length === 0 ? (
-                  <p role="status" className="rounded-md bg-panel p-4 text-muted">This file is empty.</p>
+                  <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("thisFileIsEmpty")}</p>
                 ) : tab === "walk" ? (
                   <article className="walkthrough-markdown p-5">
                     <Markdown remarkPlugins={[remarkGfm]}>{output.content}</Markdown>

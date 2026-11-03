@@ -5,7 +5,7 @@ import { join } from "node:path";
 export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
   const configPath = join(fixture.repo, "software-factory.json");
   const original = readFileSync(configPath, "utf8");
-  const nav = (label) => `//nav[@aria-label="Main"]//button[normalize-space(.)="${label}"]`;
+  const nav = (label) => `//nav[@data-testid="main-nav"]//button[normalize-space(.)="${label}"]`;
   const sharedAgent = '(//main//label[normalize-space(text())="Agent"]/select)[1]';
   const model = () => browser.$("#default-model");
   const stage = () => browser.$("#implementation-model");
@@ -35,7 +35,7 @@ export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
   async function captureDropdown(input, name) {
     const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
     const startingSize = await browser.getWindowSize();
-    const toggle = await browser.$('nav [role="switch"][aria-label="Dark mode"]');
+    const toggle = await browser.$('[data-testid="theme-toggle"]');
     for (const theme of ["light", "dark"]) {
       if (await browser.execute(() => document.documentElement.dataset.theme) !== theme) {
         await toggle.click();

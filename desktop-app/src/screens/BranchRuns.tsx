@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { WorktreePath } from "../components/WorktreePath";
 import { RUN_MODE, type Navigate } from "../router";
-import { statusClass, statusLabel } from "../runStatus";
+import { stageLabel, statusClass, statusLabel } from "../runStatus";
 import { useBranchRuns, type RunEntry } from "../hooks/useBranchRuns";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, SectionHeading, Title } from "../components/ui";
 
@@ -12,14 +12,6 @@ interface Props {
   worktreePath?: string;
   navigate: Navigate;
 }
-
-const STAGE_LABELS: Record<string, string> = {
-  implementation: "Implementation",
-  codeReview: "Code review",
-  securityReview: "Security review",
-  riskClassification: "Risk classification",
-  reviewChanges: "Review changes",
-};
 
 function RunRow({ entry, onOpen }: { entry: RunEntry; onOpen: () => void }) {
   const { t } = useTranslation();
@@ -50,7 +42,7 @@ function StageRow({ name, status }: { name: string; status: string }) {
   const { t } = useTranslation();
   return (
     <>
-      <dt>{Object.prototype.hasOwnProperty.call(STAGE_LABELS, name) ? t(STAGE_LABELS[name]) : name}</dt>
+      <dt>{stageLabel(name, t)}</dt>
       <dd className={statusClass(status)}>{statusLabel(status, t, true)}</dd>
     </>
   );

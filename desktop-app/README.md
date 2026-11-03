@@ -1,6 +1,69 @@
-# Tauri + React + Typescript
+# Soft Factory Desktop
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+A Tauri 2 desktop app for Software Factory and Agent Sandbox.
+
+## Install a release
+
+Download a `desktop-vX.Y.Z` release from
+[GitHub Releases](https://github.com/ernesto27/ai-tools/releases).
+Install `software-factory` and `agent-sandbox` separately first; the desktop
+installers do not include them. Both commands must be available on the desktop
+process's `PATH`. Check them from the terminal you will use to launch the app:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+software-factory --version
+agent-sandbox --version
+```
+
+The Software Factory public installer currently supports Linux only. Preparing
+that CLI for macOS is separate from installing the desktop DMG.
+
+| Computer | Download |
+|---|---|
+| Linux x64 | `soft-factory_X.Y.Z_linux_amd64.AppImage` |
+| macOS Apple Silicon | `soft-factory_X.Y.Z_darwin_arm64.dmg` |
+
+Download the matching `.sha256` file alongside the installer. In that directory,
+verify it with `sha256sum -c FILE.sha256` on Linux or
+`shasum -a 256 -c FILE.sha256` on macOS, replacing `FILE` with the full installer
+filename.
+
+### Linux
+
+AppImages are built on GitHub's `ubuntu-latest` runner. The build environment
+changes as GitHub updates that runner; compatibility with older distributions
+depends on their runtime libraries and desktop environment. The initial release
+targets x64 only.
+
+For example, after downloading version 0.1.0:
+
+```bash
+chmod +x soft-factory_0.1.0_linux_amd64.AppImage
+env PATH="$HOME/.local/bin:$PATH" ./soft-factory_0.1.0_linux_amd64.AppImage
+```
+
+If the system cannot mount AppImages through FUSE, use extraction mode:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./soft-factory_0.1.0_linux_amd64.AppImage
+```
+
+### macOS
+
+Requires an Apple Silicon (ARM64) Mac with macOS 11 or later. Open the DMG and drag
+**Soft Factory** into **Applications**. Builds use an ad hoc signature without
+Apple Developer credentials or notarization. After a blocked first launch, use
+**System Settings > Privacy & Security > Open Anyway** and confirm opening the app.
+See [Apple's instructions](https://support.apple.com/en-us/102445) if your macOS
+version presents different controls.
+
+Finder does not necessarily inherit your terminal's `PATH`. To make separately
+installed CLIs available, launch the installed executable from a configured terminal:
+
+```bash
+env PATH="$HOME/.local/bin:$PATH" "/Applications/Soft Factory.app/Contents/MacOS/desktop-app"
+```
 
 ## Recommended IDE Setup
 

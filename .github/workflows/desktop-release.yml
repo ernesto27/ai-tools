@@ -1,0 +1,201 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify ${{ matrix.platform }}/${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux
+            arch: amd64
+            host_arch: x86_64
+            target: x86_64-unknown-linux-gnu
+            bundle: appimage
+            extension: AppImage
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+            host_arch: arm64
+            target: aarch64-apple-darwin
+            bundle: dmg
+            extension: dmg
+    defaults:
+      run:
+        working-directory: desktop-app
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      TARGET: ${{ matrix.target }}
+      BUNDLE: ${{ matrix.bundle }}
+      EXTENSION: ${{ matrix.extension }}
+      PLATFORM: ${{ matrix.platform }}
+      ARCH: ${{ matrix.arch }}
+      HOST_ARCH: ${{ matrix.host_arch }}
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop-app/package-lock.json
+
+      - name: Validate tag matches application versions
+        id: version
+        run: |
+          test "$(uname -m)" = "$HOST_ARCH"
+          [[ "$RELEASE_TAG" =~ ^desktop-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          VERSION=${RELEASE_TAG#desktop-v}
+          test "$(jq -r .version src-tauri/tauri.conf.json)" = "$VERSION"
+          test "$(jq -r .version package.json)" = "$VERSION"
+          test "$(jq -r .version package-lock.json)" = "$VERSION"
+          test "$(jq -r '.packages[""].version' package-lock.json)" = "$VERSION"
+          test "$(awk '/^\[package\]$/ { package=1; next } /^\[/ { package=0 } package && /^version = / { gsub(/"/, "", $3); print $3 }' src-tauri/Cargo.toml)" = "$VERSION"
+          test "$(awk '/^\[\[package\]\]$/ { package=0 } /^name = "desktop-app"$/ { package=1 } package && /^version = / { gsub(/"/, "", $3); print $3 }' src-tauri/Cargo.lock)" = "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --target "$TARGET"
+          rustup default 1.99.1
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libwebkit2gtk-4.1-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf file
+
+      - name: Install locked frontend dependencies
+        run: npm ci
+
+      - name: Test native backend
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target "$TARGET"
+
+      - name: Build installer
+        env:
+          CI: "true"
+        run: npm run tauri -- build --target "$TARGET" --bundles "$BUNDLE" -- --locked
+
+      - name: Verify package payload and stage installer
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          shopt -s nullglob
+          installers=(src-tauri/target/"$TARGET"/release/bundle/"$BUNDLE"/*."$EXTENSION")
+          test "${#installers[@]}" -eq 1
+          installer="${installers[0]}"
+          test -s "$installer"
+          [[ "$(basename "$installer")" == *"_${VERSION}_"* ]]
+          if [ "$PLATFORM" = linux ]; then
+            installer=$(realpath "$installer")
+            payload=$(mktemp -d)
+            (cd "$payload" && "$installer" --appimage-extract > /dev/null)
+            file "$payload/squashfs-root/usr/bin/desktop-app" | grep -E 'ELF 64-bit.*x86-64'
+          else
+            mountpoint="$RUNNER_TEMP/desktop-dmg"
+            mkdir -p "$mountpoint"
+            hdiutil attach "$installer" -readonly -nobrowse -mountpoint "$mountpoint"
+            trap 'hdiutil detach "$mountpoint"' EXIT
+            app="$mountpoint/Soft Factory.app"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")" = "11.0"
+            test "$(lipo -archs "$app/Contents/MacOS/desktop-app")" = "$HOST_ARCH"
+            codesign --verify --deep --strict "$app"
+            hdiutil detach "$mountpoint"
+            trap - EXIT
+          fi
+          mkdir -p release-assets
+          asset="soft-factory_${VERSION}_${PLATFORM}_${ARCH}.${EXTENSION}"
+          cp "$installer" "release-assets/$asset"
+          (cd release-assets && shasum -a 256 "$asset" > "$asset.sha256")
+
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          overwrite: true
+          if-no-files-found: error
+          path: desktop-app/release-assets/*
+
+  release:
+    name: Publish verified desktop release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: release-assets
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Download verified candidates
+        uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Verify complete asset set
+        run: |
+          [[ "$RELEASE_TAG" =~ ^desktop-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          VERSION=${RELEASE_TAG#desktop-v}
+          shopt -s nullglob
+          files=(*)
+          test "${#files[@]}" -eq 4
+          for asset in \
+            "soft-factory_${VERSION}_linux_amd64.AppImage" \
+            "soft-factory_${VERSION}_darwin_arm64.dmg"; do
+            test -s "$asset"
+            test "$(cat "$asset.sha256")" = "$(sha256sum "$asset")"
+          done
+
+      - name: Publish release with installation guidance
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Soft Factory Desktop ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          make_latest: false
+          generate_release_notes: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Install `software-factory` and `agent-sandbox` separately before using desktop.
+            They must be on the desktop process's PATH. CLI installers are not included.
+
+            - Linux x64: download the AppImage, run `chmod +x` on it, and launch it from a terminal with the CLIs on PATH. Built on GitHub's `ubuntu-latest` runner; compatibility with older distributions depends on their runtime libraries. If FUSE is unavailable, try `APPIMAGE_EXTRACT_AND_RUN=1 ./soft-factory_*.AppImage`.
+            - macOS Apple Silicon (ARM64): download `darwin_arm64.dmg`. Requires macOS 11 or later. Drag Soft Factory to Applications. The app is ad hoc signed without Apple notarization; approve it in System Settings > Privacy & Security > Open Anyway after the first blocked launch.
+            - For CLI discovery on macOS, launch the installed executable from a configured terminal: `env PATH="$HOME/.local/bin:$PATH" "/Applications/Soft Factory.app/Contents/MacOS/desktop-app"`.
+
+            Each installer includes a `.sha256` sidecar. Verify with `sha256sum -c FILE.sha256` (Linux) or `shasum -a 256 -c FILE.sha256` (macOS).
+            See [desktop installation instructions](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/desktop-app/README.md) for prerequisites and support limits.
+          files: |
+            release-assets/*.AppImage
+            release-assets/*.dmg
+            release-assets/*.sha256

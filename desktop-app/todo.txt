@@ -17,7 +17,7 @@ Run screen.
 [] - Proposed improvement (deferred): replace the Rust process tracker's 50 ms try_wait polling loop with Tokio async process waiting. Keep the current polling implementation for now. Let one async task own each child and use tokio::select! to await process exit or a Stop message; store Stop message senders in the shared registry. Preserve graceful SIGINT cleanup, truthful stop acknowledgements and retries on signal failure, successful-exit precedence, registry cleanup, Linux/macOS support, and execution surviving desktop exit. Update Tauri commands and process tests when implementing; this is separate from frontend log polling.
 
 config screen
-[] - i want model input to be autocomplete with options
+[x] - i want model input to be autocomplete with options
 [] - remove input , file for task
 
 run detail

@@ -34,13 +34,14 @@ func TestSandboxArgumentTransport(t *testing.T) {
 		branch           string
 		branchSet        bool
 	}{
-		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run","reviewers":["secret-reviewer"]}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
+		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run","reviewers":["secret-reviewer"]}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
 		{name: "resume explicit zeros replace shared", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"shared","branch":"shared","push":true,"pr":true,"hn":true,"file":["shared"],"resume":{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false,"file":[],"image":[],"query":"","filePrompt":"","commitMessage":"","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false", "--query", "", "--filePrompt", "", "--commitMessage", ""}},
 		{name: "shared zeros use sandbox defaults", settings: `{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false}`, invocation: []string{"run"}, want: []string{"run"}},
 		{name: "workflow controls and independent agent override", settings: `{"agent":"shared","model":"shared-model","branch":"shared","push":true,"pr":true,"resume":{"agent":"section","model":"section-model","branch":"section","query":"ignored","filePrompt":"ignored","file":["replacement"]}}`, invocation: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage"}, branch: "workflow", want: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage", "--model", "section-model", "--branch", "workflow", "--file", "replacement"}},
 		{name: "independent model override", settings: `{"agent":"shared","resume":{"agent":"section","model":"old"}}`, invocation: []string{"resume", "-m", "stage-model"}, want: []string{"resume", "-m", "stage-model", "--agent", "section"}},
 		{name: "empty workflow branch overrides resume", settings: `{"resume":{"branch":"other"}}`, invocation: []string{"resume"}, branchSet: true, want: []string{"resume", "--branch", ""}},
 		{name: "explicit invocation branch is emitted once", settings: `{"branch":"shared","resume":{"branch":"section"}}`, invocation: []string{"resume", "--branch", "explicit"}, branch: "workflow", branchSet: true, want: []string{"resume", "--branch", "explicit"}},
+		{name: "blank query keeps file prompt", settings: `{"run":{"query":"  ","filePrompt":"task path"}}`, invocation: []string{"run"}, want: []string{"run", "--query", "", "--filePrompt", "task path"}},
 		{name: "null sandbox", settings: `null`, invocation: []string{"run"}, want: []string{"run"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -99,6 +100,68 @@ func TestUnifiedTaskAndSelection(t *testing.T) {
 	assertNoConfigArtifacts(t)
 }
 
+func TestReadTaskSource(t *testing.T) {
+	t.Run("query takes precedence over file prompt", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("task.txt", []byte("file task"), 0600))
+		cfg := decodeConfig(t, `{"run":{"query":"inline task","filePrompt":"task.txt"}}`)
+
+		got, err := readTaskFile(cfg.AgentSandbox)
+		require.NoError(t, err)
+		require.Equal(t, "inline task", got)
+	})
+
+	t.Run("file prompt is used when query is absent", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		require.NoError(t, os.WriteFile("task.txt", []byte("file task"), 0600))
+		cfg := decodeConfig(t, `{"run":{"filePrompt":"task.txt"}}`)
+
+		got, err := readTaskFile(cfg.AgentSandbox)
+		require.NoError(t, err)
+		require.Equal(t, "file task", got)
+	})
+
+	t.Run("query only needs no file", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		cfg := decodeConfig(t, `{"run":{"query":"inline task"}}`)
+
+		got, err := readTaskFile(cfg.AgentSandbox)
+		require.NoError(t, err)
+		require.Equal(t, "inline task", got)
+	})
+
+	for _, query := range []string{`""`, `"   "`} {
+		t.Run("blank query "+query+" falls back to file prompt", func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			require.NoError(t, os.WriteFile("task.txt", []byte("file task"), 0600))
+			cfg := decodeConfig(t, `{"run":{"query":`+query+`,"filePrompt":"task.txt"}}`)
+
+			got, err := readTaskFile(cfg.AgentSandbox)
+			require.NoError(t, err)
+			require.Equal(t, "file task", got)
+		})
+	}
+
+	for _, settings := range []string{`null`, `{}`, `{"run":{"query":"  "}}`} {
+		t.Run("neither query nor file prompt "+settings, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			cfg := decodeConfig(t, settings)
+
+			_, err := readTaskFile(cfg.AgentSandbox)
+			require.ErrorContains(t, err, "agentSandbox.run.query or agentSandbox.run.filePrompt is required")
+		})
+	}
+
+	t.Run("task override wins over query", func(t *testing.T) {
+		cfg := decodeConfig(t, `{"run":{"query":"inline task"}}`)
+
+		got, err := buildTaskPrompt(TaskContext{Config: cfg, TaskOverride: "jira task"})
+		require.NoError(t, err)
+		require.Contains(t, got, "jira task")
+		require.NotContains(t, got, "inline task")
+	})
+}
+
 func TestExecutionFailureAndCancellation(t *testing.T) {
 	for _, mode := range []string{"child failure", "cancel", "setup failure"} {
 		t.Run(mode, func(t *testing.T) {
@@ -141,7 +204,7 @@ func TestExecutionFailureAndCancellation(t *testing.T) {
 }
 
 func TestMissingUnifiedTaskPath(t *testing.T) {
-	for _, settings := range []string{`null`, `{}`, `{"run":{"filePrompt":"missing task.txt"}}`} {
+	for _, settings := range []string{`{"run":{"filePrompt":"missing task.txt"}}`} {
 		t.Run(settings, func(t *testing.T) {
 			t.Chdir(t.TempDir())
 			require.NoError(t, os.WriteFile("agent-sandbox.json", []byte(`{"run":{"filePrompt":"legacy task.txt"}}`), 0600))

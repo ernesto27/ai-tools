@@ -28,7 +28,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.filePrompt")
+	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.query or agentSandbox.run.filePrompt")
 
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newUpdateCmd())

@@ -39,8 +39,9 @@ creates missing folders and keeps its files separate from earlier invocations.
 See [execution logs](reports.md#execution-logs) for identity and collision
 details. It runs implementation again rather than resuming at the last failed stage.
 
-Keep the original task in `run.filePrompt`, or supply `--jira` again when
-continuing a Jira task. Supporting documents and enabled stages still apply.
+Keep the original task in `run.query` or `run.filePrompt`, or supply `--jira`
+again when continuing a Jira task. Supporting documents and enabled stages
+still apply.
 See [configuration](configuration.md#disabling-stages) to skip selected stages.
 
 ## Resume a failed or interrupted run
@@ -55,8 +56,8 @@ software-factory resume "$HOME/.config/software-factory/logs/soft-factory-a1b2c3
 Run this from the original project directory, with `resume.branch` set to the
 sandbox branch used by that run. The path selects the logs; it does not restore
 the branch or configuration. Soft Factory reads the current configuration,
-supporting documents, and task from `run.filePrompt`. For a Jira task, pass
-`--jira` again:
+supporting documents, and task from `run.query` when configured, otherwise
+`run.filePrompt`. For a Jira task, pass `--jira` again:
 
 ```bash
 software-factory resume "$HOME/.config/software-factory/logs/soft-factory-a1b2c3d4e5f6/eng-123/run-2026-10-26_17-47-23" --jira 'https://your-company.atlassian.net/browse/ENG-123'

@@ -52,7 +52,7 @@ type ProjectSkills struct {
 }
 
 // TaskContext carries a task override and supporting documents through all stages.
-// An empty override retains the configured filePrompt behavior.
+// An empty override retains the configured run.query or run.filePrompt behavior.
 type TaskContext struct {
 	TaskOverride string
 	Documents    string
@@ -357,9 +357,16 @@ func buildTaskPrompt(input TaskContext) (string, error) {
 }
 
 func readTaskFile(settings sandboxconfig.Config) (string, error) {
+	if query, ok := configuredQuery(settings.Run); ok {
+		return query, nil
+	}
+
 	var taskPath string
 	if settings.Run != nil && settings.Run.FilePrompt != nil {
 		taskPath = *settings.Run.FilePrompt
+	}
+	if taskPath == "" {
+		return "", errors.New("read software-factory.json: agentSandbox.run.query or agentSandbox.run.filePrompt is required")
 	}
 
 	task, err := os.ReadFile(taskPath)

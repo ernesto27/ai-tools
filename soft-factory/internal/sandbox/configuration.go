@@ -81,8 +81,20 @@ func sandboxArgs(options ExecuteOptions) []string {
 	addBool("pr", shared.PR, section.PR)
 	addBool("hn", shared.HostNetwork, section.HostNetwork)
 	addList("file", shared.File, section.File)
-	addString("query", "", section.Query)
-	addString("filePrompt", "", section.FilePrompt)
+	// Agent Sandbox rejects --query and --filePrompt together, and treats any
+	// non-empty query as set, so a configured query replaces filePrompt and a
+	// blank query is forwarded as "" to leave filePrompt as the task source.
+	query, hasQuery := configuredQuery(section)
+	blankQuery := ""
+	switch {
+	case hasQuery:
+		addString("query", "", &query)
+	case section.Query != nil:
+		addString("query", "", &blankQuery)
+	}
+	if !hasQuery {
+		addString("filePrompt", "", section.FilePrompt)
+	}
 	addString("commitMessage", "", section.CommitMessage)
 	addList("image", nil, section.Image)
 	if options.Stage == config.StageSecurityReview && options.Config.Stages.SecurityReview.SaveFindings {
@@ -92,4 +104,13 @@ func sandboxArgs(options ExecuteOptions) []string {
 		args = append(args, "--push=false", "--pr=false")
 	}
 	return args
+}
+
+// configuredQuery returns run.query when it contains non-blank text. Blank
+// queries are treated as absent so they never shadow run.filePrompt.
+func configuredQuery(section *sandboxconfig.Section) (string, bool) {
+	if section == nil || section.Query == nil || strings.TrimSpace(*section.Query) == "" {
+		return "", false
+	}
+	return *section.Query, true
 }

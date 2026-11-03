@@ -266,8 +266,9 @@ Continue using Agent Sandbox's existing host authentication.
 `agentSandbox` is required. If it is `null` or `{}`, Factory supplies no sandbox
 settings and Agent Sandbox applies defaults and command requirements. A missing
 local task path may still cause a contextual Factory file-read error. The
-original local task always comes from `agentSandbox.run.filePrompt`, including
-continuation and recovery, unless `--jira` supplies it.
+original task comes from `agentSandbox.run.query` when configured, otherwise
+from `agentSandbox.run.filePrompt`, including continuation and recovery, unless
+`--jira` supplies it.
 
 ### `agentSandbox`: defaults and task
 
@@ -316,7 +317,7 @@ Example for a local task:
 Choose a new `run.branch` for each new task. For `continue`, use an
 existing sandbox branch in `resume.branch`; list available branches with
 `agent-sandbox worktree-list`. Even for `continue`, the local task is read from
-`run.filePrompt` unless you supply `--jira`.
+`run.query` when configured, otherwise `run.filePrompt`, unless you supply `--jira`.
 
 Example for a Jira task, where `--jira` supplies the task instead of a local file:
 
@@ -364,6 +365,6 @@ Common settings in either section:
 | `file` | Read-only file mounts; a section list replaces the shared list, including an empty list. |
 | `effort` | Optional effort setting, validated by Agent Sandbox. |
 | `image` | Optional list of image paths to attach for agents that support them. |
-| `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
+| `query` | Inline task prompt. `run.query` takes precedence over `run.filePrompt` and remains available to every stage. |
 
 Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.

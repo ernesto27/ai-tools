@@ -1,3 +1,4 @@
+import { toggleThemeInSettings } from "./themeChecks.js";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -35,10 +36,16 @@ export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
   async function captureDropdown(input, name) {
     const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
     const startingSize = await browser.getWindowSize();
-    const toggle = await browser.$('[data-testid="theme-toggle"]');
+    const inputId = await input.getAttribute("id");
+    // Theme selection now leaves the form, so persist edits before navigating.
+    await (await save()).click();
+    await browser.waitUntil(async () =>
+      await (await browser.$('main header [role="status"]')).getText() === "Saved",
+      { timeout: 15_000 });
     for (const theme of ["light", "dark"]) {
       if (await browser.execute(() => document.documentElement.dataset.theme) !== theme) {
-        await toggle.click();
+        await toggleThemeInSettings(browser);
+        input = await browser.$(`#${inputId}`);
       }
       await input.click();
       await assertPopupInViewport(input);
@@ -50,7 +57,8 @@ export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
       await browser.setWindowSize(startingSize.width, startingSize.height);
     }
     if (await browser.execute(() => document.documentElement.dataset.theme) !== startingTheme) {
-      await toggle.click();
+      await toggleThemeInSettings(browser);
+      input = await browser.$(`#${inputId}`);
     }
     await input.click();
   }

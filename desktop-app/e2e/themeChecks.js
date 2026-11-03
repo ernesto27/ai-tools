@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 
+export async function toggleThemeInSettings(browser) {
+  const back = await browser.$('[data-testid="settings-back"]');
+  const alreadyInSettings = await back.isExisting();
+  if (!alreadyInSettings) await (await browser.$('[data-testid="nav-settings"]')).click();
+  await (await browser.$('[data-testid="theme-toggle"]')).click();
+  if (!alreadyInSettings) await (await browser.$('[data-testid="settings-back"]')).click();
+}
+
 export async function runThemeChecks(browser, artifacts) {
   const key = "soft-factory.theme";
   const original = await browser.execute((name) => localStorage.getItem(name), key);
@@ -10,6 +18,9 @@ export async function runThemeChecks(browser, artifacts) {
     scheme: getComputedStyle(document.documentElement).colorScheme,
   }));
   const ready = async () => {
+    const settings = await browser.$('[data-testid="nav-settings"]');
+    await settings.waitForDisplayed({ timeout: 15_000 });
+    await settings.click();
     await (await browser.$('[data-testid="theme-toggle"]'))
       .waitForDisplayed({ timeout: 15_000 });
   };
@@ -63,5 +74,6 @@ export async function runThemeChecks(browser, artifacts) {
     }, key, original);
     await browser.refresh();
     await ready();
+    await (await browser.$('[data-testid="settings-back"]')).click();
   }
 }

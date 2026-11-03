@@ -1,5 +1,38 @@
 @import "tailwindcss";
 
+.stage-activity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+}
+
+.stage-activity > span {
+  width: 4px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-info);
+  animation: stage-signal 1.6s ease-in-out infinite;
+}
+
+@keyframes stage-signal {
+  0%, 100% { transform: scaleY(0.25); opacity: 0.35; }
+  45% { transform: scaleY(1); opacity: 1; }
+  70% { transform: scaleY(0.5); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-activity > span {
+    animation: none;
+    transform: scaleY(0.5);
+    opacity: 0.7;
+  }
+
+  .stage-activity > span:nth-child(3n + 2) {
+    transform: scaleY(1);
+  }
+}
+
 .walkthrough-markdown {
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -140,6 +173,9 @@
   /* Only the design's palette is available as utilities (bg-panel, text-muted, border-line…). */
   --color-*: initial;
   --color-canvas: #111110;
+  --color-accent: #5479e0;
+  --color-accent-hover: #4369d1;
+  --color-on-accent: #ffffff;
   --color-ink: #edece8;
   --color-ink-strong: #ffffff;
   --color-muted: #9b9a95;
@@ -181,6 +217,9 @@
 
 :root[data-theme="light"] {
   --color-canvas: #ffffff;
+  --color-accent: #365ccb;
+  --color-accent-hover: #294bb1;
+  --color-on-accent: #ffffff;
   --color-ink: #242424;
   --color-ink-strong: #111110;
   --color-muted: #626262;
@@ -223,5 +262,129 @@
   :focus-visible {
     outline: 2px solid var(--color-info);
     outline-offset: 2px;
+  }
+}
+
+/* Layout shared by the repository chooser and every application screen. */
+.app-sidebar {
+  background: var(--color-field);
+}
+
+.app-main {
+  padding-inline: clamp(24px, 4vw, 64px);
+  padding-top: 40px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px 10px 10px 3px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.nav-item[aria-current="page"] {
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+
+.repository-list {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-field);
+}
+
+.repository-entry {
+  min-width: 0;
+  padding: 24px;
+}
+
+.repository-entry + .repository-entry {
+  border-top: 1px solid var(--color-line);
+}
+
+.repository-symbol {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-panel);
+  color: var(--color-info);
+}
+
+.repository-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 20px 0 0 23px;
+  border-left: 1px solid var(--color-line);
+  padding-left: 24px;
+}
+
+.repository-branch {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 6px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.repository-branch:hover {
+  background: var(--color-hover);
+}
+
+.workspace-empty {
+  display: flex;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  border: 1px dashed var(--color-field-line);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    max-height: 36dvh;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+    padding: 12px 16px;
+  }
+
+  .app-sidebar > :first-child {
+    padding-bottom: 12px;
+  }
+
+  .app-main {
+    min-height: 0;
+    padding-inline: 20px;
+    padding-top: 24px;
+  }
+
+  .repository-entry {
+    padding: 16px;
+  }
+
+  .repository-branches {
+    margin-left: 0;
+    padding-left: 12px;
   }
 }

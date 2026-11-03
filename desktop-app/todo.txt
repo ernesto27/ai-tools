@@ -1,7 +1,7 @@
-[] - use lang ,  english , spanish
+[x] - use lang ,  english , spanish
 [x] - add dark - ligth mode
 [x] - add githuaction to run tests
-[] - create release for linux and mac
+[x] - create release for linux and mac
 
 
 sidebar

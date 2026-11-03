@@ -8,9 +8,8 @@ import { useRunLogs } from "../hooks/useRunLogs";
 import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDesktopRuns";
 import { STAGES, stageProgress } from "../runProgress";
 import { RUN_MODE, type Navigate } from "../router";
-import { statusClass, statusLabel } from "../runStatus";
 import { StageSummary } from "../components/StageSummary";
-import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
+import { Crumb, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
 type Tab = "log" | "summary" | "walk";
 
@@ -36,7 +35,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   const showStop = desktopRuns.supportsStop
     && session !== undefined
     && live;
-  const { logs, run, loading, error, refresh } = useRunLogs(repoPath, branch, runId, session);
+  const { logs, run, loading, error } = useRunLogs(repoPath, branch, runId, session);
   const interrupted = session?.state === RUN_STATE.INTERRUPTED
     || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
   const title = session?.runId ?? (
@@ -123,9 +122,6 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
               {t("showFolder")}
             </TextButton>
-            <OutlineButton disabled={loading} onClick={refresh}>
-              {loading ? t("loading") : t("refresh")}
-            </OutlineButton>
             {showStop && (
               <OutlineButton
                 disabled={session.state !== RUN_STATE.RUNNING}
@@ -171,37 +167,21 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
         <>
           {run?.error && <p role="alert" className="break-words text-bad">{t("couldNotLoadStageStatusesError", { error: run.error })}</p>}
 
-          <StageSummary statuses={progress.statuses} logs={logs} live={live} />
+          <StageSummary
+            statuses={progress.statuses}
+            logs={logs}
+            live={live}
+            selectedStage={currentStage?.id}
+            onSelectStage={(stage) => {
+              setFollowing(false);
+              setSelectedStage(stage);
+              setTab("log");
+            }}
+          />
 
           {logs.length === 0 && <p role="status" className="text-muted">{t("noLogFilesRecordedForThisRunYet")}</p>}
 
-          <div className="grid min-h-0 flex-1 grid-cols-[minmax(140px,220px)_minmax(0,1fr)] gap-6 lg:gap-10">
-            <section aria-label={t("stages")} className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
-              {stages.length === 0 && <p className="text-sm text-muted">{t("noStagesRecordedYet")}</p>}
-              {stages.map((stage) => {
-                const status = progress.statuses.get(stage.id);
-                return (
-                  <button
-                    key={stage.id}
-                    type="button"
-                    aria-pressed={currentStage?.id === stage.id}
-                    onClick={() => {
-                      setFollowing(false);
-                      setSelectedStage(stage.id);
-                      setTab("log");
-                    }}
-                    className="flex min-h-13 w-full shrink-0 flex-col items-start gap-0.5 rounded-md px-2.5 py-2 text-left hover:bg-hover aria-pressed:bg-selected"
-                  >
-                    <span className="font-medium">{t(stage.label)}</span>
-                    <span className={cx("text-sm", statusClass(status))}>
-                      {!status && live ? t("pending") : statusLabel(status, t)}
-                    </span>
-                  </button>
-                );
-              })}
-            </section>
-
-            <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+            <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
                 <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
                 {live && (
@@ -251,7 +231,6 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 )}
               </div>
             </section>
-          </div>
         </>
       )}
     </div>

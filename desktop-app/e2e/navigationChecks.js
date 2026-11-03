@@ -1,3 +1,4 @@
+import { toggleThemeInSettings } from "./themeChecks.js";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -86,11 +87,10 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await t.test(name, { timeout: 60_000 }, async (screenContext) => {
       try {
         await check();
-        const toggle = await browser.$('[data-testid="theme-toggle"]');
         const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
         for (const theme of ["light", "dark"]) {
           if (await browser.execute(() => document.documentElement.dataset.theme) !== theme) {
-            await toggle.click();
+            await toggleThemeInSettings(browser);
           }
           await browser.waitUntil(async () =>
             await browser.execute(() => document.documentElement.dataset.theme) === theme,
@@ -99,7 +99,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
             `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${theme}.png`));
         }
         if (await browser.execute(() => document.documentElement.dataset.theme) !== startingTheme) {
-          await toggle.click();
+          await toggleThemeInSettings(browser);
         }
         const alerts = await browser.$$("main [role=alert]");
         for (const alert of alerts) {
@@ -189,7 +189,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
       `//span[text()="${logText}"]`,
       logText,
     );
-    await text('//main//dl/div[dt[normalize-space(.)="Implement"]]/dd[1]', "Failed");
+    await text('//main//button[span[normalize-space(.)="Implement"]]/span[2]', "Failed");
     await runStageTimingChecks(browser, fixture, artifacts, { text, openRuns, click });
   });
 }

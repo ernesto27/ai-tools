@@ -7,12 +7,9 @@ import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
 import { cx } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
-import type { Theme } from "../theme";
-import { ThemeToggle } from "./ThemeToggle";
+import { Icon } from "./Icon";
 
 interface Props {
-  theme: Theme;
-  onToggleTheme: () => void;
   repos: SavedRepo[];
   branchesByPath: Record<string, BranchWorktree[]>;
   onRefreshBranches: (path: string) => Promise<void>;
@@ -31,7 +28,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
     <button
       type="button"
       className={cx(
-        "flex w-full items-center gap-2 rounded-md px-2 text-left text-muted hover:text-ink",
+        "nav-item flex w-full items-center gap-2 rounded-md px-2 text-left text-muted hover:bg-hover hover:text-ink",
         tall ? "min-h-9" : "min-h-8",
         "aria-expanded:text-ink aria-[current=page]:bg-selected aria-[current=page]:font-medium aria-[current=page]:text-ink",
         className,
@@ -41,7 +38,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
+export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
   const { t } = useTranslation();
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
@@ -78,22 +75,21 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
   const sub = route.screen === "newRun" ? route.mode : "runs";
 
   return (
-    <nav data-testid="main-nav" aria-label={t("main")} className="flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-7 text-base">
-      <div className="flex shrink-0 flex-col gap-3 pb-5">
-        <span className="px-2 font-mono text-md font-medium">soft·factory</span>
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+    <nav data-testid="main-nav" aria-label={t("main")} className="app-sidebar flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-6 text-base">
+      <div className="flex shrink-0 items-center gap-3 px-2 pb-7">
+        <span className="brand-mark"><Icon name="factory" width="24" height="24" /></span>
+        <span className="text-xl font-semibold tracking-[-0.04em]">soft·factory</span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        <NavItem tall data-testid="nav-settings"
-          aria-current={route.screen === "settings" ? "page" : undefined}
-          onClick={() => navigate({ screen: "settings" })}>
-          {t("settings")}
-        </NavItem>
         <NavItem tall aria-current={route.screen === "addRepo" ? "page" : undefined} onClick={() => navigate({ screen: "addRepo" })}>
+          <Icon name="plus" className="shrink-0" />
           {t("addRepository")}
         </NavItem>
 
-        <span className="px-2 pt-7 pb-2 text-2xs tracking-[0.08em] text-muted uppercase">{t("repositories")}</span>
+        <span className="flex items-center justify-between px-2 pt-7 pb-3 text-xs font-medium text-muted">
+          {t("repositories")}
+          <span className="text-faint tabular-nums">{repos.length}</span>
+        </span>
         <div className="flex flex-col gap-2">
           {repos.map((saved) => {
             const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
@@ -118,7 +114,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                   }}
                   aria-expanded={isOpen}
                   onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
-                  className="flex min-h-8.5 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
+                  className="repo-nav flex min-h-10 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:bg-hover hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <svg
@@ -141,7 +137,7 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
                 </button>
 
                 {isOpen && (
-                  <div className="flex flex-col gap-px pl-3">
+                  <div className="ml-3 flex flex-col gap-px border-l border-line pl-3">
                     <NavItem
                       className="text-md"
                       aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
@@ -219,6 +215,14 @@ export function Sidebar({ theme, onToggleTheme, repos, branchesByPath, onRefresh
           })}
         </div>
         {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{messageText(removeError, t)}</p>}
+      </div>
+      <div className="mt-5 flex shrink-0 flex-col gap-2 border-t border-line pt-3">
+        <NavItem tall data-testid="nav-settings"
+          aria-current={route.screen === "settings" ? "page" : undefined}
+          onClick={() => navigate({ screen: "settings" })}>
+          <Icon name="settings" className="shrink-0" />
+          {t("settings")}
+        </NavItem>
       </div>
       {repoMenu && (
         <RepoContextMenu

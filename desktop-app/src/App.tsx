@@ -12,7 +12,10 @@ import { Settings } from "./screens/Settings";
 import { AddRepo } from "./screens/AddRepo";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
 import { useTheme } from "./hooks/useTheme";
-import { Title } from "./components/ui";
+import { PrimaryButton, Title } from "./components/ui";
+
+import { Icon } from "./components/Icon";
+import type { Theme } from "./theme";
 
 import type { BranchWorktree } from "./worktrees";
 
@@ -23,6 +26,7 @@ function App() {
   const { theme, toggleTheme } = useTheme();
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
+  const settingsReturnRoute = useRef<Route>(HOME);
   const mainRef = useRef<HTMLElement>(null);
   const [savedRepos, setSavedRepos] = useState<SavedRepo[]>([]);
   const [branchesByPath, setBranchesByPath] = useState<Record<string, BranchWorktree[]>>({});
@@ -102,19 +106,23 @@ function App() {
   }, []);
 
   const navigate = (next: Route) => {
+    if (next.screen === "settings" && route.screen !== "settings") settingsReturnRoute.current = route;
     if (route.screen !== "addRepo" && route.screen !== "config" && route.screen !== "settings") lastBranchRoute.current = route;
     setRoute(next);
     mainRef.current?.scrollTo({ top: 0 });
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar theme={theme} onToggleTheme={toggleTheme} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
+    <div className="app-shell flex h-dvh overflow-hidden">
+      <Sidebar repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
       <main
         ref={mainRef}
-        className={`min-w-0 flex-auto px-14 pt-10 ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
+        className={`app-main min-w-0 flex-auto ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
       >
          <Screen
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          repos={savedRepos}
           desktopRuns={desktopRuns}
           branchesByPath={branchesByPath}
           route={route}
@@ -124,7 +132,7 @@ function App() {
             : undefined
           }
           navigate={navigate}
-          back={() => navigate(lastBranchRoute.current)}
+          back={() => navigate(route.screen === "settings" ? settingsReturnRoute.current : lastBranchRoute.current)}
           repoAdded={() => {
             loadRepos();
             navigate(lastBranchRoute.current);
@@ -136,6 +144,10 @@ function App() {
 }
 
 function Screen({
+  theme,
+  onToggleTheme,
+  back,
+  repos,
   desktopRuns,
   branchesByPath,
   route,
@@ -143,6 +155,9 @@ function Screen({
   repoAdded,
   repoPath,
 }: {
+  theme: Theme;
+  onToggleTheme: () => void;
+  repos: SavedRepo[];
   desktopRuns: DesktopRuns;
   branchesByPath: Record<string, BranchWorktree[]>;
   route: Route;
@@ -152,12 +167,54 @@ function Screen({
   repoPath?: string;
 }) {
   const { t } = useTranslation();
-  if (route.screen === "settings") return <Settings />;
+  if (route.screen === "settings") return <Settings theme={theme} onToggleTheme={onToggleTheme} onBack={back} />;
   if (route.screen === "home") {
     return (
-      <div className="flex flex-col gap-3">
-        <Title>{t("selectARepository")}</Title>
-        <p className="text-muted">{t("chooseARepositoryFromTheSidebarToViewItsBranchesAndRuns")}</p>
+      <div className="home-workspace flex max-w-[1080px] flex-col gap-8">
+        <header className="flex flex-wrap items-start justify-between gap-5">
+          <div className="flex max-w-[64ch] flex-col gap-3">
+            <Title>{t("selectARepository")}</Title>
+            <p className="text-base text-muted">{t("chooseARepositoryFromTheSidebarToViewItsBranchesAndRuns")}</p>
+          </div>
+          <PrimaryButton onClick={() => navigate({ screen: "addRepo" })}>
+            <Icon name="plus" width="18" height="18" />{t("addRepository")}
+          </PrimaryButton>
+        </header>
+        {repos.length > 0 ? (
+          <section aria-label={t("repositories")} className="repository-list">
+            {repos.map((repo) => {
+              const branches = branchesByPath[repo.path] ?? [];
+              return (
+                <div key={repo.path} className="repository-entry">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <span className="repository-symbol"><Icon name="repository" width="24" height="24" /></span>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <h2 className="text-xl font-semibold tracking-[-0.02em]">{repo.name}</h2>
+                      <p className="truncate font-mono text-xs text-muted" title={repo.path}>{repo.path}</p>
+                    </div>
+                    <button type="button" className="ml-auto min-h-10 shrink-0 rounded-md border border-field-line px-3 text-sm hover:bg-hover" onClick={() => navigate({ screen: "config", repo: repo.name })}>{t("config")}</button>
+                  </div>
+                  <div className="repository-branches">
+                    {branches.map((entry) => (
+                      <button key={entry.branch} type="button" className="repository-branch" onClick={() => navigate({ screen: "branch", repo: repo.name, branch: entry.branch })}>
+                        <Icon name="branch" width="17" height="17" className="shrink-0 text-muted" />
+                        <span className="truncate font-mono text-sm">{entry.branch}</span>
+                        <Icon name="chevron" width="14" height="14" className="ml-auto shrink-0 text-muted" />
+                      </button>
+                    ))}
+                    {branches.length === 0 && <p className="py-2 text-sm text-muted">{t("noBranchesYet")}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        ) : (
+          <div className="workspace-empty">
+            <span className="repository-symbol"><Icon name="repository" width="32" height="32" /></span>
+            <h2 className="text-xl font-medium">{t("pointSoftFactoryAtAGitRepositoryOnThisMachine")}</h2>
+            <PrimaryButton onClick={() => navigate({ screen: "addRepo" })}>{t("addRepository")}</PrimaryButton>
+          </div>
+        )}
       </div>
     );
   }

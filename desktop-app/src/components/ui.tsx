@@ -6,7 +6,7 @@ export const cx = (...classes: (string | false | null | undefined)[]) => classes
 // ---------- Text ----------
 
 export function Title({ children }: { children: ReactNode }) {
-  return <h1 className="text-3xl font-semibold tracking-[-0.015em]">{children}</h1>;
+  return <h1 className="text-3xl font-semibold leading-tight tracking-[-0.035em] text-ink-strong">{children}</h1>;
 }
 
 export function Crumb({ children }: { children: ReactNode }) {
@@ -19,7 +19,7 @@ export function SectionHeading({
   className,
   ...props
 }: ComponentProps<"h2"> & { as?: "h2" | "h3"; plain?: boolean }) {
-  return <Tag className={cx("text-md font-medium text-muted", !plain && "pb-3 border-b border-line", className)} {...props} />;
+  return <Tag className={cx("text-md font-semibold text-ink", !plain && "pb-3 border-b border-line", className)} {...props} />;
 }
 
 // ---------- Buttons ----------
@@ -29,7 +29,7 @@ export function PrimaryButton({ size = "md", className, ...props }: ComponentPro
     <button
       type="button"
       className={cx(
-        "inline-flex items-center rounded-md bg-ink font-medium text-canvas enabled:hover:bg-ink-strong disabled:cursor-not-allowed disabled:opacity-40",
+        "primary-button inline-flex justify-center items-center gap-2 rounded-md bg-accent font-medium text-on-accent enabled:hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40",
         size === "lg" ? "min-h-10 px-[18px]" : "min-h-9 px-3.5",
         className,
       )}
@@ -42,7 +42,7 @@ export function OutlineButton({ className, ...props }: ComponentProps<"button">)
   return (
     <button
       type="button"
-      className={cx("min-h-10 rounded-md border border-field-line px-3.5 text-md text-ink hover:border-muted", className)}
+      className={cx("min-h-10 rounded-md border border-field-line bg-field px-3.5 text-md font-medium text-ink enabled:hover:border-muted disabled:cursor-not-allowed disabled:opacity-40", className)}
       {...props}
     />
   );
@@ -68,7 +68,7 @@ export function LinkButton({ muted, className, ...props }: ComponentProps<"butto
 
 // ---------- Form fields ----------
 
-const FIELD = "rounded-md border border-field-line bg-field text-ink placeholder:text-faint focus:border-muted focus:outline-none";
+const FIELD = "rounded-md border border-field-line bg-field text-ink placeholder:text-faint focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info";
 
 export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   return (
@@ -129,7 +129,7 @@ export function Tabs<T extends string>({ label, items, value, onChange, size = "
           aria-selected={value === key}
           onClick={() => onChange(key)}
           className={cx(
-            "-mb-px min-h-10 border-b-2 border-transparent text-muted aria-selected:border-ink aria-selected:font-medium aria-selected:text-ink",
+            "-mb-px min-h-10 border-b-2 border-transparent text-muted hover:text-ink aria-selected:border-accent aria-selected:font-medium aria-selected:text-ink",
             size === "sm" ? "text-base" : "text-lg",
           )}
         >

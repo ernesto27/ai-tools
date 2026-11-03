@@ -16,7 +16,7 @@ export async function runStageTimingChecks(browser, fixture, artifacts, { text, 
     ...(finish ? ["--- RESULT ---", "Status: FAILED", `Finished: ${finish}`] : []),
     "",
   ].join("\n");
-  const selector = 'main dd[aria-label="Implement duration"]';
+  const selector = 'main span[aria-label="Implement duration"]';
   const value = async () => (await browser.$(selector)).getProperty("innerText");
   const seconds = (label) => {
     const match = /^(?:(\d+)h )?(?:(\d+)m )?(\d+)s$/.exec(label);
@@ -35,7 +35,7 @@ export async function runStageTimingChecks(browser, fixture, artifacts, { text, 
     await reopen();
     await text(selector, "2m 08s");
     await browser.saveScreenshot(join(artifacts, "stage-timing-completed.png"));
-    assert.equal(await (await browser.$('main dd[aria-label="Code review duration"]')).isExisting(), false);
+    assert.equal(await (await browser.$('main span[aria-label="Code review duration"]')).isExisting(), false);
 
     const started = Date.now() - 4000;
     writeFileSync(file, completed + attempt(new Date(started).toISOString()));

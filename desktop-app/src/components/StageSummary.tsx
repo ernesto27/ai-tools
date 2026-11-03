@@ -10,9 +10,11 @@ interface Props {
   statuses: ReturnType<typeof stageProgress>["statuses"];
   logs: RunLog[];
   live: boolean;
+  selectedStage?: string;
+  onSelectStage: (stage: string) => void;
 }
 
-export function StageSummary({ statuses, logs, live }: Props) {
+export function StageSummary({ statuses, logs, live, selectedStage, onSelectStage }: Props) {
   const { t } = useTranslation();
   const timings = useMemo(() => new Map(STAGES.map((stage) => {
     const log = logs.find((entry) => entry.filename === stage.filename);
@@ -30,7 +32,7 @@ export function StageSummary({ statuses, logs, live }: Props) {
   }, [ticking]);
 
   return (
-    <dl className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
+    <div aria-label={t("stages")} className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
       {STAGES.map((stage) => {
         const status = statuses.get(stage.id);
         const timing = timings.get(stage.id);
@@ -40,19 +42,33 @@ export function StageSummary({ statuses, logs, live }: Props) {
           ? formatStageDuration((timing.finishedAt ?? now) - timing.startedAt)
           : recorded ? t("durationUnavailable") : null;
         return (
-          <div key={stage.id} className="flex flex-col gap-0.5">
-            <dt className="text-sm text-muted">{t(stage.label)}</dt>
-            <dd className={cx("text-xl font-medium", statusClass(status))}>
+          <button
+            key={stage.id}
+            type="button"
+            disabled={!recorded}
+            aria-pressed={selectedStage === stage.id}
+            onClick={() => onSelectStage(stage.id)}
+            className="flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2 text-left enabled:hover:bg-hover aria-pressed:bg-selected disabled:cursor-default"
+          >
+            <span className="text-sm text-muted">{t(stage.label)}</span>
+            <span className={cx("text-xl font-medium", statusClass(status))}>
               {!status && live ? t("pending") : statusLabel(status, t)}
-            </dd>
+            </span>
             {duration !== null && (
-              <dd aria-label={t("stageDuration", { stage: t(stage.label) })} className="text-sm text-muted tabular-nums">
+              <span aria-label={t("stageDuration", { stage: t(stage.label) })} className="text-sm text-muted tabular-nums">
                 {duration}
-              </dd>
+              </span>
             )}
-          </div>
+            {live && (status === "RUNNING" || status === "STARTED") && (
+              <span aria-hidden="true" className="stage-activity mt-2">
+                {Array.from({ length: 9 }, (_, index) => (
+                  <span key={index} style={{ animationDelay: `${index * -140}ms` }} />
+                ))}
+              </span>
+            )}
+          </button>
         );
       })}
-    </dl>
+    </div>
   );
 }

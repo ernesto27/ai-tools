@@ -86,8 +86,8 @@ export async function runLanguageChecks(browser, fixture, artifacts) {
     await click(nav("Ejecuciones"));
     await click(`main button[aria-label="Abrir ejecución ${fixture.runId}"]`);
     await expectText("main h1", fixture.runId);
-    await expectText('//main//dl/div[dt[normalize-space(.)="Implementar"]]/dd[1]', "Fallida");
-    await expectText('main dd[aria-label="Duración de Implementar"]', "Duración no disponible");
+    await expectText('//main//button[span[normalize-space(.)="Implementar"]]/span[2]', "Fallida");
+    await expectText('main span[aria-label="Duración de Implementar"]', "Duración no disponible");
     const output = await visible('main [role="region"][aria-label="Contenido de 01-implementation.log"]');
     assert.ok((await output.getProperty("innerText")).includes(fixture.logText));
     await browser.saveScreenshot(join(artifacts, "run-detail-es-AR.png"));

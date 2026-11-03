@@ -78,8 +78,8 @@ function App() {
     removingRepo.current = true;
     try {
       const confirmed = await ask(
-        t('Are you sure to remove "{{name}}"?', { name: repo.name }),
-        { title: t("Delete project"), kind: "warning", okLabel: t("Delete"), cancelLabel: t("Cancel") },
+        t("areYouSureToRemoveName", { name: repo.name }),
+        { title: t("deleteProject"), kind: "warning", okLabel: t("delete"), cancelLabel: t("cancel") },
       );
       if (!confirmed) return;
       await invoke<void>("remove_repo", { path: repo.path });
@@ -156,14 +156,14 @@ function Screen({
   if (route.screen === "home") {
     return (
       <div className="flex flex-col gap-3">
-        <Title>{t("Select a repository")}</Title>
-        <p className="text-muted">{t("Choose a repository from the sidebar to view its branches and runs.")}</p>
+        <Title>{t("selectARepository")}</Title>
+        <p className="text-muted">{t("chooseARepositoryFromTheSidebarToViewItsBranchesAndRuns")}</p>
       </div>
     );
   }
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
   if (route.screen === "config") {
-    if (!repoPath) return <p>{t("Repository folder not found.")}</p>;
+    if (!repoPath) return <p>{t("repositoryFolderNotFound")}</p>;
     return <Config key={repoPath} repo={route.repo} repoPath={repoPath} />;
   }
 
@@ -179,7 +179,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>{t("Repository folder not found.")}</p>
+        <p>{t("repositoryFolderNotFound")}</p>
       );
     case "run":
       return repoPath ? (
@@ -193,7 +193,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>{t("Repository folder not found.")}</p>
+        <p>{t("repositoryFolderNotFound")}</p>
       );
     case "newRun":
       return repoPath ? (
@@ -207,7 +207,7 @@ function Screen({
           navigate={navigate}
         />
       ) : (
-        <p>{t("Repository folder not found.")}</p>
+        <p>{t("repositoryFolderNotFound")}</p>
       );
   }
 }

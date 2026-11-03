@@ -15,20 +15,20 @@ export function statusClass(status: string | undefined): string {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  SUCCEEDED: "Succeeded", FAILED: "Failed", RUNNING: "Running", STARTED: "Started",
-  INTERRUPTED: "Interrupted", UNFINISHED: "Unfinished", SKIPPED: "Skipped",
+  SUCCEEDED: "succeeded", FAILED: "failed", RUNNING: "running", STARTED: "started",
+  INTERRUPTED: "interrupted", UNFINISHED: "unfinished", SKIPPED: "skipped",
 };
 const STAGE_LABELS: Record<string, string> = {
-  implementation: "Implementation", codeReview: "Code review",
-  securityReview: "Security review", riskClassification: "Risk classification",
-  reviewChanges: "Review changes",
+  implementation: "implementation", codeReview: "codeReview",
+  securityReview: "securityReview", riskClassification: "riskClassification",
+  reviewChanges: "reviewChanges",
 };
 
 export function statusLabel(status: string | undefined, t: TFunction, uppercaseEnglish = false): string {
-  if (!status) return t("Not recorded");
+  if (!status) return t("notRecorded");
   const label = Object.prototype.hasOwnProperty.call(STATUS_LABELS, status) ? STATUS_LABELS[status] : undefined;
   if (!label) return status;
-  return uppercaseEnglish ? t(status) : t(label);
+  return t(uppercaseEnglish ? `${label}Uppercase` : label);
 }
 
 export function stageLabel(stage: string, t: TFunction): string {

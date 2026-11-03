@@ -200,11 +200,11 @@ export const DEFAULT_TASK_TEXT =
 export const AGENTS = ["codex", "claude", "opencode", "pi"];
 
 export const CONFIG_STAGES = [
-  { key: "implementation", label: "Implement", agent: "", skill: "" },
-  { key: "codeReview", label: "Code review", agent: "claude", skill: "" },
-  { key: "securityReview", label: "Security review", agent: "claude", skill: "" },
-  { key: "riskClassification", label: "Risk", agent: "", skill: "" },
-  { key: "reviewChanges", label: "Walkthrough", agent: "", skill: "" },
+  { key: "implementation", label: "implement", agent: "", skill: "" },
+  { key: "codeReview", label: "codeReview", agent: "claude", skill: "" },
+  { key: "securityReview", label: "securityReview", agent: "claude", skill: "" },
+  { key: "riskClassification", label: "risk", agent: "", skill: "" },
+  { key: "reviewChanges", label: "walkthrough", agent: "", skill: "" },
 ];
 
 // ---- Add repository ----

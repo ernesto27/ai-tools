@@ -12,8 +12,8 @@ interface TaskInputProps {
 function TaskTextInput({ value, onChange }: TaskInputProps) {
   const { t } = useTranslation();
   return (
-    <Field label={t("Task instructions")}>
-      <Textarea rows={7} placeholder={t("Describe what you want to implement…")} value={value}
+    <Field label={t("taskInstructions")}>
+      <Textarea rows={7} placeholder={t("describeWhatYouWantToImplement")} value={value}
         onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
@@ -36,7 +36,7 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
       const path = await open({ directory, multiple: false });
       if (path) onChange(path);
     } catch (error) {
-      setError({ key: "Could not open the browser: {{error}}", values: { error: String(error) } });
+      setError({ key: "couldNotOpenTheBrowserError", values: { error: String(error) } });
     } finally {
       setOpening(false);
     }
@@ -51,8 +51,8 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
               onChange={(event) => onChange(event.target.value)} />
           </Field>
         </div>
-        <OutlineButton onClick={browse} disabled={opening} aria-label={t("Browse for {{label}}", { label })}>
-          {opening ? t("Opening…") : t("Browse")}
+        <OutlineButton onClick={browse} disabled={opening} aria-label={t("browseForLabel", { label })}>
+          {opening ? t("opening") : t("browse")}
         </OutlineButton>
       </div>
       {error && <p role="alert" className="text-sm text-bad">{messageText(error, t)}</p>}
@@ -62,18 +62,18 @@ function TaskPathInput({ value, onChange, directory, label, placeholder }: TaskI
 
 function TaskFileInput(props: TaskInputProps) {
   const { t } = useTranslation();
-  return <TaskPathInput {...props} directory={false} label={t("Task file")} placeholder={t("Path to your task file")} />;
+  return <TaskPathInput {...props} directory={false} label={t("taskFile")} placeholder={t("pathToYourTaskFile")} />;
 }
 
 function TaskFolderInput(props: TaskInputProps) {
   const { t } = useTranslation();
-  return <TaskPathInput {...props} directory label={t("Task folder")} placeholder={t("Folder with task and context files")} />;
+  return <TaskPathInput {...props} directory label={t("taskFolder")} placeholder={t("folderWithTaskAndContextFiles")} />;
 }
 
 function JiraUrlInput({ value, onChange }: TaskInputProps) {
   const { t } = useTranslation();
   return (
-    <Field label={t("Jira issue URL")}>
+    <Field label={t("jiraIssueUrl")}>
       <Input type="url" mono large placeholder="https://your-team.atlassian.net/browse/SF-142" value={value}
         onChange={(event) => onChange(event.target.value)} />
     </Field>
@@ -81,10 +81,10 @@ function JiraUrlInput({ value, onChange }: TaskInputProps) {
 }
 
 const TASK_SOURCES = {
-  task: { label: "Task", component: TaskTextInput },
-  file: { label: "File", component: TaskFileInput },
-  folder: { label: "Folder", component: TaskFolderInput },
-  jira: { label: "Jira URL", component: JiraUrlInput },
+  task: { label: "task", component: TaskTextInput },
+  file: { label: "file", component: TaskFileInput },
+  folder: { label: "folder", component: TaskFolderInput },
+  jira: { label: "jiraUrl", component: JiraUrlInput },
 } as const;
 
 export type TaskSource = keyof typeof TASK_SOURCES;
@@ -104,8 +104,8 @@ export function RunTaskInput({ source, onSourceChange, values, onChange }: {
   return (
     <section aria-labelledby="task-h" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionHeading id="task-h" plain>{t("Task")}</SectionHeading>
-        <TextTabs label={t("Task source")} items={sourceTabs} value={source} onChange={onSourceChange} />
+        <SectionHeading id="task-h" plain>{t("task")}</SectionHeading>
+        <TextTabs label={t("taskSource")} items={sourceTabs} value={source} onChange={onSourceChange} />
       </div>
       <ActiveInput key={source} value={values[source]} onChange={(value) => onChange(source, value)} />
     </section>

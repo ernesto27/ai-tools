@@ -11,21 +11,21 @@ import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from
 import type { FactoryConfig, StageSettings, TaskSource } from "../config";
 
 const TASK_SOURCES = [
-  ["file", "File"],
-  ["folder", "Folder"],
-  ["drive", "Google Drive"],
+  ["file", "file"],
+  ["folder", "folder"],
+  ["drive", "googleDrive"],
 ] as const;
 
 const TASK_SOURCE_TEXT: Record<TaskSource, { placeholder: string; hint: string }> = {
-  file: { placeholder: "Path to the task file", hint: "run.filePrompt" },
-  folder: { placeholder: "Folder with task.md and context files", hint: "task.md is the task; other files become documents" },
-  drive: { placeholder: "Google Doc URL", hint: "Read with service_account.json" },
+  file: { placeholder: "pathToTheTaskFile", hint: "run.filePrompt" },
+  folder: { placeholder: "folderWithTaskMdAndContextFiles", hint: "taskMdIsTheTaskOtherFilesBecomeDocuments" },
+  drive: { placeholder: "googleDocUrl", hint: "readWithServiceAccountJson" },
 };
 
 const FLAGS = [
-  { key: "push", hint: "commit & push" },
-  { key: "pr", hint: "open a PR" },
-  { key: "hn", hint: "host network" },
+  { key: "push", hint: "commitPush" },
+  { key: "pr", hint: "openAPr" },
+  { key: "hn", hint: "hostNetwork" },
 ] as const;
 
 type FlagKey = (typeof FLAGS)[number]["key"];
@@ -182,7 +182,7 @@ export function Config({ repo, repoPath }: Props) {
       setInitialConfig(formConfig);
       setSaved(true);
       setDirty(false);
-      setSaveMessage({ key: "software-factory.json saved in {{path}}", values: { path: repoPath } });
+      setSaveMessage({ key: "softwareFactoryJsonSavedInPath", values: { path: repoPath } });
     } catch (error) {
       setSaveError(toUiMessage(error));
     } finally {
@@ -195,11 +195,11 @@ export function Config({ repo, repoPath }: Props) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <Crumb>{repo} · {repoPath}</Crumb>
-          <Title>{t("Config")}</Title>
+          <Title>{t("config")}</Title>
         </div>
         <div className="flex items-center gap-4 text-md">
-          <span role="status" className="text-muted">{loading ? t("Loading…") : loadError ? t("Could not load") : saving ? t("Saving…") : dirty ? t("Unsaved changes") : saved ? t("Saved") : t("Not saved")}</span>
-          <PrimaryButton disabled={saving || loading || !!loadError} onClick={saveConfig}>{saving ? t("Saving…") : t("Save")}</PrimaryButton>
+          <span role="status" className="text-muted">{loading ? t("loading") : loadError ? t("couldNotLoad") : saving ? t("saving") : dirty ? t("unsavedChanges") : saved ? t("saved") : t("notSaved")}</span>
+          <PrimaryButton disabled={saving || loading || !!loadError} onClick={saveConfig}>{saving ? t("saving") : t("save")}</PrimaryButton>
         </div>
       </header>
       {saveMessage && <StatusMessage message={messageText(saveMessage, t)} />}
@@ -207,17 +207,17 @@ export function Config({ repo, repoPath }: Props) {
       {loadError && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
           <span>{messageText(loadError, t)}</span>
-          <OutlineButton onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{t("Retry")}</OutlineButton>
+          <OutlineButton onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{t("retry")}</OutlineButton>
         </div>
       )}
 
       <div className="flex flex-wrap items-start gap-8">
         <fieldset disabled={saving || loading || !!loadError} className="@container m-0 flex min-w-0 flex-[1.2_1_520px] flex-col border-0 p-0">
-          <SectionHeading>{t("Agent defaults")}</SectionHeading>
+          <SectionHeading>{t("agentDefaults")}</SectionHeading>
           <div className={FORM_GRID}>
-            <Field label={t("Agent")}>
+            <Field label={t("agent")}>
               <Select value={agent} onChange={(e) => edit(setAgent)(e.target.value)}>
-                {!AGENTS.includes(agent) && <option value={agent}>{agent || t("Agent default")}</option>}
+                {!AGENTS.includes(agent) && <option value={agent}>{agent || t("agentDefault")}</option>}
                 {AGENTS.map((a) => (
                   <option key={a} value={a}>
                     {a}
@@ -225,18 +225,18 @@ export function Config({ repo, repoPath }: Props) {
                 ))}
               </Select>
             </Field>
-            <Field label={t("Model")}>
+            <Field label={t("model")}>
               <ModelAutocomplete
                 key={agent}
                 id="default-model"
                 agent={agent}
                 value={model}
-                placeholder={t("agent default")}
+                placeholder={t("agentDefaultPlaceholder")}
                 disabled={saving || loading || !!loadError}
                 onChange={edit(setModel)}
               />
             </Field>
-            <Field label={t("Effort")}>
+            <Field label={t("effort")}>
               <Select value={effort} onChange={(e) => edit(setEffort)(e.target.value)}>
                 {!EFFORT_OPTIONS.some((value) => value === effort) && <option value={effort}>{effort}</option>}
                 {EFFORT_OPTIONS.map((value) => (
@@ -244,20 +244,20 @@ export function Config({ repo, repoPath }: Props) {
                 ))}
               </Select>
             </Field>
-            <Field label={t("Base image")}>
+            <Field label={t("baseImage")}>
               <Input mono value={baseImage} placeholder={t("optional")} onChange={(e) => edit(setBaseImage)(e.target.value)} />
             </Field>
           </div>
 
-          <SectionHeading>{t("Branch & task")}</SectionHeading>
+          <SectionHeading>{t("branchTask")}</SectionHeading>
           <div className="grid grid-cols-1 items-start gap-5 pt-5 pb-8 @min-[600px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            <Field label={t("Branch")}>
+            <Field label={t("branch")}>
               <Input mono value={branch} onChange={(e) => edit(setBranch)(e.target.value)} />
             </Field>
             <div className="flex flex-col gap-1.5 text-sm text-muted">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span id="task-lbl">{t("Task source")}</span>
-                <TextTabs label={t("Task source")} items={TASK_SOURCES.map(([key, label]) => [key, t(label)] as const)} value={taskSrc} onChange={(source) => {
+                <span id="task-lbl">{t("taskSource")}</span>
+                <TextTabs label={t("taskSource")} items={TASK_SOURCES.map(([key, label]) => [key, t(label)] as const)} value={taskSrc} onChange={(source) => {
                   edit(setTaskSrc)(source);
                   setTaskPickerError(null);
                 }} size="sm" />
@@ -274,7 +274,7 @@ export function Config({ repo, repoPath }: Props) {
                 />
                 {taskSrc !== "drive" && (
                   <OutlineButton className="shrink-0" disabled={taskPickerOpen} onClick={browseTask}>
-                    {t("Browse")}
+                    {t("browse")}
                   </OutlineButton>
                 )}
               </div>
@@ -293,8 +293,8 @@ export function Config({ repo, repoPath }: Props) {
             ))}
           </div>
 
-          <SectionHeading>{t("Stages")}</SectionHeading>
-          <p className="pt-3 pb-5 text-sm text-muted">{t("Set overrides for each stage. Empty agent and model values use the defaults above.")}</p>
+          <SectionHeading>{t("stages")}</SectionHeading>
+          <p className="pt-3 pb-5 text-sm text-muted">{t("setOverridesForEachStageEmptyAgentAndModelValuesUseTheDefaultsAbove")}</p>
           <div className="flex flex-col gap-4 pb-8">
             {CONFIG_STAGES.map((s) => (
               <div key={s.key} className={`flex flex-col gap-4 rounded-lg border border-line p-5 ${off[s.key] ? "bg-canvas" : "bg-field"}`}>
@@ -303,29 +303,29 @@ export function Config({ repo, repoPath }: Props) {
                   <div className="flex flex-wrap items-center gap-4">
                     {s.key === "securityReview" && (
                       <Checkbox tight className="text-sm" disabled={!!off[s.key]} checked={saveFindings} onChange={() => edit(setSaveFindings)(!saveFindings)}>
-                        {t("Save findings")}
+                        {t("saveFindings")}
                       </Checkbox>
                     )}
                     <Checkbox
                       tight
                       className="text-sm"
-                      aria-label={t("Disable {{stage}}", { stage: t(s.label) })}
+                      aria-label={t("disableStage", { stage: t(s.label) })}
                       checked={!!off[s.key]}
                       onChange={() => edit(setOff)({ ...off, [s.key]: !off[s.key] })}
                     >
-                      {t("Disabled")}
+                      {t("disabled")}
                     </Checkbox>
                   </div>
                 </div>
-                <fieldset disabled={!!off[s.key]} aria-label={t("{{stage}} settings", { stage: t(s.label) })} className="m-0 grid min-w-0 grid-cols-1 gap-4 border-0 p-0 disabled:opacity-50 @min-[400px]:grid-cols-2 @min-[800px]:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                  <Field label={t("Agent")}>
+                <fieldset disabled={!!off[s.key]} aria-label={t("stageSettings", { stage: t(s.label) })} className="m-0 grid min-w-0 grid-cols-1 gap-4 border-0 p-0 disabled:opacity-50 @min-[400px]:grid-cols-2 @min-[800px]:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                  <Field label={t("agent")}>
                     <Select className="min-w-0 w-full" value={stageSettings[s.key].agent} onChange={(e) => editStage(s.key, "agent", e.target.value)}>
-                      <option value="">{t("Use shared agent")}</option>
+                      <option value="">{t("useSharedAgent")}</option>
                       {stageSettings[s.key].agent && !AGENTS.includes(stageSettings[s.key].agent) && <option value={stageSettings[s.key].agent}>{stageSettings[s.key].agent}</option>}
                       {AGENTS.map((a) => <option key={a} value={a}>{a}</option>)}
                     </Select>
                   </Field>
-                  <Field label={t("Model")}>
+                  <Field label={t("model")}>
                     <ModelAutocomplete
                       key={stageSettings[s.key].agent || agent}
                       id={`${s.key}-model`}
@@ -335,7 +335,7 @@ export function Config({ repo, repoPath }: Props) {
                       onChange={(value) => editStage(s.key, "model", value)}
                     />
                   </Field>
-                  <Field label={t("Effort")}>
+                  <Field label={t("effort")}>
                     <Select className="min-w-0 w-full" value={stageSettings[s.key].effort} onChange={(e) => editStage(s.key, "effort", e.target.value)}>
                       {!EFFORT_OPTIONS.some((value) => value === stageSettings[s.key].effort) && <option value={stageSettings[s.key].effort}>{stageSettings[s.key].effort}</option>}
                       {EFFORT_OPTIONS.map((value) => (
@@ -344,7 +344,7 @@ export function Config({ repo, repoPath }: Props) {
                     </Select>
                   </Field>
                   {s.key !== "implementation" && (
-                    <Field label={t("Custom skill")}>
+                    <Field label={t("customSkill")}>
                       <Input mono className="min-w-0 w-full" value={stageSettings[s.key].customSkill} onChange={(e) => editStage(s.key, "customSkill", e.target.value)} />
                     </Field>
                   )}
@@ -353,14 +353,14 @@ export function Config({ repo, repoPath }: Props) {
             ))}
           </div>
 
-          <SectionHeading>{t("Documents")}</SectionHeading>
+          <SectionHeading>{t("documents")}</SectionHeading>
           <div className="flex flex-col font-mono text-md">
             {documents.map((doc) => (
               <div key={doc} className="flex min-h-11 items-center justify-between border-b border-line">
                 {doc}
                 <button
                   type="button"
-                  aria-label={t("Remove {{document}}", { document: doc })}
+                  aria-label={t("removeDocument", { document: doc })}
                   className="size-9 text-xl text-muted hover:text-ink"
                   onClick={() => edit(setDocuments)(documents.filter((d) => d !== doc))}
                 >
@@ -368,13 +368,13 @@ export function Config({ repo, repoPath }: Props) {
                 </button>
               </div>
             ))}
-            {documents.length === 0 && <p className="py-3 font-sans text-sm text-muted">{t("No documents added.")}</p>}
+            {documents.length === 0 && <p className="py-3 font-sans text-sm text-muted">{t("noDocumentsAdded")}</p>}
             <button
               type="button"
               onClick={addDocument}
               className="min-h-10 self-start font-sans text-md underline-offset-4 hover:underline"
             >
-              {t("+ Add document")}
+              {t("addDocument")}
             </button>
           </div>
         </fieldset>
@@ -383,7 +383,7 @@ export function Config({ repo, repoPath }: Props) {
           <h2 id="json-h" className="font-mono text-sm font-normal text-muted">
             software-factory.json
           </h2>
-          <pre className="overflow-x-auto rounded-md bg-panel p-4 font-mono text-sm leading-[1.7] whitespace-pre">{loading ? t("Loading configuration…") : loadError ? t("Configuration unavailable.") : json}</pre>
+          <pre className="overflow-x-auto rounded-md bg-panel p-4 font-mono text-sm leading-[1.7] whitespace-pre">{loading ? t("loadingConfiguration") : loadError ? t("configurationUnavailable") : json}</pre>
         </aside>
       </div>
     </div>

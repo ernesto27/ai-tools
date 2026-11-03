@@ -107,20 +107,20 @@ function isObject(value: unknown): value is JsonObject {
 }
 
 function requireObject(value: unknown, path: string): asserts value is JsonObject {
-  if (!isObject(value)) throw new AppMessageError({ key: "{{path}} must be a JSON object.", values: { path } });
+  if (!isObject(value)) throw new AppMessageError({ key: "pathMustBeAJsonObject", values: { path } });
 }
 
 function checkFields(object: JsonObject, fields: string[], type: "string" | "boolean", path: string) {
   for (const field of fields) {
     if (object[field] !== undefined && typeof object[field] !== type) {
-      throw new AppMessageError({ key: "{{path}}.{{field}} must be a {{type}}.", values: { path, field, type } });
+      throw new AppMessageError({ key: "pathFieldMustBeAType", values: { path, field, type } });
     }
   }
 }
 
 function checkStringList(value: unknown, path: string) {
   if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== "string"))) {
-    throw new AppMessageError({ key: "{{path}} must be a list of strings.", values: { path } });
+    throw new AppMessageError({ key: "pathMustBeAListOfStrings", values: { path } });
   }
 }
 

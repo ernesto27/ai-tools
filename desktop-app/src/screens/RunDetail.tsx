@@ -14,9 +14,9 @@ import { Crumb, cx, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, 
 type Tab = "log" | "summary" | "walk";
 
 const TABS = [
-  ["log", "Log"],
-  ["summary", "Summary"],
-  ["walk", "Walkthrough"],
+  ["log", "log"],
+  ["summary", "summary"],
+  ["walk", "walkthrough"],
 ] as const;
 
 interface Props {
@@ -40,11 +40,11 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
   const title = session?.runId ?? (
     session
-      ? session.state === RUN_STATE.STOPPING ? t("Stopping run")
-        : interrupted ? t("Stopped run")
-        : live ? t("Starting run")
-        : session.state === RUN_STATE.FAILED ? t("Failed run")
-        : t("Completed run")
+      ? session.state === RUN_STATE.STOPPING ? t("stoppingRun")
+        : interrupted ? t("stoppedRun")
+        : live ? t("startingRun")
+        : session.state === RUN_STATE.FAILED ? t("failedRun")
+        : t("completedRun")
       : runId
   );
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
@@ -86,12 +86,12 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     setStopDialogError(null);
     try {
       // Tauri's dialog plugin makes window.confirm asynchronous.
-      const confirmed = await window.confirm(t("Stop this run? You can resume it later."));
+      const confirmed = await window.confirm(t("stopThisRunYouCanResumeItLater"));
       if (confirmed) {
         await desktopRuns.stop(session.id);
       }
     } catch (error) {
-      setStopDialogError({ key: "Could not confirm stopping the run: {{error}}", values: { error: String(error) } });
+      setStopDialogError({ key: "couldNotConfirmStoppingTheRunError", values: { error: String(error) } });
     } finally {
       stopConfirmationPending.current = false;
     }
@@ -120,10 +120,10 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           <div className="min-w-0 break-words"><Title>{title}</Title></div>
           <div className="flex flex-wrap items-center gap-5 text-md">
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
-              {t("Show folder")}
+              {t("showFolder")}
             </TextButton>
             <OutlineButton disabled={loading} onClick={refresh}>
-              {loading ? t("Loading…") : t("Refresh")}
+              {loading ? t("loading") : t("refresh")}
             </OutlineButton>
             {showStop && (
               <OutlineButton
@@ -131,14 +131,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 onClick={() => void stopRun()}
                 className="text-bad disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {session.state === RUN_STATE.STOPPING ? t("Stopping…") : t("Stop")}
+                {session.state === RUN_STATE.STOPPING ? t("stopping") : t("stop")}
               </OutlineButton>
             )}
             <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({
               screen: "newRun", repo, branch,
               mode: interrupted ? RUN_MODE.RESUME : RUN_MODE.CONTINUE,
             })}>
-              {interrupted ? t("Resume") : t("Continue")}
+              {interrupted ? t("resume") : t("continue")}
             </PrimaryButton>
           </div>
         </div>
@@ -147,12 +147,12 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
       {session && (
         <div className="shrink-0 space-y-2">
           <p role="status" className="text-sm text-muted">
-            {session.state === RUN_STATE.STARTING ? t("Starting run…")
-              : session.state === RUN_STATE.STOPPING ? t("Stopping run… Waiting for cleanup.")
-              : live ? (session.directory ? t("Live · updates every second") : t("Waiting for execution log directory…"))
-              : session.state === RUN_STATE.SUCCEEDED ? t("Run completed.")
-              : session.state === RUN_STATE.INTERRUPTED ? t("Run stopped. Use Resume to continue.")
-              : t("Run failed.")}
+            {session.state === RUN_STATE.STARTING ? t("startingRunProgress")
+              : session.state === RUN_STATE.STOPPING ? t("stoppingRunWaitingForCleanup")
+              : live ? (session.directory ? t("liveUpdatesEverySecond") : t("waitingForExecutionLogDirectory"))
+              : session.state === RUN_STATE.SUCCEEDED ? t("runCompleted")
+              : session.state === RUN_STATE.INTERRUPTED ? t("runStoppedUseResumeToContinue")
+              : t("runFailed")}
           </p>
           {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{messageText(session.error, t)}</p>}
           {session.stopError && (
@@ -161,14 +161,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
         </div>
       )}
 
-      {loading && <p role="status" className="text-muted">{t("Loading run logs…")}</p>}
+      {loading && <p role="status" className="text-muted">{t("loadingRunLogs")}</p>}
       {error && <p role="alert" className="break-words text-bad">{error}</p>}
-      {folderError && <p role="alert" className="break-words text-bad">{t("Could not show folder: {{error}}", { error: folderError })}</p>}
+      {folderError && <p role="alert" className="break-words text-bad">{t("couldNotShowFolderError", { error: folderError })}</p>}
       {stopDialogError && <p role="alert" className="break-words text-bad">{messageText(stopDialogError, t)}</p>}
 
       {!loading && (
         <>
-          {run?.error && <p role="alert" className="break-words text-bad">{t("Could not load stage statuses: {{error}}", { error: run.error })}</p>}
+          {run?.error && <p role="alert" className="break-words text-bad">{t("couldNotLoadStageStatusesError", { error: run.error })}</p>}
 
           <dl className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
             {STAGES.map((stage) => {
@@ -177,18 +177,18 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 <div key={stage.id} className="flex flex-col gap-0.5">
                   <dt className="text-sm text-muted">{t(stage.label)}</dt>
                   <dd className={cx("text-xl font-medium", statusClass(status))}>
-                    {!status && live ? t("Pending") : statusLabel(status, t)}
+                    {!status && live ? t("pending") : statusLabel(status, t)}
                   </dd>
                 </div>
               );
             })}
           </dl>
 
-          {logs.length === 0 && <p role="status" className="text-muted">{t("No log files recorded for this run yet.")}</p>}
+          {logs.length === 0 && <p role="status" className="text-muted">{t("noLogFilesRecordedForThisRunYet")}</p>}
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(140px,220px)_minmax(0,1fr)] gap-6 lg:gap-10">
-            <section aria-label={t("Stages")} className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
-              {stages.length === 0 && <p className="text-sm text-muted">{t("No stages recorded yet.")}</p>}
+            <section aria-label={t("stages")} className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-auto">
+              {stages.length === 0 && <p className="text-sm text-muted">{t("noStagesRecordedYet")}</p>}
               {stages.map((stage) => {
                 const status = progress.statuses.get(stage.id);
                 return (
@@ -205,16 +205,16 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                   >
                     <span className="font-medium">{t(stage.label)}</span>
                     <span className={cx("text-sm", statusClass(status))}>
-                      {!status && live ? t("Pending") : statusLabel(status, t)}
+                      {!status && live ? t("pending") : statusLabel(status, t)}
                     </span>
                   </button>
                 );
               })}
             </section>
 
-            <section aria-label={t("Output")} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+            <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
-                <Tabs label={t("Views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
+                <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
                 {live && (
                   <TextButton aria-pressed={following} onClick={() => {
                     setFollowing(true);
@@ -224,28 +224,28 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                       outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
                     }
                   }}>
-                    {following ? t("Following live") : t("Follow live")}
+                    {following ? t("followingLive") : t("followLive")}
                   </TextButton>
                 )}
-                <span className="font-mono text-xs break-all text-muted">{filename ?? t("No stage selected")}</span>
+                <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
               </div>
 
               <div
                 ref={outputPanel}
                 key={filename ?? "no-file"}
                 role="region"
-                aria-label={filename ? t("Contents of {{filename}}", { filename }) : t("File contents")}
+                aria-label={filename ? t("contentsOfFilename", { filename }) : t("fileContents")}
                 tabIndex={0}
                 className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-panel"
               >
                 {!output ? (
                   <p role="status" className="rounded-md bg-panel p-4 text-muted">
-                    {tab === "summary" ? t("No summary recorded for this run yet.")
-                      : tab === "walk" ? t("No walkthrough recorded for this run yet.")
-                      : t("No log recorded for this stage yet.")}
+                    {tab === "summary" ? t("noSummaryRecordedForThisRunYet")
+                      : tab === "walk" ? t("noWalkthroughRecordedForThisRunYet")
+                      : t("noLogRecordedForThisStageYet")}
                   </p>
                 ) : output.content.length === 0 ? (
-                  <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("This file is empty.")}</p>
+                  <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("thisFileIsEmpty")}</p>
                 ) : tab === "walk" ? (
                   <article className="walkthrough-markdown p-5">
                     <Markdown remarkPlugins={[remarkGfm]}>{output.content}</Markdown>

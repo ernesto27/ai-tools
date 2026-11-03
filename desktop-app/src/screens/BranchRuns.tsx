@@ -19,7 +19,7 @@ function RunRow({ entry, onOpen }: { entry: RunEntry; onOpen: () => void }) {
     <article className="relative flex min-w-0 flex-col gap-3 border-b border-line p-4 hover:bg-hover focus-within:bg-hover">
       <button
         type="button"
-        aria-label={t("Open run {{name}}", { name: entry.name })}
+        aria-label={t("openRunName", { name: entry.name })}
         onClick={onOpen}
         className="absolute inset-0 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info"
       />
@@ -27,7 +27,7 @@ function RunRow({ entry, onOpen }: { entry: RunEntry; onOpen: () => void }) {
       <p className="font-mono text-xs break-all text-muted">{entry.directory}</p>
       {entry.error && <p role="alert" className="text-sm break-words text-bad">{entry.error}</p>}
       {!entry.error && entry.stages.length === 0 && (
-        <p className="text-sm text-muted">{t("No stage results recorded yet.")}</p>
+        <p className="text-sm text-muted">{t("noStageResultsRecordedYet")}</p>
       )}
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-2 text-md">
         {entry.stages.map((stage, index) => (
@@ -57,26 +57,26 @@ export function BranchRuns({ repo, repoPath, branch, worktreePath, navigate }: P
     <div className="flex max-w-[1080px] flex-col gap-8" aria-busy={loading}>
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 max-w-full flex-1 flex-col gap-1">
-          <Crumb>{repo} / {t("branch")}</Crumb>
+          <Crumb>{repo} / {t("branchLowercase")}</Crumb>
           <Title><span className="font-mono font-medium">{branch}</span></Title>
           {worktreePath !== undefined && <WorktreePath key={worktreePath} path={worktreePath} />}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <OutlineButton onClick={refresh} disabled={loading}>{loading ? t("Loading…") : t("Refresh")}</OutlineButton>
-          <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RUN })}>{t("New run")}</PrimaryButton>
+          <OutlineButton onClick={refresh} disabled={loading}>{loading ? t("loading") : t("refresh")}</OutlineButton>
+          <PrimaryButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.RUN })}>{t("newRun")}</PrimaryButton>
         </div>
       </header>
       <div className="flex items-center gap-5 text-md">
-        <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}>{t("Continue")}</LinkButton>
+        <LinkButton onClick={() => navigate({ screen: "newRun", ...at, mode: RUN_MODE.CONTINUE })}>{t("continue")}</LinkButton>
       </div>
       <section aria-labelledby="runs-heading" className="min-w-0">
         <SectionHeading id="runs-heading">
-          {loading ? t("Runs") : t("runCount", { count: entries.length })}
+          {loading ? t("runs") : t(entries.length === 1 ? "runCountOne" : "runCountOther", { count: entries.length })}
         </SectionHeading>
-        {loading && <p role="status" className="py-4 text-muted">{t("Loading runs…")}</p>}
+        {loading && <p role="status" className="py-4 text-muted">{t("loadingRuns")}</p>}
         {error && <p role="alert" className="py-4 text-bad">{error}</p>}
         {!loading && !error && entries.length === 0 && (
-          <p className="py-4 text-muted">{t("No runs recorded for this branch.")}</p>
+          <p className="py-4 text-muted">{t("noRunsRecordedForThisBranch")}</p>
         )}
         {entries.map((entry) => (
           <RunRow

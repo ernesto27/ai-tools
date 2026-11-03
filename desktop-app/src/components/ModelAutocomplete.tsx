@@ -80,7 +80,7 @@ export function ModelAutocomplete({ id, agent, value, onChange, placeholder, dis
         id={id}
         className="min-w-0 w-full"
         role="combobox"
-        aria-label={t("Model")}
+        aria-label={t("model")}
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={expanded}
@@ -104,7 +104,7 @@ export function ModelAutocomplete({ id, agent, value, onChange, placeholder, dis
           "absolute left-0 z-20 w-full min-w-0 rounded-md border border-field-line bg-panel shadow-lg",
           openAbove ? "bottom-full mb-1" : "top-full mt-1",
         )}>
-          <div id={listId} role="listbox" aria-label={t("Model suggestions")} className="max-h-52 overflow-y-auto p-1">
+          <div id={listId} role="listbox" aria-label={t("modelSuggestions")} className="max-h-52 overflow-y-auto p-1">
             {matches.map((model, index) => (
               <div
                 key={model}
@@ -123,7 +123,7 @@ export function ModelAutocomplete({ id, agent, value, onChange, placeholder, dis
             ))}
           </div>
           {matches.length === 0 && (
-            <p role="status" className="px-3 py-2 text-sm text-muted">{t("No matching models")}</p>
+            <p role="status" className="px-3 py-2 text-sm text-muted">{t("noMatchingModels")}</p>
           )}
         </div>
       )}

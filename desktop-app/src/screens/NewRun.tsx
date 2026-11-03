@@ -19,17 +19,17 @@ import {
 } from "../components/ui";
 
 const MODES = [
-  [RUN_MODE.RUN, "Run"],
-  [RUN_MODE.CONTINUE, "Continue"],
-  [RUN_MODE.RESUME, "Resume"],
+  [RUN_MODE.RUN, "run"],
+  [RUN_MODE.CONTINUE, "continue"],
+  [RUN_MODE.RESUME, "resume"],
 ] as const;
 
 const RESUMABLE_STATUSES = new Set(["FAILED", "INTERRUPTED"]);
 
 const MODE_DESC: Record<NewRunMode, string> = {
-  [RUN_MODE.RUN]: "Full workflow: implement, review, classify risk, explain.",
-  [RUN_MODE.CONTINUE]: "Rerun implementation and later stages on the existing resume.branch worktree.",
-  [RUN_MODE.RESUME]: "Pick up an interrupted run from its log folder.",
+  [RUN_MODE.RUN]: "fullWorkflowImplementReviewClassifyRiskExplain",
+  [RUN_MODE.CONTINUE]: "rerunImplementationAndLaterStagesOnTheExistingResumeBranchWorktree",
+  [RUN_MODE.RESUME]: "pickUpAnInterruptedRunFromItsLogFolder",
 };
 
 interface Props {
@@ -142,7 +142,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
   const activeRun = desktopRuns.busy(repoPath);
   const resumeDisabled = !loadedConfig || !selectedRun || branchRuns.loading || !!branchRuns.error;
-  const cta = mode === RUN_MODE.RUN ? "Start run" : mode === RUN_MODE.CONTINUE ? "Continue" : "Resume";
+  const cta = mode === RUN_MODE.RUN ? "startRun" : mode === RUN_MODE.CONTINUE ? "continue" : "resume";
 
   return (
     <div className="@container flex h-full w-full max-w-[1440px] flex-col gap-8">
@@ -150,23 +150,23 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
         <Crumb>
           {repo} / {branch}
         </Crumb>
-        <Title>{t("New run")}</Title>
+        <Title>{t("newRun")}</Title>
       </header>
 
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 items-start gap-8 @min-[1040px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-8">
           <fieldset className="m-0 min-w-0 border-0 p-0">
-            <Tabs label={t("Mode")} items={MODES.map(([key, label]) => [key, t(label)] as const)} value={mode} onChange={setMode} />
+            <Tabs label={t("mode")} items={MODES.map(([key, label]) => [key, t(label)] as const)} value={mode} onChange={setMode} />
           </fieldset>
           <p className="-mt-3 text-base text-muted">{t(MODE_DESC[mode])}</p>
 
           {(loadingConfig || (!configError && !loadedConfig)) && (
             <p role="status" className="text-sm text-muted">
               {loadingConfig
-                ? t("Loading configuration…")
+                ? t("loadingConfiguration")
                 : mode === RUN_MODE.RESUME
-                  ? t("No configuration found. Configure this repository before resuming a run.")
-                  : t("No configuration yet. Saving will create software-factory.json.")}
+                  ? t("noConfigurationFoundConfigureThisRepositoryBeforeResumingARun")
+                  : t("noConfigurationYetSavingWillCreateSoftwareFactoryJson")}
             </p>
           )}
 
@@ -178,7 +178,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <div className="flex flex-col gap-3">
               <fieldset disabled={loadingConfig || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
                 {mode === RUN_MODE.RUN && (
-                  <Field label={t("Branch name")} hint={t("Sets the shared branch for the workflow.")}>
+                  <Field label={t("branchName")} hint={t("setsTheSharedBranchForTheWorkflow")}>
                     <Input mono large className="w-full" placeholder="feature/my-task" value={runBranch}
                       onChange={(event) => {
                         setRunBranch(event.target.value);
@@ -201,15 +201,15 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
           {mode === RUN_MODE.RESUME && (
             <section aria-labelledby="rs-h" className="flex flex-col">
-              <SectionHeading id="rs-h">{t("Failed or interrupted runs")}</SectionHeading>
+              <SectionHeading id="rs-h">{t("failedOrInterruptedRuns")}</SectionHeading>
               {branchRuns.loading && (
-                <p role="status" className="py-4 text-muted">{t("Loading runs…")}</p>
+                <p role="status" className="py-4 text-muted">{t("loadingRuns")}</p>
               )}
               {branchRuns.error && (
                 <p role="alert" className="py-4 text-bad">{branchRuns.error}</p>
               )}
               {!branchRuns.loading && !branchRuns.error && resumableRuns.length === 0 && (
-                <p className="py-4 text-muted">{t("No failed or interrupted runs recorded for this branch.")}</p>
+                <p className="py-4 text-muted">{t("noFailedOrInterruptedRunsRecordedForThisBranch")}</p>
               )}
               {resumableRuns.map((entry) => {
                 const last = entry.stages[entry.stages.length - 1];
@@ -225,7 +225,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
                         <span className="text-sm text-bad">{entry.error}</span>
                       ) : (
                         <span className="text-sm text-muted">
-                          {last ? t("Last recorded stage: {{stage}}", { stage: stageLabel(last.stage, t) }) : t("No stage results recorded.")}
+                          {last ? t("lastRecordedStageStage", { stage: stageLabel(last.stage, t) }) : t("noStageResultsRecorded")}
                         </span>
                       )}
                     </span>
@@ -242,7 +242,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <button type="button" className="self-start text-sm underline" onClick={() => navigate({
               screen: "run", repo, branch: activeRun.branch, runId: activeRun.id,
             })}>
-              {t("This repository has an active run. Open active run")}
+              {t("thisRepositoryHasAnActiveRunOpenActiveRun")}
             </button>
           )}
           <div className="flex border-t border-line pt-4">
@@ -259,7 +259,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
         {!loadingConfig && !configError && (
           <section aria-labelledby="config-preview-h" className="flex h-[70dvh] min-h-[320px] min-w-0 flex-col gap-3 @min-[1040px]:h-full @min-[1040px]:min-h-0">
-            <SectionHeading id="config-preview-h" plain>{t("software-factory.json preview")}</SectionHeading>
+            <SectionHeading id="config-preview-h" plain>{t("softwareFactoryJsonPreview")}</SectionHeading>
             <pre className="min-h-0 flex-1 overflow-auto rounded-md bg-panel p-4 font-mono text-md whitespace-pre-wrap break-words">
               <code>{JSON.stringify(mode === RUN_MODE.RESUME ? resumeConfig : taskConfig, null, 2)}</code>
             </pre>

@@ -29,6 +29,20 @@ Review reports include their status (**PASS**, **UNRESOLVED**, or **BLOCKED**), 
 
 Local configuration, credentials, task files, and generated reports are ignored by Git. Keep sensitive content out of commits.
 
+## GitHub pull request summaries
+
+After a successful workflow with execution logs, Soft Factory attempts to append
+that invocation's summary to the description of an existing pull request for
+the selected sandbox branch. It resolves the repository from the project's
+`origin` remote and uses the host's `gh` command and authentication.
+This happens independently of the sandbox's `push` and `pr` settings; it does
+not create a pull request. Repeated successful invocations append more summaries.
+
+If the repository, pull request, GitHub CLI, authentication, or update is
+unavailable, Factory prints `Warning: append PR execution summary` and keeps
+the successful workflow result. Failed workflows and runs without execution
+logs do not attempt this update.
+
 ## Execution logs
 
 New workflows save logs under

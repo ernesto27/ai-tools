@@ -70,3 +70,11 @@ the result of earlier stages. During `resume`, a walkthrough failure returns
 an error so recovery can be retried. Check whether `reviewChanges` is disabled,
 then check terminal warnings and [reports](reports.md). If execution logging
 is unavailable, the workflow can proceed but cannot save the final walkthrough.
+
+## The PR execution summary could not be appended
+
+A `Warning: append PR execution summary` does not change the workflow result.
+To enable the update, install and authenticate the host GitHub CLI (`gh`),
+check the project's `origin` remote, and confirm that the selected sandbox
+branch has an existing pull request you can edit. Read the local `summary.log`
+when no PR is available. See [PR summaries](reports.md#github-pull-request-summaries).

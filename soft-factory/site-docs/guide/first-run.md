@@ -19,18 +19,12 @@ Create `software-factory.json`:
 {
   "documents": [],
   "agentSandbox": {
+    "agent": "codex",
+    "branch": "fix-login",
+    "push": false,
+    "pr": false,
     "run": {
-      "agent": "codex",
-      "branch": "fix-login",
-      "filePrompt": "task.txt",
-      "push": false,
-      "pr": false
-    },
-    "resume": {
-      "agent": "codex",
-      "branch": "fix-login",
-      "push": false,
-      "pr": false
+      "filePrompt": "task.txt"
     }
   }
 }
@@ -40,7 +34,9 @@ Factory passes `agentSandbox` settings as CLI flags and creates no sandbox
 configuration JSON. Section `apiKey` and `reviewers` are temporarily ignored;
 use host authentication. See [transport details](configuration.md#sandbox-settings-transport).
 
-Use the same branch in both sections. Choose a new branch for each new task.
+The shared agent, branch, and publishing settings apply to both `run` and
+`resume`. Keep the local task file in `run.filePrompt`. Choose a new branch
+for each new task.
 See [configuration](configuration.md) for agent options and supporting documents.
 
 ## Run the task

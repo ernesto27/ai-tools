@@ -1,187 +1,87 @@
 # Reports
 
-Reports appear in the terminal. Default and `continue` workflows save code
-review, security review, and risk classification output in their stage logs,
-plus a run summary and the final walkthrough.
+After a run, open `summary.log` to see each stage's result. Then read
+`05-reviewChanges.md` to understand the changes, or check the stage logs for
+more detail. Output also appears in the terminal.
 
-| Command | Saved output |
+## Where files are saved {#execution-logs}
+
+Soft Factory prints the log folder when a run starts. It lives under:
+
+```text
+~/.config/software-factory/logs/<project>-<id>/<branch>/
+```
+
+Each run creates a subfolder with its date and time:
+
+| Command | Folder |
 | --- | --- |
-| `software-factory` | `~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/run-<local-timestamp>/summary.log`, stage `.log` files, and `05-reviewChanges.md` when the walkthrough runs successfully. |
-| `software-factory continue` | The same files in a `continue-<local-timestamp>` child under the selected project's branch folder. |
-| `software-factory resume <path>` | Appends stage logs, progress, and summary entries to the supplied invocation folder; saves the walkthrough there. |
+| `software-factory` | `run-<timestamp>` |
+| `software-factory continue` | `continue-<timestamp>` |
+| `software-factory resume <path>` | Reuses the supplied folder and appends new results. |
 
-Code and security reviews also write temporary reports in the sandbox worktree
-for risk classification to read. These are normally removed after risk
-classification, or when that stage is disabled. Logged workflows archive
-successful code and security review evidence as `codeReview.txt` and `securityReview.txt` in the
-invocation folder so `resume` can reuse it after worktree cleanup.
+## Which file to open
 
-The `05-reviewChanges.md` walkthrough shows the changed code lines,
-file-by-file explanations, findings, and flow diagrams. Terminal setup and
-command output from that final stage are shown live but are not saved in the
-Markdown file. The agent writes the report in its sandbox worktree; Soft Factory
-copies it to the run logs and removes the worktree copy.
-Findings in this report are informational. If the report cannot be generated
-or saved, Soft Factory prints a warning and keeps the result of the earlier
-stages. During `resume`, a walkthrough failure returns an error.
+| File | Contents |
+| --- | --- |
+| `summary.log` | Each stage's status, duration, agent, model, and summary. |
+| `01-implementation.log` | Implementation details. |
+| `02-codeReview.log` | Code review and corrections. |
+| `03-securityReview.log` | Security review and findings. |
+| `04-riskClassification.log` | Risk classification. |
+| `05-reviewChanges.md` | File-by-file explanations, changed lines, and diagrams. |
+| `stage_status.txt` | Saved progress for recovery with `resume`. |
 
-Review reports include their status (**PASS**, **UNRESOLVED**, or **BLOCKED**), corrections, remaining findings, and verification gaps. Read the reports before accepting the changes: a successful command exit does not guarantee that every finding was resolved.
+Skipped stages create no files. The final walkthrough is saved when it
+completes successfully; its `.log` file contains execution details.
 
-Local configuration, credentials, task files, and generated reports are ignored by Git. Keep sensitive content out of commits.
+## How to read the result
 
-## GitHub pull request summaries
+The execution status tells you whether a stage completed:
 
-After a successful workflow with execution logs, Soft Factory attempts to append
-that invocation's summary to the description of an existing pull request for
-the selected sandbox branch. It resolves the repository from the project's
-`origin` remote and uses the host's `gh` command and authentication.
-This happens independently of the sandbox's `push` and `pr` settings; it does
-not create a pull request. Repeated successful invocations append more summaries.
+- `SUCCEEDED`: completed successfully.
+- `FAILED`: failed.
+- `INTERRUPTED`: was interrupted.
 
-If the repository, pull request, GitHub CLI, authentication, or update is
-unavailable, Factory prints `Warning: append PR execution summary` and keeps
-the successful workflow result. Failed workflows and runs without execution
-logs do not attempt this update.
+Reviews also have their own verdict:
 
-## Execution logs
+| Verdict | Meaning |
+| --- | --- |
+| `PASS` | No actionable findings remain. |
+| `UNRESOLVED` | Some findings remain unresolved. |
+| `BLOCKED` | More information or verification is needed to complete the review. |
 
-New workflows save logs under
-`~/.config/software-factory/logs/<project-folder>-<id>/<sanitized-branch>/`.
-The project folder is where Factory is invoked, including a project subfolder
-inside a monorepo. The ID is the first 12 hexadecimal characters of SHA-256 of
-the cleaned absolute invocation path. Two folders named `app` at different
-locations get separate groups. Moving a project changes its ID. Symlink paths
-are not explicitly canonicalized. The root always uses the home directory's
-`.config` folder, regardless of `XDG_CONFIG_HOME`; there is no configuration
-setting for it.
+A stage can complete successfully and still leave findings. Read the reviews
+before accepting the changes.
 
-Default invocations use `run.branch` and create `run-<local-timestamp>`;
-`continue` uses `resume.branch` and creates `continue-<local-timestamp>`.
-The timestamp is local time in `YYYY-MM-DD_HH-MM-SS` format, without fractional
-seconds. An existing child name gets `-2`, `-3`, and later suffixes.
-Timestamps inside log contents retain their existing UTC format.
+With [`saveFindings: true`](configuration.md#save-security-findings-without-corrections),
+security findings and suggested fixes appear in `summary.log` without being
+applied. If you see `Security findings unavailable.`, check the warnings and
+security log.
 
-ASCII letters, digits, `.`, `_`, and `-` remain in branch folder names;
-all other characters become `-`. For example, `feature/logs` becomes
-`feature-logs`. Directories are created when needed. Existing project-local
-logs stay untouched and remain usable with explicit-path `resume`.
+## Recover a run
 
-The project ID below is illustrative; use the path printed by your run.
+To continue from the last saved stage:
 
-```text
-~/.config/software-factory/logs/
-└── soft-factory-a1b2c3d4e5f6/
-    └── feature-logs/
-        ├── run-2026-10-26_17-47-23/
-        │   ├── summary.log
-        │   ├── stage_status.txt
-        │   ├── 01-implementation.log
-        │   └── 05-reviewChanges.md
-        └── continue-2026-10-26_18-15-30/
-            ├── summary.log
-            └── ...
+```bash
+software-factory resume "/path/to/run-folder"
 ```
 
-The CLI prints the absolute invocation path, for example:
+Keep the complete folder, including `summary.log`, `stage_status.txt`, and the
+archived `codeReview.txt` and `securityReview.txt` reports when present.
+See the [recovery guide](workflow.md#resume-a-failed-or-interrupted-run).
 
-```text
-Execution logs: /home/user/.config/software-factory/logs/soft-factory-a1b2c3d4e5f6/feature-logs/run-2026-10-26_17-47-23
-```
+If the final walkthrough fails, default and `continue` runs warn and keep the
+earlier results. During `resume`, the failure returns an error so you can retry.
 
-Stages have position-prefixed log files (`01-implementation.log`,
-`02-codeReview.log`, `03-securityReview.log`, `04-riskClassification.log`, and
-`05-reviewChanges.log`); another attempt at a stage uses a numbered file
-such as `01-implementation-2.log`. Each stage file includes the run details
-and that stage's result. A stage that never starts has no file. The CLI prints
-the directory path when the run starts and continues to show stage output
-live. The final stage writes `05-reviewChanges.md` as the only Markdown file
-in the run directory. The code review, security review, and risk classification
-output stays in their stage logs.
+## GitHub summary {#github-pull-request-summaries}
 
-The first four stage logs identify the configured agent and model and where
-each value came from. A [stage override](configuration.md#stage-agents-and-models) names its
-Factory setting, for example
-`software-factory.json: stages.codeReview.model`; inherited values name their
-setting in `software-factory.json: agentSandbox`. If no model is configured, the log says
-`unavailable (no configured model)`.
+After a successful run with logs, Soft Factory tries to append the summary to
+the branch's existing pull request. It uses `gh`, host authentication, and the
+`origin` remote. It does not create a PR and works independently of `push` and `pr`.
 
-Start with `summary.log` for a quick view of the stages that ran.
-Each entry includes the execution status (`SUCCEEDED`, `FAILED`, or
-`INTERRUPTED`), the recorded agent and model, duration, a short summary
-of changes made during that stage,
-and any execution error. If the agent's change summary cannot be collected,
-the entry says `Change summary unavailable.` Disabled stages are listed as
-skipped without an executed-stage entry. The final walkthrough also has an
-execution-summary entry and stage log; its report is saved separately as Markdown. Its agent output remains live-only,
-and its agent, model, and change summary may be unavailable.
+If you see `Warning: append PR execution summary`, the run's result is
+preserved. You can read the local summary in `summary.log`.
 
-`Agent:` and `Model:` appear between `Status:` and `Duration:`, with configured
-names only. Each field is resolved independently: a stage override in
-`software-factory.json`, then the `run` or `resume` section in
-`software-factory.json: agentSandbox`, then its shared value. An explicitly empty sandbox section
-value clears the shared value. Unset summary values are left empty; agent
-defaults are not inferred from output. Each sandbox attempt replaces both
-fields, and subprocess output cannot change them. Detailed logs retain
-configuration provenance. Executed attempts append their own summary entries.
-
-```text
-1. IMPLEMENTATION
-   Status:    SUCCEEDED
-   Agent:     codex
-   Model:     gpt-5
-   Duration:  20 sec
-   Changes:   Created hello.txt containing Hello, world!
-```
-
-Execution statuses describe whether the stage ran successfully. They are
-separate from the review verdicts (`PASS`, `UNRESOLVED`, or `BLOCKED`); read the
-review output to assess remaining findings.
-
-With `stages.securityReview.saveFindings: true`, the security entry includes
-full actionable findings and suggested fixes directly in `summary.log`, plus
-checks and verification gaps. Each finding includes priority, affected location
-when available, trigger, impact, and a suggested fix left unapplied. The ordinary
-change summary separately says `No code changes made (saveFindings enabled).`
-There is no two-line limit on findings. Reports must omit secret values.
-
-A `PASS` verdict explicitly says `No actionable findings.` `UNRESOLVED` means
-findings were intentionally left unapplied. `BLOCKED` identifies insufficient
-review evidence or verification. A successful execution can have either of the
-latter verdicts. Missing, unreadable, malformed, or incomplete final reports say
-`Security findings unavailable.` and produce a visible warning; they never imply
-a clean review. Actual execution errors remain in the same entry.
-
-Factory collects a dedicated final report, rather than parsing terminal output
-or echoed prompts. The detailed security log and latest `securityReview.txt`
-archive remain available; reporting mode also keeps a uniquely named
-`.soft-factory-stage-changes-<id>-review.txt` archive in the invocation directory
-for each collected attempt. Risk classification receives the unapplied findings
-as evidence and must not describe them as fixed.
-
-Each executed attempt gets its own appended summary entry and fresh report.
-Resume preserves historical entries; an already successful security stage that
-is skipped during recovery gets no new entry. Collection or summary-write
-failures warn without enabling corrections or commits. Collected archives are
-retained even if the summary cannot be saved; if archiving also fails, the
-worktree report is retained when summary saving fails.
-
-Each default or `continue` invocation creates a new directory, including after
-a failure. `resume <path>` reopens an existing invocation instead: it appends
-to the same stage log files and adds a `RESUMED` marker and new numbered
-entries to `summary.log`.
-Disabled stages keep the usual filename positions, so disabling code review
-still leaves security review at `03-securityReview.log`.
-
-Each completed stage attempt appends a line such as
-`codeReview,SUCCEEDED` or `securityReview,FAILED` to `stage_status.txt`.
-This includes the final walkthrough; disabled stages have no status entry.
-[Recovery](workflow.md#resume-a-failed-or-interrupted-run) uses the last saved
-entry, so a process killed before saving its result may leave only the previous
-stage's status.
-
-If log creation or writing fails in a default or `continue` run, Soft Factory
-warns and keeps running. `resume` requires its existing status file and summary;
-failure to open recovery logs stops that command.
-Logs may be missing or incomplete; without a run log directory, the final
-walkthrough cannot be saved. Stage logs include prompts and supporting context,
-so keep the generated output private and out of commits.
+Logs include the task and context documents. Keep their contents private and
+out of commits.

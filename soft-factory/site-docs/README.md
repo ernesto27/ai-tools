@@ -1,6 +1,15 @@
 # Soft Factory documentation
 
 This VitePress site uses the same theme and dependency versions as Agent Sandbox.
+The English guide is served at `/` and the Spanish guide at `/es/`, with a
+language switcher that keeps the current page. Both use the shared custom home
+component and local search, following Agent Sandbox’s locale setup.
+
+Keep matching page filenames in both languages. Translate navigation and search
+labels in `guide/.vitepress/config.mjs`, and home-page text in
+`guide/.vitepress/theme/home-es.js`. Preserve explicit section anchors used by
+cross-links when translating headings. Update both guides when content changes.
+
 Use Node.js 22 or later. From `soft-factory/site-docs`:
 
 ```bash

@@ -52,3 +52,7 @@ Do not create ad hoc frontend `.test.mjs` files such as `tests/runProgress.test.
 ## Commit & Pull Request Guidelines
 
 Prefix every commit subject with `desktop:` and use a short, descriptive subject, such as `desktop: Load sidebar repos and branches from disk`. Keep commits focused. PRs should explain behavior changes, link relevant issues, and list validation performed. Include screenshots for UI changes and identify any new CLI, configuration, or platform requirements.
+
+## Release Tags
+
+Use `desktop-vMAJOR.MINOR.PATCH` for desktop release tags, for example `desktop-v0.1.2`. When releasing a patch, fetch tags from `origin`, select the latest stable `desktop-vMAJOR.MINOR.PATCH` tag using semantic-version ordering, and increment only its patch component. Ignore unprefixed tags and tags belonging to other tools. If no desktop release tag exists, propose `desktop-v0.0.1`. This rule also applies when using the `push-github-tag` skill.

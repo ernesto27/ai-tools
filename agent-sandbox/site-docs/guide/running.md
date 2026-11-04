@@ -39,6 +39,16 @@ agent-sandbox run -a pi -q "inspect the test failures and fix their cause"
 use their own configuration when you omit it. Model availability depends on
 your provider account.
 
+To explore models by creator, description, context limit, and input/output
+pricing, open the public OpenRouter catalog:
+
+```bash
+agent-sandbox models
+```
+
+This browser requires interactive terminal input and output. It does not
+change your configured model or grant provider access.
+
 ## Choose effort
 
 All agents default to `high`. Override it for a single task:
@@ -127,6 +137,34 @@ A closing separator marks the end of the feed, including cancellation. Check
 the command's exit status and publication messages to determine the task's
 outcome; individual failed commands can be followed by a successful retry.
 
+## Review verification evidence
+
+When a session makes net changes to project files, the tool instructs the agent
+to attempt checks appropriate to those changes and save evidence under
+`.agent-sandbox-verification/` in the task's worktree:
+
+| File | Purpose |
+| --- | --- |
+| `summary.md` | Results, checks and exit codes, evidence paths, and limitations. |
+| `verification.log` | A summarized combined log, when useful output exists. |
+| `desktop.png` and `mobile.png` | Final web UI screenshots at 1280×800 and 390×844. |
+| `demo.webm` | A short recording demonstrating the changed web UI. |
+
+Non-UI tasks do not require screenshots or video. Missing tools or services
+should be reported as unavailable verification. These are instructions to the
+agent, so files and successful checks are not guaranteed. Failed or unavailable
+verification does not itself block task completion or publication.
+
+A local `.gitignore` containing `*` keeps evidence out of normal staging.
+On resume, the agent is instructed to update the existing evidence. A session
+with no net project changes skips automatic verification and leaves earlier
+evidence untouched; committing pre-existing work alone does not count as a
+new project change.
+
+Open the worktree using [worktree commands](worktrees.md#open-and-review) to
+inspect evidence. PR publication can include it and then clean up the local
+files; see [verification in pull requests](publishing.md#verification-in-pull-requests).
+
 ## Use the terminal UI
 
 Use `run-tui` or `resume-tui` for a terminal view with execution output and
@@ -145,7 +183,8 @@ The output panel shows the same [compact audit feed](#read-the-compact-audit-fee
 for Codex and Claude Code, with colors for activity, notices, and failures.
 The TUI transcript records that formatted text. Logs normally live under
 `~/.config/agent-sandbox/logs/`, honoring `XDG_CONFIG_HOME`; they contain the
-formatted feed rather than the original agent JSON event stream.
+formatted feed rather than the original agent JSON event stream. On macOS,
+logs live under `~/Library/Application Support/agent-sandbox/logs/`.
 
 | Key | Action |
 | --- | --- |

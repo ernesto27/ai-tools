@@ -72,6 +72,28 @@ If PR creation or a description update fails after pushing, the branch stays
 published and the command reports an error. Failed description updates are
 not saved or replayed on the next resume. See [publication recovery](troubleshooting.md#push-or-pr-creation-fails).
 
+## Verification in pull requests
+
+When creating a new PR or appending a resumed session's checklist, the host
+collects available files from `.agent-sandbox-verification/` in the worktree.
+Text files (`.txt`, `.log`, `.md`, `.json`) are embedded as collapsible sections
+in the PR description. Supported images and videos are passed to GitHub CLI
+with `--attach`. Hidden files and directories, temporary scripts, and unsupported
+file types are excluded.
+
+After successful creation or a successful resumed description update, the host
+removes local evidence contents while preserving `.gitignore`. An initial run
+that reuses an existing PR leaves its description and local evidence unchanged.
+A resume reporting no net session changes also leaves both unchanged.
+Push-only runs do not publish or clean up evidence.
+
+A missing evidence directory does not block publication. Errors reading evidence
+or attaching it can still fail publication after the branch was pushed. The
+agent is instructed to keep text evidence concise enough to fit within the
+PR description's 65,536-character limit. Review the
+[verification summary](running.md#review-verification-evidence) for actual checks
+and limitations; an agent's successful exit does not guarantee its checks passed.
+
 ## Request reviewers
 
 Pass one plain GitHub username per repeatable flag, without a shorthand:

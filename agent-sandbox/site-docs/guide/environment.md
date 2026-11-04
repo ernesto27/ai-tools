@@ -77,6 +77,46 @@ Ask the agent to read or extract the files as part of your task. Files are not
 automatically converted. Poppler tools are installed when images are built;
 there is no runtime check or automatic rebuild for missing PDF tools.
 
+## Mount reference folders
+
+Use repeatable `--folder` flags to share existing directories with any agent:
+
+```bash
+agent-sandbox run -a codex \
+  --folder "/path/to/reference-project" \
+  --folder "/path/to/design-notes" \
+  -q "Read the reference folders and use their conventions for this task."
+```
+
+Folders are mounted read-only under
+`/agent-sandbox-folders/<number>/<folder-name>`, outside the task's worktree.
+Relative paths resolve from the invocation directory. Numbered directories
+keep folders with the same name separate. The prompt lists the container
+paths and asks the agent to read their files.
+
+`--folder` works on all four execution commands. It is a CLI-only option;
+`folder` is not a supported JSON configuration field.
+
+## Browser checks inside the container
+
+New default and derived image builds include Chromium, fonts, Puppeteer Core,
+and FFmpeg. Agents can use these tools to check a web UI and capture screenshots
+or a video. For a screenshot inside the container:
+
+```bash
+agent-sandbox-browser http://localhost:3000 /workspace/page.png
+```
+
+Start the project's web server first. An optional third argument supplies a
+required CSS selector. Custom browser scripts can use
+`require("/opt/agent-sandbox-browser/browser.cjs").launch()`.
+
+These tools are installed at image build time. Existing images are not checked
+for missing browser tools; rebuild an older image to pick them up. External
+bases must provide the required browser, font, and FFmpeg packages. See
+[verification evidence](running.md#review-verification-evidence) for the files
+agents are instructed to retain.
+
 ## Reach services on your host
 
 When a task needs access to local services, enable host networking explicitly:

@@ -1,36 +1,25 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { withBase } from 'vitepress'
 
-const command = 'agent-sandbox run -b fix-login -a codex \\\n  -q "fix the login redirect loop"'
-const copyLabel = ref('Copy command')
-
+const selected = ref(0)
+const copied = ref(false)
+const copyFailed = ref(false)
+const stages = [
+  { title: 'Run', command: 'agent-sandbox run -b fix-login -a codex \\\n  -q "fix the login redirect loop"', heading: 'Give the agent a separate place to work.', detail: 'Creates a branch and worktree from your current commit, then runs the agent inside Docker. Changes stay uncommitted for you to review.', link: '/first-run', label: 'Follow your first run' },
+  { title: 'Review', command: 'agent-sandbox worktree-list\nagent-sandbox worktree-editor -b fix-login', heading: 'Open the worktree and inspect the changes.', detail: 'Find the recorded worktree and open it in VS Code. You can also open the listed path in your preferred editor.', link: '/worktrees', label: 'Find and manage worktrees' },
+  { title: 'Continue', command: 'agent-sandbox resume -b fix-login -a codex \\\n  -q "add a regression test for the redirect"', heading: 'Keep working in the same worktree.', detail: 'Starts another agent invocation with the existing files and commits. Your original working copy remains available.', link: '/worktrees', label: 'Continue an existing task' }
+]
+const stage = computed(() => stages[selected.value])
+function selectStage(index) { selected.value = index; copied.value = false; copyFailed.value = false }
 async function copyCommand() {
-  try {
-    await navigator.clipboard.writeText(command)
-    copyLabel.value = 'Copied'
-  } catch {
-    copyLabel.value = 'Select the command to copy'
-  }
+  try { await navigator.clipboard.writeText(stage.value.command); copied.value = true; copyFailed.value = false }
+  catch { copyFailed.value = true }
 }
-
-const chapters = [
-  { number: '01', title: 'Set up your sandbox', description: 'From installation to your first completed task.', links: [
-    { text: 'Installation', path: '/installation' },
-    { text: 'Authentication', path: '/authentication' },
-    { text: 'Your first run', path: '/first-run' }
-  ] },
-  { number: '02', title: 'Build your workflow', description: 'Configure a session, continue the work, and publish it.', links: [
-    { text: 'Prompts & terminal UI', path: '/running' },
-    { text: 'Configuration', path: '/configuration' },
-    { text: 'Worktrees', path: '/worktrees' },
-    { text: 'Push & pull requests', path: '/publishing' }
-  ] },
-  { number: '03', title: 'Keep a reference handy', description: 'Find the option you need or get past a failed run.', links: [
-    { text: 'Images & networking', path: '/environment' },
-    { text: 'Commands & flags', path: '/reference' },
-    { text: 'Troubleshooting', path: '/troubleshooting' }
-  ] }
+const guides = [
+  { title: 'Start a task', description: 'Install the CLI, connect your agent, and run a small change.', links: [['Installation', '/installation'], ['Authentication', '/authentication'], ['Your first run', '/first-run']] },
+  { title: 'Make it your workflow', description: 'Set defaults, continue a task, and publish the result.', links: [['Prompts and terminal UI', '/running'], ['Configuration', '/configuration'], ['Worktrees', '/worktrees'], ['Push and pull requests', '/publishing']] },
+  { title: 'Find an answer', description: 'Look up a flag, adjust the environment, or resolve a failed run.', links: [['Commands and flags', '/reference'], ['Images and networking', '/environment'], ['Troubleshooting', '/troubleshooting']] }
 ]
 </script>
 
@@ -38,65 +27,26 @@ const chapters = [
   <div class="sandbox-home">
     <section class="sandbox-hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-mark" aria-hidden="true"></span> Coding agents / Separate workspaces</p>
         <h1 id="hero-title">Your agent.<br>Its own workspace.</h1>
-        <p class="hero-description">Run a coding agent on your local machine, inside Docker and on a Git worktree of its own. Give it a task. Review the changes. Publish when you’re ready.</p>
-        <div class="hero-actions">
-          <a class="primary-link" :href="withBase('/installation')">Get started <span aria-hidden="true">↗︎</span></a>
-          <a class="secondary-link" :href="withBase('/first-run')">Walk through a first run <span aria-hidden="true">→</span></a>
-        </div>
-        <p class="hero-platform">Linux x86_64 <span aria-hidden="true">·</span> Docker <span aria-hidden="true">·</span> Git</p>
+        <p class="hero-description">Run Codex, Claude Code, opencode, or pi on your local machine, inside Docker and on a separate Git worktree. Keep working while your agent takes on a task.</p>
+        <div class="hero-actions"><a class="primary-link" :href="withBase('/installation')">Install agent-sandbox</a><a class="secondary-link" :href="withBase('/first-run')">Walk through a first run</a></div>
+        <p class="hero-platform">Linux x86_64 and macOS (Intel and Apple silicon). Requires Docker and Git.</p>
       </div>
-
-      <div class="workspace-panel">
-        <div class="panel-heading"><span class="terminal-symbol" aria-hidden="true">&gt;_</span><span>A task, in its own worktree</span><span class="panel-label">CLI</span></div>
-        <div class="command-example">
-          <div class="command-heading"><span>Start a session</span><button type="button" @click="copyCommand">{{ copyLabel }}</button></div>
-          <pre><span class="shell-prompt" aria-hidden="true">$ </span><code>{{ command }}</code></pre>
-          <span class="copy-status" role="status">{{ copyLabel === 'Copied' ? 'Command copied to clipboard.' : '' }}</span>
-        </div>
-        <div class="workspace-map" role="group" aria-label="The host repository and a separate sandbox worktree">
-          <div class="workspace-node">
-            <span class="node-marker" aria-hidden="true"></span>
-            <div><span class="node-label">Your working copy</span><strong>Keep working here</strong></div>
-            <span class="node-tag">HOST</span>
-          </div>
-          <div class="worktree-connection"><span aria-hidden="true">↳</span> separate branch + working directory</div>
-          <div class="workspace-node sandbox-node">
-            <span class="node-marker" aria-hidden="true"></span>
-            <div><span class="node-label">Agent’s worktree</span><strong>fix-login <span>/workspace</span></strong></div>
-            <span class="node-tag">DOCKER</span>
-          </div>
-        </div>
-        <div class="panel-footnote"><span aria-hidden="true">↗︎</span> Review locally, push a branch, or open a PR.</div>
-      </div>
+      <div class="hero-note"><span class="branch-glyph" aria-hidden="true">⑂</span><p>A branch and working directory for each task.</p><p>You review the result.<br>You decide what ships.</p></div>
     </section>
 
-    <div class="agent-strip" aria-label="Supported agents">
-      <span class="eyebrow">Choose your agent</span>
-      <div><span>Codex</span><span>Claude Code</span><span>opencode</span><span>pi</span></div>
-    </div>
-
-    <section class="workflow-section" aria-labelledby="workflow-title">
-      <div class="section-heading"><p class="eyebrow">The workflow</p><h2 id="workflow-title">A short path from task to review.</h2></div>
-      <ol class="workflow-steps">
-        <li><span class="step-number">01 /</span><h3>Describe the task</h3><p>Start from your repository. Choose an agent and tell it what you want changed.</p></li>
-        <li><span class="step-number">02 /</span><h3>Let the agent work</h3><p>The tool creates a worktree and runs the agent inside a Docker container.</p></li>
-        <li><span class="step-number">03 /</span><h3>Review and continue</h3><p>Inspect the result, resume the task, or publish with <code>--push</code> or <code>--pr</code>.</p></li>
-      </ol>
-    </section>
-
-    <section class="guide-section" aria-labelledby="guide-title">
-      <div class="section-heading"><p class="eyebrow">The user guide</p><h2 id="guide-title">Start here. Come back as you need.</h2></div>
-      <div class="guide-chapters">
-        <div v-for="chapter in chapters" :key="chapter.number" class="guide-chapter">
-          <span class="chapter-number">{{ chapter.number }}</span>
-          <div class="chapter-intro"><h3>{{ chapter.title }}</h3><p>{{ chapter.description }}</p></div>
-          <div class="chapter-links"><a v-for="link in chapter.links" :key="link.path" :href="withBase(link.path)">{{ link.text }} <span aria-hidden="true">↗︎</span></a></div>
-        </div>
+    <section class="workspace-section" aria-label="Explore the sandbox workflow">
+      <div class="workflow-picker" role="group" aria-label="Workflow stage"><button v-for="(item, index) in stages" :key="item.title" type="button" :aria-pressed="selected === index" @click="selectStage(index)"><span class="stage-number" aria-hidden="true">{{ index + 1 }}</span>{{ item.title }}</button><span class="picker-hint">See where the work happens</span></div>
+      <div class="workspace-map">
+        <div class="host-workspace"><span class="location-label">Your local machine</span><h2>Your working copy</h2><p>Your files and current work.<br>Keep using your usual tools.</p><span class="path-label">~/projects/your-repo</span></div>
+        <div class="worktree-connection" aria-hidden="true"><span></span><b>Git worktree</b><span></span></div>
+        <div class="agent-workspace" :class="{ reviewing: selected === 1 }"><div class="agent-location"><span class="location-label">Agent’s worktree</span><span class="branch-name">fix-login</span></div><div class="container-boundary"><span class="docker-label">{{ selected === 1 ? 'Review locally' : 'Runs inside Docker' }}</span><h2>{{ selected === 1 ? 'Your editor' : 'Your coding agent' }}</h2><p v-if="selected === 1">Inspect the diff and verify the result.</p></div></div>
       </div>
+      <p class="map-note">Separate files and branch; worktrees share the repository’s Git metadata.</p>
+      <div class="command-workbench"><div class="stage-explanation" aria-live="polite"><h3>{{ stage.heading }}</h3><p>{{ stage.detail }}</p><a :href="withBase(stage.link)">{{ stage.label }}</a></div><div class="command-example"><div class="command-heading"><span>{{ stage.title }} command</span><button type="button" @click="copyCommand">{{ copied ? 'Copied' : 'Copy command' }}</button></div><pre><code>{{ stage.command }}</code></pre><p class="copy-status" role="status">{{ copied ? 'Command copied to clipboard.' : copyFailed ? 'Select the command above and copy it manually.' : '' }}</p></div></div>
     </section>
 
-    <footer class="home-footer"><span>agent-sandbox <span class="footer-divider">/</span> User documentation</span><a :href="withBase('/installation#update')">Keep your CLI up to date <span aria-hidden="true">→</span></a></footer>
+    <section class="guide-section" aria-labelledby="guide-title"><div class="guide-heading"><h2 id="guide-title">From first task to everyday use.</h2><p>Start with a walkthrough, or go straight to the detail you need.</p></div><div class="guide-chapters"><div v-for="guide in guides" :key="guide.title" class="guide-chapter"><h3>{{ guide.title }}</h3><p>{{ guide.description }}</p><ul><li v-for="[label, path] in guide.links" :key="path"><a :href="withBase(path)">{{ label }}</a></li></ul></div></div></section>
+    <footer class="home-footer"><span>agent-sandbox / User documentation</span><a :href="withBase('/installation#update')">Update your CLI</a></footer>
   </div>
 </template>

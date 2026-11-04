@@ -107,6 +107,9 @@ Relative paths in either array resolve from the invocation directory.
 See [reference-file attachments](environment.md#mount-reference-files) for
 container paths and PDF tools.
 
+Reference directories use repeatable CLI `--folder` flags instead; JSON does
+not accept a `folder` field. See [reference folders](environment.md#mount-reference-folders).
+
 ## Set effort globally
 
 Set the root-level `effort` string to share a default across all agents and

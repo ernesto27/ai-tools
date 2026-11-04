@@ -2,7 +2,15 @@
 
 ## What you need
 
-The published binary and installer support **Linux x86_64**.
+The published binary and installer support:
+
+- **Linux x86_64**.
+- **macOS Intel (x86_64)**.
+- **macOS Apple silicon (arm64)**.
+
+The installer detects your operating system and architecture, downloads the
+matching archive, verifies its SHA-256 checksum, and installs the binary to
+`~/.local/bin`. On macOS it can use the built-in `shasum` for verification.
 
 - Git, and a Git repository to work in.
 - Docker installed, running, and accessible to your user.

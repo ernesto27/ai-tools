@@ -9,8 +9,9 @@
 | `run-tui` | Start a task in the terminal UI. |
 | `resume-tui` | Continue a task in the terminal UI; requires `-b`. |
 | `doctor [--json]` | Check host dependency availability in `PATH`; optionally return JSON. |
+| `models` | Browse the public OpenRouter model catalog in an interactive terminal. |
 | `update` | Install the latest release binary. |
-| `worktree-list` | List registered worktrees for the current repository. |
+| `worktree-list [--repo <directory>] [--json]` | List registered branch/path records for the selected repository; optionally return JSON. |
 | `worktree-editor -b <branch>` | Open a recorded worktree in VS Code. |
 | `worktree-delete -b <branch> [--force]` | Remove a worktree and its local branch. |
 | `worktree-delete-all [--yes]` | Remove all registered tasks for the current repository, including uncommitted work. |
@@ -45,6 +46,7 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-i`, `--baseImage` | Build the sandbox image from a compatible external base. |
 | `--image` | Attach an image to Codex or Claude Code; repeat for multiple files. |
 | `--file` | Mount a regular file read-only for any agent; repeat for multiple files. See [reference files](environment.md#mount-reference-files). |
+| `--folder` | Mount an existing directory read-only for any agent; repeat for multiple folders. CLI only. See [reference folders](environment.md#mount-reference-folders). |
 | `-p`, `--push` | Ask the agent to commit, then push from the host. |
 | `--pr` | Commit and publish from the host. Initial runs create or reuse a PR; resumes require an open PR and append a session checklist. |
 | `-c`, `--commitMessage` | Exact commit message to use with `--push` or `--pr`. |
@@ -70,17 +72,3 @@ agent-sandbox --help
 agent-sandbox run --help
 agent-sandbox --version
 ```
-
-## Exit status
-
-| Status | Meaning |
-| --- | --- |
-| `0` | Successful execution. |
-| `1` | General tool error. |
-| `2` | Invalid command usage. |
-| `130` | Execution cancelled. |
-| Agent's nonzero status | Agent failure, propagated by the CLI. |
-
-Agent status values can overlap these numbers; read the accompanying error
-message to understand the cause. In publishing modes, a failed agent is not
-published.

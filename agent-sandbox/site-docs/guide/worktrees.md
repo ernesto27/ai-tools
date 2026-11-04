@@ -22,6 +22,37 @@ On Linux, worktrees normally live under:
 ```
 
 
+To select a repository explicitly or consume the listing in a script:
+
+```bash
+agent-sandbox worktree-list --repo /path/to/repository --json
+```
+
+JSON output is an array of objects containing only `branch` and `path`:
+
+```json
+[{"branch":"fix-login","path":"/home/user/.config/agent-sandbox/worktrees/repo-hash/fix-login"}]
+```
+
+Both text and JSON output use reverse registration order, newest registered
+first. They include stale records without checking worktree paths. No matches
+returns `[]` in JSON mode. Listing failures retain stderr diagnostics and a
+nonzero exit status. `--repo` applies only to listing; other worktree commands
+select the repository from the current directory.
+
+Worktree and log locations honor `XDG_CONFIG_HOME` on Linux. Separate worktrees
+share Git metadata with the original repository; they provide separate files
+and branches, rather than complete repository isolation.
+
+On macOS, worktrees normally live under:
+
+```text
+~/Library/Application Support/agent-sandbox/worktrees/<repo>-<hash>/<branch>
+```
+
+Use the path printed by `worktree-list` when opening a worktree; quote paths
+containing spaces in shell commands.
+
 ## Open and review
 
 ```bash

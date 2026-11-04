@@ -15,7 +15,7 @@ Choose the starting branch you want the agent to work from. A new worktree
 starts from your current commit; uncommitted files in your working copy are
 not copied into it. Commit any changes the agent needs before starting.
 
-## 2. Give the agent a  task
+## 2. Give the agent a task
 
 ```bash
 agent-sandbox run -b improve-readme -a codex \
@@ -39,6 +39,10 @@ agent-sandbox worktree-editor -b improve-readme
 
 The second command opens the worktree in VS Code. If you use another editor,
 open the path shown by `worktree-list`.
+
+If the agent produced [verification evidence](running.md#review-verification-evidence),
+read `.agent-sandbox-verification/summary.md` in that worktree before deciding
+whether the result is ready.
 
 ## 4. Ask for a follow-up
 

@@ -1,6 +1,6 @@
 # Maintaining the user guide
 
-The English user-facing website lives in `site-docs/guide/` and is built with
+The English and Spanish user-facing website lives in `site-docs/guide/` and is built with
 [VitePress](https://vitepress.dev/).
 `../docs/architecture.md` remains a separate developer reference and is not
 included in the published website.
@@ -42,6 +42,27 @@ so local and CI builds use the same versions.
 The Vite override in `package.json` replaces VitePress 1.x's older Vite 5
 dependency with a patched release. Keep it until VitePress supports a patched
 version directly, and verify both the build and preview when updating it.
+
+## Languages
+
+English pages remain directly under `guide/` at `/ai-tools/`. Spanish pages live
+under `guide/es/` at `/ai-tools/es/`. The language menu switches to the same page
+in the other language. Section IDs are shared across translations so links to
+specific sections keep working when switching languages.
+
+When adding or changing a guide page, update both language versions and the
+corresponding navigation in `guide/.vitepress/config.mjs`. Keep command names,
+flags, JSON keys, and literal output unchanged in translations. For translated
+headings, preserve the original English section ID with `{#section-id}`.
+
+The homepage shares `guide/.vitepress/theme/DocsHome.vue` between languages;
+its Spanish text is in `home-es.js` beside the component. Homepage links follow
+the selected language and respect the Pages base path. Navigation, interface,
+and local-search translations are configured in `config.mjs`. Other tools linked
+from the top navigation keep their own documentation and language settings.
+
+Run `npm run docs:build` to validate both languages, then check language switching,
+search, and homepage controls in the preview, including a narrow mobile viewport.
 
 ## Enable GitHub Pages
 

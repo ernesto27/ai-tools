@@ -56,3 +56,5 @@ Prefix every commit subject with `desktop:` and use a short, descriptive subject
 ## Release Tags
 
 Use `desktop-vMAJOR.MINOR.PATCH` for desktop release tags, for example `desktop-v0.1.2`. When releasing a patch, fetch tags from `origin`, select the latest stable `desktop-vMAJOR.MINOR.PATCH` tag using semantic-version ordering, and increment only its patch component. Ignore unprefixed tags and tags belonging to other tools. If no desktop release tag exists, propose `desktop-v0.0.1`. This rule also applies when using the `push-github-tag` skill.
+
+Before creating a desktop release tag, update `package.json`'s `version` to the tag's numeric version (for example, `desktop-v0.1.2` requires `"version": "0.1.2"`). The sidebar reads this value at build time. Keep `package-lock.json` (both the top-level and root package versions), `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and the desktop app entry in `src-tauri/Cargo.lock` in sync, as required by the release workflow. Commit these version updates before creating the tag, and tag the commit containing them. This requirement also applies when using the `push-github-tag` skill.

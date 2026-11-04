@@ -8,6 +8,7 @@ import { Dot } from "./Dot";
 import { cx } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
 import { Icon } from "./Icon";
+import { version } from "../../package.json";
 
 interface Props {
   repos: SavedRepo[];
@@ -223,6 +224,7 @@ export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navig
           <Icon name="settings" className="shrink-0" />
           {t("settings")}
         </NavItem>
+        <p className="px-2 text-left text-xs text-muted">v{version}</p>
       </div>
       {repoMenu && (
         <RepoContextMenu

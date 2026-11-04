@@ -2,6 +2,11 @@
 
 A Tauri 2 desktop app for Software Factory and Agent Sandbox.
 
+## Documentation
+
+The desktop user guide lives in [site-docs](site-docs/README.md), using the same
+VitePress setup as Agent Sandbox. It includes screenshots of the real desktop app.
+
 ## Install a release
 
 Download a `desktop-vX.Y.Z` release from
@@ -11,7 +16,6 @@ installers do not include them. Both commands must be available on the desktop
 process's `PATH`. Check them from the terminal you will use to launch the app:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
 software-factory --version
 agent-sandbox --version
 

@@ -35,7 +35,7 @@ Paths below are relative to the module unless stated otherwise.
 | Public assets | `site-docs/guide/public/` |
 | Site maintenance instructions | `site-docs/README.md` |
 | npm scripts and dependencies | `site-docs/package.json`, `site-docs/package-lock.json` |
-| Deployment workflow | Git root: `.github/workflows/agent-sandbox-docs.yml` |
+| Deployment workflow | Git root: `.github/workflows/ai-tools-docs.yml` |
 
 Keep site files inside `site-docs`; GitHub Actions requires its workflow at
 the Git root. Generated `guide/.vitepress/dist/`, `guide/.vitepress/cache/`,
@@ -74,7 +74,7 @@ Do not change CLI behavior to make a documentation example work.
 - Use VitePress Markdown containers (`::: warning`), and `withBase()` for
   site links or public asset URLs constructed in Vue components. Respect the
   configured GitHub Pages subpath `/ai-tools/soft-factory/`.
-- The shared `.github/workflows/agent-sandbox-docs.yml` builds both sites in one
+- The shared `.github/workflows/ai-tools-docs.yml` builds both sites in one
   Pages artifact: Agent Sandbox stays at `/ai-tools/`, and Soft Factory goes
   under `/ai-tools/soft-factory/`. Preserve both sites when changing deployment;
   build both if shared workflow or Agent Sandbox files change.

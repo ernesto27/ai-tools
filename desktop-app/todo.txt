@@ -37,3 +37,19 @@ add respostory
 - by default do not show checks,  only show after add a folder  - desktop
 - softwre factory shuld be create with default values,  only agent be select here
 - logs folder should be save in .config/factor not in repo
+
+1. All-runs dashboard — See active, failed, and completed runs across every repository.
+2. Desktop notifications — Know when a run finishes, fails, or needs attention.
+3. Changes viewer — Review changed files and Git diffs directly from a run.
+4. Searchable logs — Search output and filter by stage, errors, or warnings.
+5. Run recovery after restart — Rediscover ongoing or interrupted runs when reopening the app.
+6. Open in editor or terminal — Launch your preferred tools in the run’s worktree.
+7. Run presets — Save reusable task instructions, models, and workflow settings.
+8. Run queue — Queue tasks with a configurable concurrency limit.
+9. Results summary — Show what changed, test results, unresolved issues, and the PR link.
+10. Worktree manager — Inspect worktrees, identify uncommitted changes, and clean up finished work.
+11. Run comparison — Compare results and stage durations between attempts.
+12. Environment diagnostics — Check CLI versions, authentication, and configuration, with actionable fixes.
+13. Cost and token tracking — Show usage per run and stage, where providers expose it.
+14. Command palette — Quickly switch repositories, open runs, and launch common actions.
+15. Export run report — Export a Markdown summary with results and relevant logs.

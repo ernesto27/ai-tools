@@ -34,7 +34,7 @@ Paths below are relative to the module unless stated otherwise.
 | Public assets | `site-docs/guide/public/` |
 | Site maintenance instructions | `site-docs/README.md` |
 | npm scripts and dependencies | `site-docs/package.json`, `site-docs/package-lock.json` |
-| Deployment workflow | Git root: `.github/workflows/agent-sandbox-docs.yml` |
+| Deployment workflow | Git root: `.github/workflows/ai-tools-docs.yml` |
 
 Keep site files inside `site-docs`; GitHub Actions requires its workflow at
 the Git root. Generated `guide/.vitepress/dist/`, `guide/.vitepress/cache/`,

@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;450;500;550;600;650;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --vp-font-family-base: 'Public Sans', sans-serif;
+  --vp-font-family-mono: 'IBM Plex Mono', monospace;
+  --vp-c-brand-1: #2856b6;
+  --vp-c-brand-2: #214a9f;
+  --vp-c-brand-3: #2856b6;
+  --vp-c-brand-soft: #2856b610;
+  --vp-c-bg: #f5f7fa;
+  --vp-c-bg-alt: #edf1f6;
+  --vp-c-bg-elv: #fff;
+  --vp-c-bg-soft: #e9eef5;
+  --vp-c-text-1: #243247;
+  --vp-c-text-2: #526177;
+  --vp-c-text-3: #607087;
+  --vp-c-divider: #cbd5e1;
+  --vp-c-border: #b7c4d5;
+  --vp-code-block-bg: #e9eef5;
+  --vp-code-color: #2856b6;
+  --vp-sidebar-bg-color: #edf1f6;
+  --site-panel: #fff;
+  --site-accent-bg: #edf3ff;
+}
+.dark {
+  --vp-c-brand-1: #a7c3ff;
+  --vp-c-brand-2: #c2d5ff;
+  --vp-c-brand-3: #739eea;
+  --vp-c-brand-soft: #a7c3ff15;
+  --vp-c-bg: #182536;
+  --vp-c-bg-alt: #132030;
+  --vp-c-bg-elv: #223247;
+  --vp-c-bg-soft: #223247;
+  --vp-c-text-1: #edf3fc;
+  --vp-c-text-2: #b9c7da;
+  --vp-c-text-3: #a0b2ca;
+  --vp-c-divider: #3d5068;
+  --vp-c-border: #546c89;
+  --vp-code-block-bg: #223247;
+  --vp-code-color: #a7c3ff;
+  --vp-sidebar-bg-color: #132030;
+  --site-panel: #1e2e43;
+  --site-accent-bg: #263c5d;
+}
+.VPNavBarTitle .title { font-family: var(--vp-font-family-mono); font-size: 16px; letter-spacing: -.6px; }
+.VPNavBarTitle .logo { height: 28px; }
+.VPSidebar { border-right: 1px solid var(--vp-c-divider); }
+.VPSidebarItem.level-0 > .item > .text { font-size: 14px; font-weight: 650; }
+.VPSidebarItem.level-1 .text { font-size: 14px; }
+.vp-doc h1 { font-size: clamp(32px, 4vw, 42px); line-height: 1.15; letter-spacing: -1.4px; }
+.vp-doc h2 { margin-top: 40px; font-size: 25px; letter-spacing: -.5px; }
+.vp-doc p, .vp-doc li { line-height: 1.8; }
+.vp-doc p { max-width: 72ch; }
+.vp-doc a { text-underline-offset: 3px; }
+.vp-doc div[class*='language-'] { border: 1px solid var(--vp-c-divider); border-radius: 6px; }
+:where(a, button):focus-visible { outline: 3px solid var(--vp-c-brand-1); outline-offset: 5px; }
+.sandbox-home { max-width: 1192px; margin: auto; padding: 0 40px; }
+.sandbox-hero { display: grid; grid-template-columns: 1.8fr 1fr; align-items: end; gap: 80px; padding: 76px 0 48px; }
+.hero-copy h1 { font-size: clamp(44px, 5.6vw, 70px); line-height: 1.04; letter-spacing: -3.3px; font-weight: 650; }
+.hero-description { max-width: 590px; margin-top: 24px; font-size: 18px; line-height: 1.7; color: var(--vp-c-text-2); }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin-top: 28px; font-size: 14px; font-weight: 600; }
+.primary-link { background: var(--vp-c-brand-1); color: var(--vp-c-bg); padding: 12px 18px; border-radius: 5px; }
+.secondary-link { text-decoration: underline; text-underline-offset: 5px; }
+.hero-platform { margin-top: 18px; font-size: 13px; color: var(--vp-c-text-2); }
+.hero-note { padding: 0 0 8px 24px; border-left: 2px solid var(--vp-c-divider); font-size: 16px; line-height: 1.6; color: var(--vp-c-text-2); }
+.hero-note p + p { margin-top: 16px; }
+.branch-glyph { display: block; color: var(--vp-c-brand-1); font-size: 50px; line-height: 1; margin-bottom: 20px; }
+
+.desktop-preview { margin: 12px 0 48px; }
+.desktop-preview img, .vp-doc img { border: 1px solid var(--vp-c-divider); border-radius: 8px; }
+.desktop-preview figcaption { margin-top: 12px; font-size: 13px; color: var(--vp-c-text-2); line-height: 1.6; }
+.desktop-chapters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding-bottom: 64px; }
+.desktop-chapters a { display: block; border-top: 2px solid var(--vp-c-divider); padding-top: 20px; }
+.desktop-chapters h2 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+.desktop-chapters p { color: var(--vp-c-text-2); font-size: 14px; line-height: 1.7; }
+@media (max-width: 719px) {
+  .sandbox-home { padding: 0 20px; }
+  .sandbox-hero { display: block; padding: 40px 0 32px; }
+  .hero-copy h1 { font-size: 44px; letter-spacing: -2px; }
+  .hero-description { font-size: 16px; }
+  .hero-note { display: none; }
+  .desktop-chapters { grid-template-columns: 1fr; gap: 28px; padding-bottom: 40px; }
+}

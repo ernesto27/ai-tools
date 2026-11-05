@@ -1,9 +1,10 @@
 import { messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { implementationPullRequestUrl } from "../runPullRequest";
 import { useRunLogs } from "../hooks/useRunLogs";
 import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDesktopRuns";
 import { STAGES, stageProgress } from "../runProgress";
@@ -36,6 +37,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     && session !== undefined
     && live;
   const { logs, run, loading, error } = useRunLogs(repoPath, branch, runId, session);
+  const pullRequestUrl = useMemo(
+    () => implementationPullRequestUrl(run?.stages ?? [], logs),
+    [run?.stages, logs],
+  );
+  const [pullRequestError, setPullRequestError] = useState<string | null>(null);
+  useEffect(() => {
+    setPullRequestError(null);
+  }, [pullRequestUrl]);
   const interrupted = session?.state === RUN_STATE.INTERRUPTED
     || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
   const title = session?.runId ?? (
@@ -97,6 +106,16 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     }
   }
 
+  async function openPullRequest() {
+    if (!pullRequestUrl) return;
+    setPullRequestError(null);
+    try {
+      await openUrl(pullRequestUrl);
+    } catch (error) {
+      setPullRequestError(String(error));
+    }
+  }
+
   async function openFolder() {
     if (!run) return;
     setFolderError(null);
@@ -117,7 +136,18 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           </LinkButton>
         </Crumb>
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0 break-words"><Title>{title}</Title></div>
+          <div className="min-w-0 max-w-full space-y-2 break-words">
+            <Title>{title}</Title>
+            {pullRequestUrl && (
+              <LinkButton
+                data-testid="run-pull-request"
+                className="block max-w-full break-all text-left text-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info"
+                onClick={() => void openPullRequest()}
+              >
+                {pullRequestUrl}
+              </LinkButton>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-5 text-md">
             <TextButton disabled={!run} onClick={() => void openFolder()} className="disabled:opacity-40">
               {t("showFolder")}
@@ -161,6 +191,11 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
       {loading && <p role="status" className="text-muted">{t("loadingRunLogs")}</p>}
       {error && <p role="alert" className="break-words text-bad">{error}</p>}
       {folderError && <p role="alert" className="break-words text-bad">{t("couldNotShowFolderError", { error: folderError })}</p>}
+      {pullRequestError && (
+        <p role="alert" className="break-words text-bad">
+          {t("couldNotOpenPullRequestError", { error: pullRequestError })}
+        </p>
+      )}
       {stopDialogError && <p role="alert" className="break-words text-bad">{messageText(stopDialogError, t)}</p>}
 
       {!loading && (

@@ -2,7 +2,7 @@
 [x] - add dark - ligth mode
 [x] - add githuaction to run tests
 [x] - create release for linux and mac
-[x] - show version app 
+[x] - show version app
 
 
 sidebar
@@ -19,10 +19,11 @@ Run screen.
 
 config screen
 [x] - i want model input to be autocomplete with options
+[] - show select option for skills in project
 [] - remove input , file for task
 
 run detail
-[]  - show some gif of progress when working task is running
+[x]  - show some gif of progress when working task is running
 [] - Stop polling finished runs: useRunLogs schedules another full read of every supported log over IPC after each request, even for completed runs or failed reads. Preserve automatic updates for reopened and CLI-started runs; gating only on the in-memory live session would break reopening. Use reliable persisted completion or process-liveness information to stop polling, since unfinished stages can remain after a crash and some stages can be disabled.
 
 

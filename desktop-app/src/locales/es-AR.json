@@ -201,5 +201,6 @@
   "runCountOther": "{{count}} ejecuciones",
   "googleDrive": "Google Drive",
   "durationUnavailable": "Duración no disponible",
-  "stageDuration": "Duración de {{stage}}"
+  "stageDuration": "Duración de {{stage}}",
+  "couldNotOpenPullRequestError": "No se pudo abrir el pull request: {{error}}"
 }

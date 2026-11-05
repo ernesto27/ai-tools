@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
+import { runPullRequestChecks } from "./pullRequestChecks.js";
 
 export async function runNavigationChecks(t, browser, fixture, artifacts) {
   const { repoName, branch, runId, logText } = fixture;
@@ -83,8 +84,8 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await text("#config-preview-h", "software-factory.json preview");
   }
 
-  async function screen(name, check) {
-    await t.test(name, { timeout: 60_000 }, async (screenContext) => {
+  async function screen(name, check, timeout = 60_000) {
+    await t.test(name, { timeout }, async (screenContext) => {
       try {
         await check();
         const startingTheme = await browser.execute(() => document.documentElement.dataset.theme);
@@ -191,5 +192,6 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     );
     await text('//main//button[span[normalize-space(.)="Implement"]]/span[2]', "Failed");
     await runStageTimingChecks(browser, fixture, artifacts, { text, openRuns, click });
-  });
+    await runPullRequestChecks(browser, fixture, artifacts, { text, openRuns, click });
+  }, 120_000);
 }

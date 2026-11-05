@@ -5,15 +5,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type { FactoryConfig } from "../config";
 import type { RunEntry } from "./useBranchRuns";
 import type { FactoryRunMode } from "../router";
+import { notifyRunCompletion } from "../notifications";
+import { RUN_STATE } from "../runState";
 
-export const RUN_STATE = {
-  STARTING: "starting",
-  RUNNING: "running",
-  STOPPING: "stopping",
-  SUCCEEDED: "succeeded",
-  FAILED: "failed",
-  INTERRUPTED: "interrupted",
-} as const;
+export { RUN_STATE } from "../runState";
 
 export type RunState = (typeof RUN_STATE)[keyof typeof RUN_STATE];
 type RunOutcome = typeof RUN_STATE.SUCCEEDED | typeof RUN_STATE.INTERRUPTED;
@@ -76,11 +71,25 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
   }, []);
 
   function update(id: string, patch: Partial<DesktopRun>) {
+    const previous = sessions.current[id];
+    const next = { ...previous, ...patch };
     sessions.current = {
       ...sessions.current,
-      [id]: { ...sessions.current[id], ...patch },
+      [id]: next,
     };
     setRuns(sessions.current);
+
+    if (
+      previous
+      && isDesktopRunActive(previous)
+      && (next.state === RUN_STATE.SUCCEEDED || next.state === RUN_STATE.FAILED)
+    ) {
+      void notifyRunCompletion({
+        repo: next.repo,
+        branch: next.branch,
+        state: next.state,
+      });
+    }
   }
 
   function busy(repoPath: string) {

@@ -24,6 +24,7 @@ const HOME: Route = { screen: "home" };
 function App() {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);
   const settingsReturnRoute = useRef<Route>(HOME);
@@ -114,31 +115,46 @@ function App() {
 
   return (
     <div className="app-shell flex h-dvh overflow-hidden">
-      <Sidebar repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
-      <main
-        ref={mainRef}
-        className={`app-main min-w-0 flex-auto ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
-      >
-         <Screen
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          repos={savedRepos}
-          desktopRuns={desktopRuns}
-          branchesByPath={branchesByPath}
-          route={route}
-          repoPath={
-          "repo" in route
-            ? savedRepos.find((repo) => repo.name === route.repo)?.path
-            : undefined
-          }
-          navigate={navigate}
-          back={() => navigate(route.screen === "settings" ? settingsReturnRoute.current : lastBranchRoute.current)}
-          repoAdded={() => {
-            loadRepos();
-            navigate(lastBranchRoute.current);
-          }}
-        />
-      </main>
+      <Sidebar hidden={!sidebarVisible} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 px-4 pt-3">
+          <button
+            type="button"
+            aria-controls="main-sidebar"
+            aria-expanded={sidebarVisible}
+            aria-label={t(sidebarVisible ? "hideSidebar" : "showSidebar")}
+            title={t(sidebarVisible ? "hideSidebar" : "showSidebar")}
+            className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+            onClick={() => setSidebarVisible((visible) => !visible)}
+          >
+            <Icon name="sidebar" />
+          </button>
+        </div>
+        <main
+          ref={mainRef}
+          className={`app-main min-h-0 min-w-0 flex-auto ${route.screen === "run" ? "overflow-hidden pb-6" : "overflow-y-auto pb-16"}`}
+        >
+          <Screen
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            repos={savedRepos}
+            desktopRuns={desktopRuns}
+            branchesByPath={branchesByPath}
+            route={route}
+            repoPath={
+            "repo" in route
+              ? savedRepos.find((repo) => repo.name === route.repo)?.path
+              : undefined
+            }
+            navigate={navigate}
+            back={() => navigate(route.screen === "settings" ? settingsReturnRoute.current : lastBranchRoute.current)}
+            repoAdded={() => {
+              loadRepos();
+              navigate(lastBranchRoute.current);
+            }}
+          />
+        </main>
+      </div>
     </div>
   );
 }

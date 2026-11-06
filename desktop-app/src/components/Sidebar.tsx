@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 import { version } from "../../package.json";
 
 interface Props {
+  hidden?: boolean;
   repos: SavedRepo[];
   branchesByPath: Record<string, BranchWorktree[]>;
   onRefreshBranches: (path: string) => Promise<void>;
@@ -39,7 +40,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
+export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
   const { t } = useTranslation();
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
@@ -76,7 +77,7 @@ export function Sidebar({ repos, branchesByPath, onRefreshBranches, route, navig
   const sub = route.screen === "newRun" ? route.mode : "runs";
 
   return (
-    <nav data-testid="main-nav" aria-label={t("main")} className="app-sidebar flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-6 text-base">
+    <nav id="main-sidebar" hidden={hidden} data-testid="main-nav" aria-label={t("main")} className="app-sidebar flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-6 text-base">
       <div className="flex shrink-0 items-center gap-3 px-2 pb-7">
         <span className="brand-mark"><Icon name="factory" width="24" height="24" /></span>
         <span className="text-xl font-semibold tracking-[-0.04em]">soft·factory</span>

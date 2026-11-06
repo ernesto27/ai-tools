@@ -1,8 +1,6 @@
 import { AppMessageError } from "./messages";
 import { CONFIG_STAGES } from "./data";
 
-export type TaskSource = "file" | "folder" | "drive";
-
 export interface StageSettings {
   agent: string;
   model: string;
@@ -42,14 +40,11 @@ export interface ConfigForm {
   agent: string;
   model: string;
   effort: string;
-  branch: string;
   baseImage: string;
   stageSettings: Record<string, StageSettings>;
   flags: { push: boolean; pr: boolean; hn: boolean };
   off: Record<string, boolean>;
   saveFindings: boolean;
-  taskSrc: TaskSource;
-  taskVals: Record<TaskSource, string>;
   documents: string[];
 }
 
@@ -163,7 +158,6 @@ export function configToForm(config: FactoryConfig | null): ConfigForm {
     agent: shared?.agent ?? "codex",
     model: shared?.model ?? "",
     effort: shared?.effort || "medium",
-    branch: shared?.branch ?? "factory-task",
     baseImage: shared?.baseImage ?? "",
     flags: { push: shared?.push ?? false, pr: shared?.pr ?? false, hn: shared?.hn ?? false },
     stageSettings: Object.fromEntries(CONFIG_STAGES.map((s) => [s.key, {
@@ -174,17 +168,11 @@ export function configToForm(config: FactoryConfig | null): ConfigForm {
     }])),
     off: Object.fromEntries(CONFIG_STAGES.map((s) => [s.key, stages?.[s.key]?.disabled ?? false])),
     saveFindings: stages?.securityReview?.saveFindings ?? false,
-    taskSrc: config?.taskFolder ? "folder" : shared?.run?.filePrompt !== undefined ? "file" : config?.googleDrive?.files?.length ? "drive" : "file",
-    taskVals: {
-      file: shared?.run?.filePrompt ?? (config ? "" : "task.txt"),
-      folder: config?.taskFolder ?? "",
-      drive: config?.googleDrive?.files?.[0] ?? "",
-    },
     documents: config?.documents ?? [],
   };
 }
 
-export function formToConfig(form: ConfigForm, original: FactoryConfig | null): FactoryConfig {
+export function formToConfig(form: ConfigForm): FactoryConfig {
   const stages: Record<string, StageConfig> = {};
   for (const { key } of CONFIG_STAGES) {
     const settings = form.stageSettings[key];
@@ -199,16 +187,12 @@ export function formToConfig(form: ConfigForm, original: FactoryConfig | null): 
   }
   return {
     documents: form.documents,
-    ...(form.taskSrc === "drive" ? { googleDrive: { files: [form.taskVals.drive, ...(original?.googleDrive?.files?.slice(1) ?? [])] } } : {}),
-    ...(form.taskSrc === "folder" ? { taskFolder: form.taskVals.folder } : {}),
     agentSandbox: {
       agent: form.agent,
       ...(form.model.trim() ? { model: form.model.trim() } : {}),
       effort: form.effort,
       ...(form.baseImage.trim() ? { baseImage: form.baseImage.trim() } : {}),
       ...form.flags,
-      branch: form.branch,
-      run: form.taskSrc === "file" ? { filePrompt: form.taskVals.file } : {},
     },
     stages,
   };

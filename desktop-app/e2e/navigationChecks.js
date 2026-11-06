@@ -130,6 +130,19 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     });
   }
 
+  await t.test("Sidebar visibility", async () => {
+    const sidebar = await visible("#main-sidebar");
+    const toggleSelector = 'button[aria-controls="main-sidebar"]';
+    const toggle = await visible(toggleSelector);
+    assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+    await click(toggleSelector);
+    await sidebar.waitForDisplayed({ reverse: true, timeout: 5_000 });
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false");
+    await click(toggleSelector);
+    await sidebar.waitForDisplayed({ timeout: 5_000 });
+    assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+  });
+
   await screen("Home", async () => {
     await text("main h1", "Select a repository");
     await mainHasText(

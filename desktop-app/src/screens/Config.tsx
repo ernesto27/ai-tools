@@ -2,25 +2,13 @@ import { toUiMessage, messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { AGENTS, CONFIG_STAGES } from "../data";
-import { Checkbox, Crumb, Field, Input, OutlineButton, PrimaryButton, SectionHeading, Select, TextTabs, Title } from "../components/ui";
+import { Checkbox, Crumb, Field, Input, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusMessage } from "../components/StatusMessage";
 import { ModelAutocomplete } from "../components/ModelAutocomplete";
 import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from "../config";
-import type { FactoryConfig, StageSettings, TaskSource } from "../config";
-
-const TASK_SOURCES = [
-  ["file", "file"],
-  ["folder", "folder"],
-  ["drive", "googleDrive"],
-] as const;
-
-const TASK_SOURCE_TEXT: Record<TaskSource, { placeholder: string; hint: string }> = {
-  file: { placeholder: "pathToTheTaskFile", hint: "run.filePrompt" },
-  folder: { placeholder: "folderWithTaskMdAndContextFiles", hint: "taskMdIsTheTaskOtherFilesBecomeDocuments" },
-  drive: { placeholder: "googleDocUrl", hint: "readWithServiceAccountJson" },
-};
+import type { FactoryConfig, StageSettings } from "../config";
 
 const FLAGS = [
   { key: "push", hint: "commitPush" },
@@ -44,7 +32,6 @@ export function Config({ repo, repoPath }: Props) {
   const [agent, setAgent] = useState("codex");
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("medium");
-  const [branch, setBranch] = useState("factory-task");
   const [baseImage, setBaseImage] = useState("");
   const [stageSettings, setStageSettings] = useState<Record<string, StageSettings>>(() =>
     Object.fromEntries(CONFIG_STAGES.map((s) => [s.key, { agent: s.agent, model: "", effort: "medium", customSkill: s.skill }])),
@@ -52,14 +39,6 @@ export function Config({ repo, repoPath }: Props) {
   const [flags, setFlags] = useState<Record<FlagKey, boolean>>({ push: false, pr: false, hn: false });
   const [off, setOff] = useState<Record<string, boolean>>({});
   const [saveFindings, setSaveFindings] = useState(false);
-  const [taskSrc, setTaskSrc] = useState<TaskSource>("file");
-  const [taskPickerError, setTaskPickerError] = useState<string | null>(null);
-  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
-  const [taskVals, setTaskVals] = useState<Record<TaskSource, string>>({
-    file: "task.txt",
-    folder: "tasks/logging",
-    drive: "https://docs.google.com/document/d/[DOC_ID]",
-  });
   const [documents, setDocuments] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,17 +66,14 @@ export function Config({ repo, repoPath }: Props) {
         setAgent(form.agent);
         setModel(form.model);
         setEffort(form.effort);
-        setBranch(form.branch);
         setBaseImage(form.baseImage);
         setStageSettings(form.stageSettings);
         setFlags(form.flags);
         setOff(form.off);
         setSaveFindings(form.saveFindings);
-        setTaskSrc(form.taskSrc);
-        setTaskVals(form.taskVals);
         setDocuments(form.documents);
         setLoadedConfig(config);
-        setInitialConfig(formToConfig(form, config));
+        setInitialConfig(formToConfig(form));
         setSaved(config !== null);
         setDirty(false);
       })
@@ -139,31 +115,8 @@ export function Config({ repo, repoPath }: Props) {
     setSaveMessage(null);
   }
 
-  async function browseTask() {
-    const source = taskSrc;
-    if (source === "drive" || taskPickerOpen) return;
-
-    setTaskPickerError(null);
-    setTaskPickerOpen(true);
-    try {
-      const path = await open({
-        directory: source === "folder",
-        multiple: false,
-      });
-      if (!path) return;
-
-      setTaskVals((current) => ({ ...current, [source]: path }));
-      setDirty(true);
-      setSaveMessage(null);
-    } catch (error) {
-      setTaskPickerError(String(error));
-    } finally {
-      setTaskPickerOpen(false);
-    }
-  }
-
-  const formConfig = useMemo(() => formToConfig({ agent, model, effort, branch, baseImage, stageSettings, flags, off, saveFindings, taskSrc, taskVals, documents }, loadedConfig),
-    [agent, model, effort, branch, baseImage, stageSettings, flags, off, saveFindings, taskSrc, taskVals, documents, loadedConfig]);
+  const formConfig = useMemo(() => formToConfig({ agent, model, effort, baseImage, stageSettings, flags, off, saveFindings, documents }),
+    [agent, model, effort, baseImage, stageSettings, flags, off, saveFindings, documents]);
   const config = loadedConfig && initialConfig ? mergeConfigEdits(loadedConfig, initialConfig, formConfig) : formConfig;
   const json = JSON.stringify(config, null, 2);
 
@@ -247,40 +200,6 @@ export function Config({ repo, repoPath }: Props) {
             <Field label={t("baseImage")}>
               <Input mono value={baseImage} placeholder={t("optional")} onChange={(e) => edit(setBaseImage)(e.target.value)} />
             </Field>
-          </div>
-
-          <SectionHeading>{t("branchTask")}</SectionHeading>
-          <div className="grid grid-cols-1 items-start gap-5 pt-5 pb-8 @min-[600px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            <Field label={t("branch")}>
-              <Input mono value={branch} onChange={(e) => edit(setBranch)(e.target.value)} />
-            </Field>
-            <div className="flex flex-col gap-1.5 text-sm text-muted">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span id="task-lbl">{t("taskSource")}</span>
-                <TextTabs label={t("taskSource")} items={TASK_SOURCES.map(([key, label]) => [key, t(label)] as const)} value={taskSrc} onChange={(source) => {
-                  edit(setTaskSrc)(source);
-                  setTaskPickerError(null);
-                }} size="sm" />
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  mono
-                  className="min-w-0 flex-1"
-                  aria-labelledby="task-lbl"
-                  readOnly={taskSrc !== "drive"}
-                  value={taskVals[taskSrc]}
-                  placeholder={t(TASK_SOURCE_TEXT[taskSrc].placeholder)}
-                  onChange={(e) => edit(setTaskVals)({ ...taskVals, [taskSrc]: e.target.value })}
-                />
-                {taskSrc !== "drive" && (
-                  <OutlineButton className="shrink-0" disabled={taskPickerOpen} onClick={browseTask}>
-                    {t("browse")}
-                  </OutlineButton>
-                )}
-              </div>
-              <span className="text-xs">{taskSrc === "file" ? TASK_SOURCE_TEXT[taskSrc].hint : t(TASK_SOURCE_TEXT[taskSrc].hint)}</span>
-              {taskPickerError && <span role="alert" className="text-sm text-bad">{taskPickerError}</span>}
-            </div>
           </div>
 
           <SectionHeading>Git</SectionHeading>

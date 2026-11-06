@@ -1,4 +1,6 @@
 {
+  "hideSidebar": "Ocultar barra lateral",
+  "showSidebar": "Mostrar barra lateral",
   "runSucceededNotification": "{{repo}} — {{branch}}: ejecución completada correctamente.",
   "runFailedNotification": "{{repo}} — {{branch}}: la ejecución falló.",
   "back": "Volver",

@@ -1,4 +1,6 @@
 {
+  "hideSidebar": "Hide sidebar",
+  "showSidebar": "Show sidebar",
   "runSucceededNotification": "{{repo}} — {{branch}}: run succeeded.",
   "runFailedNotification": "{{repo}} — {{branch}}: run failed.",
   "back": "Back",

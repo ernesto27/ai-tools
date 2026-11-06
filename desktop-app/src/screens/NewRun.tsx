@@ -145,7 +145,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const cta = mode === RUN_MODE.RUN ? "startRun" : mode === RUN_MODE.CONTINUE ? "continue" : "resume";
 
   return (
-    <div className="@container flex h-full w-full max-w-[1440px] flex-col gap-8">
+    <div className="@container flex h-full w-full min-w-0 flex-col gap-8">
       <header className="flex flex-col gap-1">
         <Crumb>
           {repo} / {branch}

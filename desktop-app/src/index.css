@@ -270,6 +270,10 @@
   background: var(--color-field);
 }
 
+.app-sidebar[hidden] {
+  display: none;
+}
+
 .app-main {
   padding-inline: clamp(24px, 4vw, 64px);
   padding-top: 40px;

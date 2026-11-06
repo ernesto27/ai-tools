@@ -29,9 +29,6 @@ run detail
 
 
 
-
-
-
 add respostory
 
 - save list of projects repo in desktop config folder -  desktop

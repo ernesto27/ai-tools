@@ -164,6 +164,9 @@ export async function runSidebarSearchChecks(browser, fixture, artifacts, comman
     assert.equal(await (await search()).getValue(), "PAY");
 
     await language("es-AR");
+    await browser.waitUntil(async () =>
+      await (await search()).getAttribute("placeholder") === "Buscar repositorios y ramas",
+    { timeout: 5_000, timeoutMsg: "Sidebar search placeholder was not translated to es-AR" });
     assert.equal(await (await search()).getAttribute("placeholder"), "Buscar repositorios y ramas");
     assert.equal(await (await search()).getAttribute("aria-label"), "Buscar repositorios y ramas");
     assert.equal(await (await browser.$('[data-testid="sidebar-search-clear"]')).getAttribute("aria-label"),
@@ -175,6 +178,9 @@ export async function runSidebarSearchChecks(browser, fixture, artifacts, comman
     { timeout: 5_000 });
     await browser.saveScreenshot(join(artifacts, "sidebar-search-empty-es-AR.png"));
     await language("en");
+    await browser.waitUntil(async () =>
+      await (await search()).getAttribute("placeholder") === "Search repositories and branches",
+    { timeout: 5_000, timeoutMsg: "Sidebar search placeholder was not translated to en" });
     assert.equal(await (await search()).getAttribute("placeholder"), "Search repositories and branches");
     assert.equal(await (await search()).getAttribute("aria-label"), "Search repositories and branches");
     assert.equal(await (await browser.$('[data-testid="sidebar-search-clear"]')).getAttribute("aria-label"),

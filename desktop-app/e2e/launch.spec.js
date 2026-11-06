@@ -183,8 +183,29 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
     await runLanguageChecks(browser, navigationFixture, artifacts);
-    await t.test("Sidebar repository and branch search", { timeout: 120_000 }, async () => {
-      await runSidebarSearchChecks(browser, navigationFixture, artifacts, command);
+    await t.test("Sidebar repository and branch search", { timeout: 120_000 }, async (searchContext) => {
+      try {
+        await runSidebarSearchChecks(browser, navigationFixture, artifacts, command);
+      } catch (error) {
+        const directory = join(artifacts, "sidebar-search");
+        try {
+          mkdirSync(directory, { recursive: true });
+          const results = await Promise.allSettled([
+            browser.saveScreenshot(join(directory, "failure.png")),
+            browser.getPageSource().then((source) =>
+              writeFileSync(join(directory, "failure.html"), source)),
+          ]);
+          searchContext.diagnostic(`Sidebar search artifacts: ${directory}`);
+          for (const result of results) {
+            if (result.status === "rejected") {
+              searchContext.diagnostic(`Could not capture diagnostic: ${result.reason}`);
+            }
+          }
+        } catch (diagnosticError) {
+          searchContext.diagnostic(`Could not create artifacts: ${diagnosticError}`);
+        }
+        throw error;
+      }
     });
   } catch (error) {
     if (browser && artifacts) {

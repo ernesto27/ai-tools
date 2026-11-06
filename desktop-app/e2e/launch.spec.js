@@ -19,6 +19,7 @@ import { prepareNavigationFixture } from "./navigationFixture.js";
 import { runNavigationChecks } from "./navigationChecks.js";
 import { runLanguageChecks } from "./languageChecks.js";
 import { runThemeChecks } from "./themeChecks.js";
+import { runSidebarSearchChecks } from "./sidebarSearchChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(testDirectory, "..");
@@ -182,6 +183,9 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
     await runLanguageChecks(browser, navigationFixture, artifacts);
+    await t.test("Sidebar repository and branch search", { timeout: 120_000 }, async () => {
+      await runSidebarSearchChecks(browser, navigationFixture, artifacts, command);
+    });
   } catch (error) {
     if (browser && artifacts) {
       const results = await Promise.allSettled([

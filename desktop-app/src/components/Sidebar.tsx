@@ -1,11 +1,11 @@
 import { messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import type { BranchWorktree } from "../worktrees";
-import { useCallback, useEffect, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { STATUS_COLOR } from "../data";
 import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
-import { cx } from "./ui";
+import { cx, Input } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
 import { Icon } from "./Icon";
 import { version } from "../../package.json";
@@ -46,6 +46,35 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
   const activeBranch = "branch" in route ? route.branch : null;
   const [openRepo, setOpenRepo] = useState("");
   const [openBranch, setOpenBranch] = useState<{ repo: string; branch: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchOpenBranch, setSearchOpenBranch] = useState<{ repo: string; branch: string } | null>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const query = search.trim().toLowerCase();
+  const searching = query.length > 0;
+
+  const updateSearch = (value: string) => {
+    if (!searching && value.trim().length > 0) setSearchOpenBranch(openBranch);
+    setSearch(value);
+  };
+
+  const clearSearch = () => {
+    updateSearch("");
+    searchInput.current?.focus();
+  };
+
+  const visibleRepos = repos.map((saved) => {
+    const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({
+      name: entry.branch,
+      status: "idle" as const,
+    }));
+    const visibleBranches = !searching || saved.name.toLowerCase().includes(query)
+      ? branches
+      : branches.filter((branch) => branch.name.toLowerCase().includes(query));
+    return { saved, branches, visibleBranches };
+  }).filter(({ saved, visibleBranches }) =>
+    !searching || saved.name.toLowerCase().includes(query) || visibleBranches.length > 0,
+  );
+
   const [repoMenu, setRepoMenu] = useState<{
     repo: SavedRepo;
     x: number;
@@ -70,6 +99,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
     const names = new Set(repos.map((repo) => repo.name));
     setOpenRepo((previous) => names.has(previous) ? previous : "");
     setOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
+    setSearchOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
     setRepoMenu((previous) => previous && paths.has(previous.repo.path) ? previous : null);
   }, [repos]);
 
@@ -92,13 +122,49 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
           {t("repositories")}
           <span className="text-faint tabular-nums">{repos.length}</span>
         </span>
+        <div className="flex items-center gap-1 px-2 pb-3">
+          <Input
+            ref={searchInput}
+            id="sidebar-search"
+            type="text"
+            className="min-w-0 w-full flex-1"
+            aria-label={t("searchRepositoriesAndBranches")}
+            placeholder={t("searchRepositoriesAndBranches")}
+            autoComplete="off"
+            spellCheck={false}
+            value={search}
+            onChange={(event) => updateSearch(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              event.stopPropagation();
+              clearSearch();
+            }}
+          />
+          {search.length > 0 && (
+            <button
+              type="button"
+              data-testid="sidebar-search-clear"
+              aria-label={t("clearSidebarSearch")}
+              title={t("clearSidebarSearch")}
+              className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-ink"
+              onClick={clearSearch}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
+        </div>
+        {searching && visibleRepos.length === 0 && (
+          <p role="status" data-testid="sidebar-search-empty" className="px-2 py-2 text-sm text-muted">
+            {t("noMatchingRepositoriesOrBranches")}
+          </p>
+        )}
         <div className="flex flex-col gap-2">
-          {repos.map((saved) => {
-            const branches = (branchesByPath[saved.path] ?? []).map((entry) => ({ name: entry.branch, status: "idle" as const }));
+          {visibleRepos.map(({ saved, branches, visibleBranches }) => {
             const repo = { name: saved.name, status: "idle" as const, branches };
-            const isOpen = openRepo === repo.name;
+            const isOpen = searching || openRepo === repo.name;
             return (
-              <div key={saved.path} className="flex flex-col">
+              <div key={saved.path} data-sidebar-repo={saved.path} className="flex flex-col">
                 <button
                   type="button"
                   aria-haspopup="menu"
@@ -115,7 +181,9 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                     setRepoMenu({ repo: saved, x: bounds.left, y: bounds.bottom, trigger: event.currentTarget });
                   }}
                   aria-expanded={isOpen}
-                  onClick={() => setOpenRepo(isOpen ? "" : repo.name)}
+                  onClick={() => {
+                    if (!searching) setOpenRepo(isOpen ? "" : repo.name);
+                  }}
                   className="repo-nav flex min-h-10 w-full items-center justify-between rounded-md px-2 text-left text-muted hover:bg-hover hover:text-ink aria-expanded:font-medium aria-expanded:text-ink"
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -158,8 +226,9 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                       {t("newRun")}
                     </NavItem>
                     {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">{t("noBranchesYet")}</span>}
-                    {repo.branches.map((b) => {
-                      const expanded = openBranch?.repo === repo.name && openBranch?.branch === b.name;
+                    {visibleBranches.map((b) => {
+                      const currentOpenBranch = searching ? searchOpenBranch : openBranch;
+                      const expanded = currentOpenBranch?.repo === repo.name && currentOpenBranch?.branch === b.name;
                       const isActive = activeRepo === repo.name && activeBranch === b.name;
                       const at = { repo: repo.name, branch: b.name };
                       return (
@@ -169,7 +238,8 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                             title={b.name}
                             aria-expanded={expanded}
                             onClick={() => {
-                              setOpenBranch(expanded ? null : at);
+                              if (searching) setSearchOpenBranch(expanded ? null : at);
+                              else setOpenBranch(expanded ? null : at);
                               if (!expanded) navigate({ screen: "branch", ...at });
                             }}
                           >

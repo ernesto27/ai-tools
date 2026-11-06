@@ -125,7 +125,7 @@ export async function runSidebarSearchChecks(browser, fixture, artifacts, comman
     await shown(branchSelector(secondBranch));
     await shown(branchSelector(sibling), false);
     const repoOrder = await browser.$$("#main-sidebar [data-sidebar-repo]");
-    assert.deepEqual(await Promise.all(repoOrder.map((element) => element.getAttribute("data-sidebar-repo"))),
+    assert.deepEqual(await repoOrder.map((element) => element.getAttribute("data-sidebar-repo")),
       [fixture.repo, secondRepo]);
     await browser.saveScreenshot(join(artifacts, "sidebar-search-multiple-repositories.png"));
 

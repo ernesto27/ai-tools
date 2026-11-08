@@ -34,6 +34,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root.AddCommand(newUpdateCmd())
 	root.AddCommand(newContinueCmd(run))
 	root.AddCommand(newResumeCmd(run))
+	root.AddCommand(newAuditCmd())
 	return root
 }
 

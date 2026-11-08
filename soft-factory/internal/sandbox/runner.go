@@ -226,7 +226,7 @@ func ReviewChanges(input TaskContext) error {
 	}
 	source = resolvedSource
 	destination := filepath.Join(input.Log.Path(), "05-"+string(config.StageReviewChanges)+".md")
-	archiveErr := archiveReviewReport(source, destination)
+	archiveErr := archiveReport(source, destination, false)
 	if archiveErr != nil {
 		return errors.Join(err, archiveErr)
 	}
@@ -543,32 +543,46 @@ func saveReport(name string, content []byte) (string, error) {
 	return path, nil
 }
 
-// archiveReviewReport copies the agent-authored file without rewriting its content.
-func archiveReviewReport(source, destination string) error {
+// archiveReport copies an agent-authored file, optionally replacing a prior report
+// only after the entire new report has been copied successfully.
+func archiveReport(source, destination string, replace bool) error {
 	info, err := os.Lstat(source)
 	if err != nil {
-		return fmt.Errorf("inspect change walkthrough %q: %w", source, err)
+		return fmt.Errorf("inspect report %q: %w", source, err)
 	}
 	if !info.Mode().IsRegular() || info.Size() == 0 {
-		return fmt.Errorf("change walkthrough %q must be a nonempty regular file", source)
+		return fmt.Errorf("report %q must be a nonempty regular file", source)
 	}
 	in, err := os.Open(source)
 	if err != nil {
-		return fmt.Errorf("open change walkthrough %q: %w", source, err)
+		return fmt.Errorf("open report %q: %w", source, err)
 	}
 	defer in.Close()
-	out, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	var out *os.File
+	if replace {
+		out, err = os.CreateTemp(filepath.Dir(destination), ".factory-report-*.tmp")
+	} else {
+		out, err = os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	}
 	if err != nil {
-		return fmt.Errorf("create archived change walkthrough %q: %w", destination, err)
+		return fmt.Errorf("create archived report %q: %w", destination, err)
+	}
+	if replace {
+		defer os.Remove(out.Name())
 	}
 	n, copyErr := io.Copy(out, in)
 	closeErr := out.Close()
 	if err := errors.Join(copyErr, closeErr); err != nil || n == 0 {
-		os.Remove(destination)
+		os.Remove(out.Name())
 		if err == nil {
 			err = fmt.Errorf("source file became empty")
 		}
-		return fmt.Errorf("copy change walkthrough to %q: %w", destination, err)
+		return fmt.Errorf("copy report to %q: %w", destination, err)
+	}
+	if replace {
+		if err := os.Rename(out.Name(), destination); err != nil {
+			return fmt.Errorf("replace archived report %q: %w", destination, err)
+		}
 	}
 	return nil
 }

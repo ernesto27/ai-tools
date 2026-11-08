@@ -11,6 +11,14 @@ import (
 //go:embed *.txt
 var bundled embed.FS
 
+//go:embed audit-template.html
+var auditHTMLTemplate string
+
+// AuditHTMLTemplate returns the embedded presentation reference for audit reports.
+func AuditHTMLTemplate() string {
+	return auditHTMLTemplate
+}
+
 // Parse fixed bundled templates once during package initialization.
 var templates = template.Must(template.New("").Option("missingkey=error").ParseFS(bundled, "*.txt"))
 

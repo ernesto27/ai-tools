@@ -16,6 +16,7 @@ type Config struct {
 	Documents    []string             `json:"documents"`
 	GoogleDrive  *GoogleDriveConfig   `json:"googleDrive,omitempty"`
 	Stages       StagesConfig         `json:"stages"`
+	Audit        StageConfig          `json:"audit"`
 }
 
 type StageConfig struct {

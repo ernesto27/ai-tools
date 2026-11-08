@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,7 +36,7 @@ func TestArchiveReviewReportPreservesAgentContent(t *testing.T) {
 	require.True(t, strings.HasPrefix(filepath.Base(run.Path()), "continue-"))
 	content := "# Changes\n\n### File: `./a.go`\nThe branch has no changed files.\n" + strings.Repeat("extra output\n", 200)
 	require.NoError(t, os.WriteFile(source, []byte(content), 0644))
-	require.NoError(t, archiveReviewReport(source, destination))
+	require.NoError(t, archiveReport(source, destination, false))
 	got, err := os.ReadFile(destination)
 	require.NoError(t, err)
 	require.Equal(t, content, string(got))
@@ -57,9 +58,41 @@ func TestArchiveReviewReportRejectsInvalidSource(t *testing.T) {
 		case "link.md":
 			require.NoError(t, os.Symlink("empty.md", source))
 		}
-		assert.Error(t, archiveReviewReport(source, destination))
+		assert.Error(t, archiveReport(source, destination, false))
 
 		_, err := os.Stat(destination)
 		assert.ErrorIs(t, err, os.ErrNotExist)
+	}
+}
+
+func TestArchiveReportReplacement(t *testing.T) {
+	for _, replace := range []bool{false, true} {
+		t.Run(fmt.Sprint(replace), func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "new.html")
+			destination := filepath.Join(dir, "audit.html")
+			require.NoError(t, os.WriteFile(source, []byte("<html>new</html>"), 0600))
+			require.NoError(t, os.WriteFile(destination, []byte("previous"), 0600))
+			err := archiveReport(source, destination, replace)
+			want := "previous"
+			if replace {
+				require.NoError(t, err)
+				want = "<html>new</html>"
+			} else {
+				require.ErrorIs(t, err, os.ErrExist)
+			}
+			got, err := os.ReadFile(destination)
+			require.NoError(t, err)
+			require.Equal(t, want, string(got))
+			// A rejected replacement must preserve the previous complete report.
+			require.NoError(t, os.WriteFile(source, nil, 0600))
+			require.Error(t, archiveReport(source, destination, true))
+			got, err = os.ReadFile(destination)
+			require.NoError(t, err)
+			require.Equal(t, want, string(got))
+			leftovers, err := filepath.Glob(filepath.Join(dir, ".factory-report-*.tmp"))
+			require.NoError(t, err)
+			require.Empty(t, leftovers)
+		})
 	}
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { RunLog } from "../hooks/useRunLogs";
 import { STAGES, type stageProgress } from "../runProgress";
@@ -12,9 +13,10 @@ interface Props {
   live: boolean;
   selectedStage?: string;
   onSelectStage: (stage: string) => void;
+  renderActions?: (stage: (typeof STAGES)[number]) => ReactNode;
 }
 
-export function StageSummary({ statuses, logs, live, selectedStage, onSelectStage }: Props) {
+export function StageSummary({ statuses, logs, live, selectedStage, onSelectStage, renderActions }: Props) {
   const { t } = useTranslation();
   const timings = useMemo(() => new Map(STAGES.map((stage) => {
     const log = logs.find((entry) => entry.filename === stage.filename);
@@ -42,31 +44,33 @@ export function StageSummary({ statuses, logs, live, selectedStage, onSelectStag
           ? formatStageDuration((timing.finishedAt ?? now) - timing.startedAt)
           : recorded ? t("durationUnavailable") : null;
         return (
-          <button
-            key={stage.id}
-            type="button"
-            disabled={!recorded}
-            aria-pressed={selectedStage === stage.id}
-            onClick={() => onSelectStage(stage.id)}
-            className="flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2 text-left enabled:hover:bg-hover aria-pressed:bg-selected disabled:cursor-default"
-          >
-            <span className="text-sm text-muted">{t(stage.label)}</span>
-            <span className={cx("text-xl font-medium", statusClass(status))}>
-              {!status && live ? t("pending") : statusLabel(status, t)}
-            </span>
-            {duration !== null && (
-              <span aria-label={t("stageDuration", { stage: t(stage.label) })} className="text-sm text-muted tabular-nums">
-                {duration}
+          <div key={stage.id} className="flex min-w-0 flex-col gap-2">
+            <button
+              type="button"
+              disabled={!recorded}
+              aria-pressed={selectedStage === stage.id}
+              onClick={() => onSelectStage(stage.id)}
+              className="flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2 text-left enabled:hover:bg-hover aria-pressed:bg-selected disabled:cursor-default"
+            >
+              <span className="text-sm text-muted">{t(stage.label)}</span>
+              <span className={cx("text-xl font-medium", statusClass(status))}>
+                {!status && live ? t("pending") : statusLabel(status, t)}
               </span>
-            )}
-            {live && (status === "RUNNING" || status === "STARTED") && (
-              <span aria-hidden="true" className="stage-activity mt-2">
-                {Array.from({ length: 9 }, (_, index) => (
-                  <span key={index} style={{ animationDelay: `${index * -140}ms` }} />
-                ))}
-              </span>
-            )}
-          </button>
+              {duration !== null && (
+                <span aria-label={t("stageDuration", { stage: t(stage.label) })} className="text-sm text-muted tabular-nums">
+                  {duration}
+                </span>
+              )}
+              {live && (status === "RUNNING" || status === "STARTED") && (
+                <span aria-hidden="true" className="stage-activity mt-2">
+                  {Array.from({ length: 9 }, (_, index) => (
+                    <span key={index} style={{ animationDelay: `${index * -140}ms` }} />
+                  ))}
+                </span>
+              )}
+            </button>
+            {renderActions?.(stage)}
+          </div>
         );
       })}
     </div>

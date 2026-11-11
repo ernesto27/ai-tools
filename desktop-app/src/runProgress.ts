@@ -2,11 +2,11 @@ import type { StageStatus } from "./hooks/useBranchRuns";
 import type { RunLog } from "./hooks/useRunLogs";
 
 export const STAGES = [
-  { id: "implementation", label: "implement", filename: "01-implementation.log" },
-  { id: "codeReview", label: "codeReview", filename: "02-codeReview.log" },
-  { id: "securityReview", label: "securityReview", filename: "03-securityReview.log" },
-  { id: "riskClassification", label: "riskClassification", filename: "04-riskClassification.log" },
-  { id: "reviewChanges", label: "reviewChanges", filename: "05-reviewChanges.log" },
+  { id: "implementation", label: "implement", filename: "01-implementation.log", supportsAudit: true },
+  { id: "codeReview", label: "codeReview", filename: "02-codeReview.log", supportsAudit: true },
+  { id: "securityReview", label: "securityReview", filename: "03-securityReview.log", supportsAudit: true },
+  { id: "riskClassification", label: "riskClassification", filename: "04-riskClassification.log", supportsAudit: false },
+  { id: "reviewChanges", label: "reviewChanges", filename: "05-reviewChanges.log", supportsAudit: false },
 ] as const;
 
 export function stageProgress(history: StageStatus[], logs: RunLog[], live: boolean, desktop: boolean) {

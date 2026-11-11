@@ -11,6 +11,7 @@ import { NewRun } from "./screens/NewRun";
 import { Settings } from "./screens/Settings";
 import { AddRepo } from "./screens/AddRepo";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
+import { useDesktopAudits, type DesktopAudits } from "./hooks/useDesktopAudits";
 import { useTheme } from "./hooks/useTheme";
 import { PrimaryButton, Title } from "./components/ui";
 
@@ -76,6 +77,7 @@ function App() {
   }, [savedRepos, refreshBranches]);
 
   const desktopRuns = useDesktopRuns(addBranch);
+  const desktopAudits = useDesktopAudits();
   const removingRepo = useRef(false);
 
   const removeRepo = async (repo: SavedRepo) => {
@@ -139,6 +141,7 @@ function App() {
             onToggleTheme={toggleTheme}
             repos={savedRepos}
             desktopRuns={desktopRuns}
+            desktopAudits={desktopAudits}
             branchesByPath={branchesByPath}
             route={route}
             repoPath={
@@ -165,6 +168,7 @@ function Screen({
   back,
   repos,
   desktopRuns,
+  desktopAudits,
   branchesByPath,
   route,
   navigate,
@@ -175,6 +179,7 @@ function Screen({
   onToggleTheme: () => void;
   repos: SavedRepo[];
   desktopRuns: DesktopRuns;
+  desktopAudits: DesktopAudits;
   branchesByPath: Record<string, BranchWorktree[]>;
   route: Route;
   navigate: (r: Route) => void;
@@ -258,6 +263,7 @@ function Screen({
       return repoPath ? (
         <RunDetail
           desktopRuns={desktopRuns}
+          desktopAudits={desktopAudits}
           key={`${repoPath}:${route.branch}:${route.runId}`}
           repo={route.repo}
           repoPath={repoPath}

@@ -1,6 +1,6 @@
 import { toggleThemeInSettings } from "./themeChecks.js";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
@@ -204,6 +204,27 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
       logText,
     );
     await text('//main//button[span[normalize-space(.)="Implement"]]/span[2]', "Failed");
+    assert.equal((await browser.$$('main [data-testid^="audit-"] button')).length, 0);
+    const statusFile = join(fixture.projectLogs, branch, runId, "stage_status.txt");
+    const originalStatuses = readFileSync(statusFile, "utf8");
+    try {
+      writeFileSync(statusFile, [
+        "implementation,SUCCEEDED", "codeReview,SUCCEEDED", "securityReview,SUCCEEDED",
+        "riskClassification,SUCCEEDED", "reviewChanges,SUCCEEDED", "",
+      ].join("\n"));
+      await browser.waitUntil(async () =>
+        (await browser.$$('main [data-testid^="audit-"] button')).length === 3,
+        { timeout: 15_000 });
+      assert.equal(await (await browser.$('main button[aria-label="Audit Implement"]')).isEnabled(), true);
+      assert.equal(await (await browser.$('main button[aria-label="Audit Code review"]')).isEnabled(), false);
+      assert.equal(await (await browser.$('main button[aria-label="Audit Security review"]')).isEnabled(), false);
+      assert.equal(await browser.$('main button button').isExisting(), false);
+    } finally {
+      writeFileSync(statusFile, originalStatuses);
+    }
+    await browser.waitUntil(async () =>
+      (await browser.$$('main [data-testid^="audit-"] button')).length === 0,
+      { timeout: 15_000 });
     await runStageTimingChecks(browser, fixture, artifacts, { text, openRuns, click });
     await runPullRequestChecks(browser, fixture, artifacts, { text, openRuns, click });
   }, 120_000);

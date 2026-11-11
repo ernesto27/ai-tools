@@ -124,9 +124,11 @@ impl RunProcesses {
 
         let pid = process.child.id() as libc::pid_t;
 
-        // SAFETY: pid identifies our child; the lock prevents concurrent
-        // polling or removal through this register while we signal it.
-        if unsafe { libc::kill(pid, libc::SIGINT) } == -1 {
+        // SAFETY: prepare creates a session whose process group ID is our child's
+        // PID. The negative ID also interrupts agent-sandbox children, including
+        // audit, which does not forward the parent's interrupt itself. The lock
+        // prevents concurrent polling or removal while we signal the group.
+        if unsafe { libc::kill(-pid, libc::SIGINT) } == -1 {
             return Err(format!(
                 "Could not stop software-factory: {}",
                 std::io::Error::last_os_error()

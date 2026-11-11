@@ -6,10 +6,14 @@ import remarkGfm from "remark-gfm";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { implementationPullRequestUrl } from "../runPullRequest";
 import { useRunLogs } from "../hooks/useRunLogs";
+import type { DesktopAudits } from "../hooks/useDesktopAudits";
 import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDesktopRuns";
 import { STAGES, stageProgress } from "../runProgress";
+import { STAGE_STATUS } from "../runStatus";
 import { RUN_MODE, type Navigate } from "../router";
 import { StageSummary } from "../components/StageSummary";
+import { AuditDuration } from "../components/AuditDuration";
+import { AuditReportLink } from "../components/AuditReportLink";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
 type Tab = "log" | "summary" | "walk";
@@ -22,6 +26,7 @@ const TABS = [
 
 interface Props {
   desktopRuns: DesktopRuns;
+  desktopAudits: DesktopAudits;
   repo: string;
   repoPath: string;
   branch: string;
@@ -29,7 +34,7 @@ interface Props {
   navigate: Navigate;
 }
 
-export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns }: Props) {
+export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns, desktopAudits }: Props) {
   const { t } = useTranslation();
   const session = desktopRuns.find(repoPath, branch, runId);
   const live = session !== undefined && isDesktopRunActive(session);
@@ -211,6 +216,50 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
               setFollowing(false);
               setSelectedStage(stage);
               setTab("log");
+            }}
+            renderActions={(stage) => {
+              if (!stage.supportsAudit || progress.statuses.get(stage.id) !== STAGE_STATUS.SUCCEEDED) return null;
+              const target = run ? { repoPath, directory: run.directory, filename: stage.filename } : null;
+              const audit = target ? desktopAudits.find(target) : undefined;
+              const auditing = audit?.state === RUN_STATE.RUNNING;
+              const stopping = audit?.state === RUN_STATE.STOPPING;
+              const canStop = auditing && desktopRuns.supportsStop;
+              const hasLog = logs.some((log) => log.filename === stage.filename);
+              return (
+                <div className="flex min-w-0 flex-col items-start gap-2 px-2.5" data-testid={`audit-${stage.id}`}>
+                  <OutlineButton
+                    disabled={stopping || (auditing ? !desktopRuns.supportsStop
+                      : !target || !hasLog || !!desktopRuns.busy(repoPath))}
+                    aria-label={t(stopping ? "stoppingAuditStage" : canStop ? "stopAuditStage"
+                      : auditing ? "auditingStage" : "auditStage", { stage: t(stage.label) })}
+                    aria-busy={auditing || stopping}
+                    onClick={() => {
+                      if (!target) return;
+                      if (canStop) void desktopAudits.stop(target);
+                      else desktopAudits.start(target);
+                    }}
+                  >
+                    {t(stopping ? "stopping" : canStop ? "stop" : auditing ? "auditing" : "audit")}
+                  </OutlineButton>
+                  {audit && <AuditDuration startedAt={audit.startedAt} finishedAt={audit.finishedAt} />}
+                  {audit?.reportPath && (
+                    <AuditReportLink key={audit.reportPath} path={audit.reportPath} />
+                  )}
+                  {audit?.state === RUN_STATE.FAILED && (
+                    <p role="alert" className="w-full break-words text-sm text-bad">
+                      {t("auditFailed", { error: audit.error })}
+                    </p>
+                  )}
+                  {audit?.stopError && (
+                    <p role="alert" className="w-full break-words text-sm text-bad">
+                      {t("couldNotStopAuditError", { error: audit.stopError })}
+                    </p>
+                  )}
+                  {audit?.state === RUN_STATE.INTERRUPTED && (
+                    <p role="status" className="text-sm text-muted">{t("auditInterrupted")}</p>
+                  )}
+                </div>
+              );
             }}
           />
 

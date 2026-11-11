@@ -288,6 +288,22 @@ async fn resume_factory_run(
     .map_err(|error| format!("Could not wait for resume: {error}"))?
 }
 
+#[tauri::command]
+async fn audit_factory_run(
+    app: tauri::AppHandle,
+    path: String,
+    execution_id: String,
+    log_path: String,
+) -> Result<RunOutcome, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let process = app.state::<RunProcesses>();
+
+        FactoryRun::new(path).audit(&process, execution_id, log_path)
+    })
+    .await
+    .map_err(|error| format!("Could not wait for audit: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -313,7 +329,8 @@ pub fn run() {
             start_tracked_factory_run,
             supports_factory_stop,
             resume_factory_run,
-            stop_factory_run
+            stop_factory_run,
+            audit_factory_run
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

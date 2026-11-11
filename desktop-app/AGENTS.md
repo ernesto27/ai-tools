@@ -57,4 +57,12 @@ Prefix every commit subject with `desktop:` and use a short, descriptive subject
 
 Use `desktop-vMAJOR.MINOR.PATCH` for desktop release tags, for example `desktop-v0.1.2`. When releasing a patch, fetch tags from `origin`, select the latest stable `desktop-vMAJOR.MINOR.PATCH` tag using semantic-version ordering, and increment only its patch component. Ignore unprefixed tags and tags belonging to other tools. If no desktop release tag exists, propose `desktop-v0.0.1`. This rule also applies when using the `push-github-tag` skill.
 
-Before creating a desktop release tag, update `package.json`'s `version` to the tag's numeric version (for example, `desktop-v0.1.2` requires `"version": "0.1.2"`). The sidebar reads this value at build time. Keep `package-lock.json` (both the top-level and root package versions), `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and the desktop app entry in `src-tauri/Cargo.lock` in sync, as required by the release workflow. Commit these version updates before creating the tag, and tag the commit containing them. This requirement also applies when using the `push-github-tag` skill.
+Before creating a desktop release tag (including with `push-github-tag`), update the version in:
+
+- `package.json` (the sidebar displays this version)
+- `package-lock.json` (top-level and root package versions)
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock` (the desktop app entry)
+
+Ask the user to confirm committing and pushing these version updates to the current branch before creating and pushing the tag. After confirmation, commit and push the version updates first, then tag that commit using the skill's tag confirmation flow.

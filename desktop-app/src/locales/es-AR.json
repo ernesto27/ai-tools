@@ -207,5 +207,17 @@
   "googleDrive": "Google Drive",
   "durationUnavailable": "Duración no disponible",
   "stageDuration": "Duración de {{stage}}",
-  "couldNotOpenPullRequestError": "No se pudo abrir el pull request: {{error}}"
+  "couldNotOpenPullRequestError": "No se pudo abrir el pull request: {{error}}",
+  "audit": "Auditar",
+  "auditing": "Auditando…",
+  "auditStage": "Auditar {{stage}}",
+  "auditingStage": "Auditando {{stage}}",
+  "auditReportSaved": "Informe de auditoría: {{path}}",
+  "auditFailed": "Falló la auditoría: {{error}}",
+  "auditInterrupted": "Auditoría interrumpida. Podés intentar de nuevo.",
+  "auditDuration": "Duración de la auditoría",
+  "couldNotOpenAuditReportError": "No se pudo abrir el informe de auditoría: {{error}}",
+  "stopAuditStage": "Detener auditoría de {{stage}}",
+  "stoppingAuditStage": "Deteniendo auditoría de {{stage}}",
+  "couldNotStopAuditError": "No se pudo detener la auditoría: {{error}}"
 }

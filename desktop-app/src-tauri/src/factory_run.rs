@@ -51,6 +51,19 @@ impl FactoryRun {
         processes.run(execution_id, command)
     }
 
+    pub fn audit(
+        &self,
+        processes: &RunProcesses,
+        execution_id: String,
+        log_path: String,
+    ) -> Result<RunOutcome, String> {
+        let mut command = self.command();
+        command.arg("audit");
+        command.arg("--log").arg(log_path);
+
+        processes.run(execution_id, command)
+    }
+
     fn command(&self) -> Command {
         let mut command = Command::new("software-factory");
         command.current_dir(&self.repository);

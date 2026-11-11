@@ -27,6 +27,7 @@ dist-ssr
 e2e/artifacts/
 
 task.txt
-software-factory.json 
+software-factory.json
 
-
+plans/*
+data.txt

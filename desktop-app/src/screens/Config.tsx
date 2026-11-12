@@ -7,6 +7,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusMessage } from "../components/StatusMessage";
 import { ModelAutocomplete } from "../components/ModelAutocomplete";
+import { SkillAutocomplete } from "../components/SkillAutocomplete";
+import { useSkills } from "../hooks/useSkills";
 import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from "../config";
 import type { FactoryConfig, StageSettings } from "../config";
 
@@ -29,6 +31,7 @@ interface Props {
 
 export function Config({ repo, repoPath }: Props) {
   const { t } = useTranslation();
+  const skills = useSkills(repoPath);
   const [agent, setAgent] = useState("codex");
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("medium");
@@ -164,6 +167,14 @@ export function Config({ repo, repoPath }: Props) {
         </div>
       )}
 
+      {skills.loading && <p id="skills-loading" role="status" className="text-sm text-muted">{t("loadingSkills")}</p>}
+      {skills.error && (
+        <div id="skills-error" role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
+          <span>{t("couldNotLoadSkills")} {skills.error}</span>
+          <OutlineButton onClick={skills.retry}>{t("retry")}</OutlineButton>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-start gap-8">
         <fieldset disabled={saving || loading || !!loadError} className="@container m-0 flex min-w-0 flex-[1.2_1_520px] flex-col border-0 p-0">
           <SectionHeading>{t("agentDefaults")}</SectionHeading>
@@ -264,7 +275,14 @@ export function Config({ repo, repoPath }: Props) {
                   </Field>
                   {s.key !== "implementation" && (
                     <Field label={t("customSkill")}>
-                      <Input mono className="min-w-0 w-full" value={stageSettings[s.key].customSkill} onChange={(e) => editStage(s.key, "customSkill", e.target.value)} />
+                      <SkillAutocomplete
+                        key={`${repoPath}-${s.key}`}
+                        id={`${s.key}-skill`}
+                        value={stageSettings[s.key].customSkill}
+                        names={skills.names}
+                        disabled={saving || loading || !!loadError || !!off[s.key] || skills.loading || !!skills.error}
+                        onChange={(value) => editStage(s.key, "customSkill", value)}
+                      />
                     </Field>
                   )}
                 </fieldset>

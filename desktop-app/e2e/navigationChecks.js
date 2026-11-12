@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
+import { runSkillAutocompleteChecks } from "./skillAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
 import { runPullRequestChecks } from "./pullRequestChecks.js";
 
@@ -166,7 +167,8 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await text('//main//h2[normalize-space(.)="Agent defaults"]', "Agent defaults");
     await text('main header [role="status"]', "Saved");
     await runModelAutocompleteChecks(browser, fixture, artifacts);
-  });
+    await runSkillAutocompleteChecks(browser, fixture, artifacts);
+  }, 180_000);
 
   await screen("Branch runs", async () => {
     await openRuns();

@@ -85,8 +85,11 @@ export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
       assert.equal(await (await browser.$(`#${key}-model-suggestions [role=option]:first-child`)).getProperty("innerText"), "gpt-6-astra");
       await browser.keys("ArrowUp");
       assert.equal(await input.getAttribute("aria-activedescendant"), `${key}-model-suggestions-3`);
+      assert.equal(await (await browser.$(`#${key}-model-suggestions-3`)).getAttribute("aria-selected"), "true");
+      assert.equal(await (await browser.$(`#${key}-model-suggestions-0`)).getAttribute("aria-selected"), "false");
       await browser.keys("ArrowDown");
       assert.equal(await input.getAttribute("aria-activedescendant"), `${key}-model-suggestions-0`);
+      assert.equal(await (await browser.$(`#${key}-model-suggestions-0`)).getAttribute("aria-selected"), "true");
       await browser.keys("Escape");
       assert.equal(await input.getValue(), "");
     }

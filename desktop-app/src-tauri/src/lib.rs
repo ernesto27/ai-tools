@@ -7,7 +7,8 @@ mod stage_log;
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
 use factory_run::FactoryRun;
-
+use std::fs;
+use std::path::Path;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -304,6 +305,44 @@ async fn audit_factory_run(
     .map_err(|error| format!("Could not wait for audit: {error}"))?
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct Skill {
+    name: String,
+}
+
+#[tauri::command]
+async fn list_skills(path: String) -> Result<Vec<Skill>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = Path::new(&path);
+        let mut skills: Vec<Skill> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        for relative in [".agents/skills", ".claude/skills"] {
+            let folder = root.join(relative);
+
+            if !folder.is_dir() {
+                continue;
+            }
+
+            for entry in fs::read_dir(&folder).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let skill_path = entry.path();
+
+                if skill_path.is_dir() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if seen.insert(name.clone()) {
+                        skills.push(Skill { name });
+                    }
+                }
+            }
+        }
+
+        Ok(skills)
+    })
+    .await
+    .map_err(|error| format!("Could not load skills: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -330,10 +369,46 @@ pub fn run() {
             supports_factory_stop,
             resume_factory_run,
             stop_factory_run,
-            audit_factory_run
+            audit_factory_run,
+            list_skills
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod skill_tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn lists_skills_without_symlink_duplicates() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+
+        fs::create_dir_all(root.join(".agents/skills/shared")).unwrap();
+        fs::create_dir_all(root.join(".claude/skills/claude-only")).unwrap();
+
+        std::os::unix::fs::symlink(
+            "../../.agents/skills/shared",
+            root.join(".claude/skills/shared"),
+        )
+        .unwrap();
+
+        let mut skills =
+            tauri::async_runtime::block_on(list_skills(root.to_str().unwrap().to_owned()))
+                .unwrap();
+
+        skills.sort_by(|a, b| a.name.cmp(&b.name));
+
+        assert_eq!(
+            serde_json::to_value(&skills).unwrap(),
+            serde_json::json!([
+                {"name": "claude-only"},
+                {"name": "shared"}
+            ])
+        );
+    }
 }
 
 #[cfg(test)]

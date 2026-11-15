@@ -24,6 +24,23 @@ To update to the latest release:
 agent-sandbox update
 ```
 
+To check for a newer release without installing it:
+
+```bash
+agent-sandbox version-check
+```
+
+The command makes unauthenticated GitHub API calls and prints JSON with
+`latest` (the latest stable release tag) and `newer` (whether that release
+is newer than the running version). For example:
+
+```json
+{"latest":"agent-sandbox-v0.0.56","newer":true}
+```
+
+Network access is required. Development builds reporting `dev` return an
+invalid-version error.
+
 To build from this directory:
 
 ```bash

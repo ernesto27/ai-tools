@@ -83,6 +83,7 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		newWorktreeDeleteAllCmd(),
 		newWorktreeEditorOpenCmd(),
 		newModelCmd(),
+		newVersionCheckCmd(),
 	)
 	cmd.AddCommand(newDoctorCmd(), newUpdateCmd())
 	return cmd, state

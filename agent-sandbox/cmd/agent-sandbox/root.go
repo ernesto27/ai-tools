@@ -84,6 +84,7 @@ func newRootCmd() (*cobra.Command, *commandState) {
 		newWorktreeEditorOpenCmd(),
 		newModelCmd(),
 		newVersionCheckCmd(),
+		newCustomImageCmd(),
 	)
 	cmd.AddCommand(newDoctorCmd(), newUpdateCmd())
 	return cmd, state

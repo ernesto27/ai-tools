@@ -1,15 +1,16 @@
-[] - implementaion stage should accept custom skill
-[] - add efffort setting in stage
+[x] - implementaion stage should accept custom skill
+[x] - add efffort setting in stage
+[]- 3. Compare agents on the same task — run Codex and Claude in separate worktrees and compare their diffs, test results, duration, and token usage.
 [] - check The screenshot shows the command launches, but Software Factory ignores run.query when building the task prompt. It tries to read run.filePrompt, which is absent, and attempts to open "".
 I confirmed this in runner.go (/home/eponce/code/ai-enginering/ai-tools/soft-factory/internal/sandbox/runner.go:352).
 The fix belongs in Software Factory: use run.query when provided; otherwise read run.filePrompt. The desktop is correctly saving your task text.
 [] - option for verbose output in terminal, default true
 [] - branch of task name should be set here
-[] - custom skill should be add in stages prop
-[] - show price of token usage, depend of model agent
+[x] - custom skill should be add in stages prop
+[x] - show price of token usage, depend of model agent
 [] - review only analysize code changes, not readme or docs
 [] - config file should not be required, now return an error
-[] - do not commit review-changes.md
+[x] - do not commit review-changes.md
 [] - think how to send more changes to current finish branch
 [] - integration with GitHub Issues to get task content from an issue URL
 [x] - in summary model appears empty, prbabli happens when use default value
@@ -39,6 +40,7 @@ Error: Process completed with exit code 1.}
 [x] - doctor comman
 [x] - commit changes in all stages
 [x] - add code-changes new skill
+[x] - add check-version command (alias: version-check) for stable Software Factory releases
 
 ..................
 The Go image works. The failure comes from prompt argument handling in agent-sandbox.

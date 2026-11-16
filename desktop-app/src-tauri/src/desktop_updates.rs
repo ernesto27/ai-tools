@@ -3,7 +3,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
-use tauri::{AppHandle, Manager, State};
+#[cfg(target_os = "linux")]
+use tauri::Manager;
+use tauri::{AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 #[derive(Default)]
@@ -17,50 +19,55 @@ pub struct AvailableUpdate {
     version: String,
 }
 
-fn supported_installation(app: &AppHandle) -> bool {
+fn supported_installation(_app: &AppHandle) -> bool {
     if cfg!(debug_assertions) {
         return false;
     }
-    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        return app
-            .env()
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        _app.env()
             .appimage
-            .is_some_and(|path| std::path::Path::new(&path).is_file());
+            .is_some_and(|path| std::path::Path::new(&path).is_file())
     }
-    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        return std::env::current_exe().ok().is_some_and(|path| {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        std::env::current_exe().ok().is_some_and(|path| {
             path.parent()
                 .and_then(|p| p.parent())
                 .and_then(|p| p.parent())
                 .is_some_and(|bundle| bundle.extension().is_some_and(|ext| ext == "app"))
-        });
+        })
     }
-    false
+    #[cfg(not(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64")
+    )))]
+    {
+        false
+    }
 }
 
 // Check the installation and its directory before downloading and again before
 // installing. This avoids offering privileged updates for shared/read-only apps.
-fn writable_installation(app: &AppHandle) -> Result<(), String> {
+fn writable_installation(_app: &AppHandle) -> Result<(), String> {
     #[cfg(unix)]
     {
-        let path = if cfg!(target_os = "linux") {
-            app.env().appimage.map(std::path::PathBuf::from)
-        } else if cfg!(target_os = "macos") {
-            std::env::current_exe().ok().and_then(|path| {
-                path.parent()?
-                    .parent()?
-                    .parent()
-                    .map(std::path::Path::to_path_buf)
-            })
-        } else {
-            None
-        }
-        .ok_or("Unsupported desktop installation.")?;
+        #[cfg(target_os = "linux")]
+        let path = _app.env().appimage.map(std::path::PathBuf::from);
+        #[cfg(target_os = "macos")]
+        let path = std::env::current_exe().ok().and_then(|path| {
+            path.parent()?
+                .parent()?
+                .parent()
+                .map(std::path::Path::to_path_buf)
+        });
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let path: Option<std::path::PathBuf> = None;
+        let path = path.ok_or("Unsupported desktop installation.")?;
         check_writable_path(&path)
     }
     #[cfg(not(unix))]
     {
-        let _ = app;
         Err("Unsupported desktop installation.".into())
     }
 }

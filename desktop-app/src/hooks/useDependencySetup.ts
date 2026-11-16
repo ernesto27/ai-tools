@@ -9,12 +9,13 @@ export type Dependency = {
 };
 
 const tools = [
-  { id: "agent-sandbox", check: "agent_sandbox_check_bin", install: "agent_sandbox_install_bin" },
-  { id: "software-factory", check: "software_factory_check_bin", install: "software_factory_install_bin" },
+  { id: "agent-sandbox", check: "agent_sandbox_check_bin", install: "agent_sandbox_install_bin", update: "agent_sandbox_check_and_update" },
+  { id: "software-factory", check: "software_factory_check_bin", install: "software_factory_install_bin", update: "software_factory_check_and_update" },
 ] as const;
 
 let snapshot: readonly Dependency[] = tools.map(({ id }) => ({ id, status: "checking" }));
 let started = false;
+let updatesStarted = false;
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
@@ -31,6 +32,11 @@ function getSnapshot() {
 function update(id: Dependency["id"], status: DependencyStatus, error?: string) {
   snapshot = snapshot.map((row) => row.id === id ? { id, status, error } : row);
   for (const listener of listeners) listener();
+
+  if (!updatesStarted && snapshot.every((row) => row.status === "ready")) {
+    updatesStarted = true;
+    for (const tool of tools) void invoke<void>(tool.update).catch(() => undefined);
+  }
 }
 
 async function checkTool(tool: typeof tools[number]) {

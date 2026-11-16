@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Requirement {
@@ -55,6 +55,36 @@ impl AgentSandboxRun {
             .output()
             .map(|output| output.status.success())
             .unwrap_or(false)
+    }
+
+    pub fn check_and_update() {
+        let Ok(output) = Self::command()
+            .arg("version-check")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+        else {
+            return;
+        };
+
+        if !output.status.success() {
+            return;
+        }
+
+        let newer = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .ok()
+            .and_then(|value| value.get("newer").and_then(|newer| newer.as_bool()));
+        if newer != Some(true) {
+            return;
+        }
+
+        let _ = Self::command()
+            .arg("update")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
     }
 
     pub fn install_bin() -> Result<(), String> {

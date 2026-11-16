@@ -148,6 +148,11 @@ async fn agent_sandbox_check_bin() -> bool {
 }
 
 #[tauri::command]
+async fn agent_sandbox_check_and_update() {
+    let _ = tauri::async_runtime::spawn_blocking(AgentSandboxRun::check_and_update).await;
+}
+
+#[tauri::command]
 async fn agent_sandbox_install_bin() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(AgentSandboxRun::install_bin)
         .await
@@ -157,6 +162,11 @@ async fn agent_sandbox_install_bin() -> Result<(), String> {
 #[tauri::command]
 async fn software_factory_check_bin() -> bool {
     FactoryRun::check_bin()
+}
+
+#[tauri::command]
+async fn software_factory_check_and_update() {
+    let _ = tauri::async_runtime::spawn_blocking(FactoryRun::check_and_update).await;
 }
 
 #[tauri::command]
@@ -355,6 +365,8 @@ pub fn run() {
             list_skills,
             agent_sandbox_check_bin,
             software_factory_check_bin,
+            agent_sandbox_check_and_update,
+            software_factory_check_and_update,
             software_factory_install_bin,
             agent_sandbox_install_bin,
         ])

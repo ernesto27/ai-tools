@@ -226,5 +226,18 @@
   "couldNotOpenAuditReportError": "Could not open audit report: {{error}}",
   "stopAuditStage": "Stop audit for {{stage}}",
   "stoppingAuditStage": "Stopping audit for {{stage}}",
-  "couldNotStopAuditError": "Could not stop audit: {{error}}"
+  "couldNotStopAuditError": "Could not stop audit: {{error}}",
+  "dependencySetupTitle": "Preparing Soft Factory",
+  "dependencySetupDescription": "Checking required tools. The app will open automatically when both are ready.",
+  "dependencyChecking": "Checking…",
+  "dependencyInstalling": "Installing…",
+  "dependencyReady": "Ready",
+  "dependencyError": "Error",
+  "dependencyMissing": "Missing",
+  "dependencyNotInstalled": "Not installed",
+  "dependencyInstallConfirmation": "Some required tools are missing. Allow Soft Factory to download and install them?",
+  "dependencyAcceptInstall": "Install missing tools",
+  "dependencyDeclineInstall": "Not now",
+  "dependencyInstallationDeclined": "Installation was declined. Both tools must be installed before you can use the app. Install them separately and choose Check again.",
+  "dependencyCheckAgain": "Check again"
 }

@@ -1,9 +1,11 @@
 use tauri::Manager;
+mod agent_sandbox_run;
 mod factory_config;
 mod factory_process;
 mod factory_run;
 mod stage_log;
 
+use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
 use factory_run::FactoryRun;
@@ -69,34 +71,12 @@ fn save_repo(app: tauri::AppHandle, path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn sandbox_help() -> Result<String, String> {
-    let output = std::process::Command::new("agent-sandbox")
-        .arg("-h")
-        .output()
-        .map_err(|e| format!("could not run agent-sandbox: {e}"))?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Requirement {
-    name: String,
-    installed: bool,
+    AgentSandboxRun::help()
 }
 
 #[tauri::command]
 async fn check_requirements() -> Result<Vec<Requirement>, String> {
-    let output = std::process::Command::new("agent-sandbox")
-        .args(["doctor", "--json"])
-        .output()
-        .map_err(|e| format!("could not run agent-sandbox: {e}"))?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-    }
-    serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())
+    AgentSandboxRun::check_requirements()
 }
 
 fn repos_file(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
@@ -138,31 +118,9 @@ fn remove_repo(app: tauri::AppHandle, path: String) -> Result<(), String> {
     remove_repo_from_file(&repos_file(&app)?, &path)
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct Worktree {
-    branch: String,
-    path: String,
-}
-
-fn parse_worktrees(bytes: &[u8]) -> Result<Vec<Worktree>, String> {
-    let worktrees: Option<Vec<Worktree>> =
-        serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    Ok(worktrees.unwrap_or_default())
-}
-
 #[tauri::command]
 async fn list_branches(path: String) -> Result<Vec<Worktree>, String> {
-    let output = std::process::Command::new("agent-sandbox")
-        .args(["worktree-list", "--json", "--repo"])
-        .arg(&path)
-        .output()
-        .map_err(|e| format!("could not run agent-sandbox: {e}"))?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-    }
-
-    parse_worktrees(&output.stdout)
+    AgentSandboxRun::new(path).list_branches()
 }
 
 #[tauri::command]
@@ -182,6 +140,30 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
     tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).update(&config))
         .await
         .map_err(|error| format!("Could not save configuration: {error}"))?
+}
+
+#[tauri::command]
+async fn agent_sandbox_check_bin() -> bool {
+    AgentSandboxRun::check_bin()
+}
+
+#[tauri::command]
+async fn agent_sandbox_install_bin() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(AgentSandboxRun::install_bin)
+        .await
+        .map_err(|error| format!("Could not wait for agent-sandbox installation: {error}"))?
+}
+
+#[tauri::command]
+async fn software_factory_check_bin() -> bool {
+    FactoryRun::check_bin()
+}
+
+#[tauri::command]
+async fn software_factory_install_bin() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(FactoryRun::install_bin)
+        .await
+        .map_err(|error| format!("Could not wait for software-factory installation: {error}"))?
 }
 
 #[tauri::command]
@@ -370,7 +352,11 @@ pub fn run() {
             resume_factory_run,
             stop_factory_run,
             audit_factory_run,
-            list_skills
+            list_skills,
+            agent_sandbox_check_bin,
+            software_factory_check_bin,
+            software_factory_install_bin,
+            agent_sandbox_install_bin,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -396,8 +382,7 @@ mod skill_tests {
         .unwrap();
 
         let mut skills =
-            tauri::async_runtime::block_on(list_skills(root.to_str().unwrap().to_owned()))
-                .unwrap();
+            tauri::async_runtime::block_on(list_skills(root.to_str().unwrap().to_owned())).unwrap();
 
         skills.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -495,44 +480,5 @@ mod repo_removal_tests {
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert!(result.is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
-    }
-}
-
-#[cfg(test)]
-mod worktree_tests {
-    use super::parse_worktrees;
-
-    #[test]
-    fn preserves_exact_branches_and_paths() {
-        let entries = parse_worktrees(
-            r#"[{"branch":"feature/a","path":"/tmp/project space/árbol"},{"branch":"other","path":"/tmp/other"}]"#.as_bytes(),
-        )
-        .unwrap();
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].branch, "feature/a");
-        assert_eq!(entries[0].path, "/tmp/project space/árbol");
-        let value = serde_json::to_value(&entries).unwrap();
-        assert_eq!(value[1]["branch"], "other");
-        assert_eq!(value[1]["path"], "/tmp/other");
-    }
-
-    #[test]
-    fn supports_empty_output() {
-        assert!(parse_worktrees(b"null").unwrap().is_empty());
-        assert!(parse_worktrees(b"[]").unwrap().is_empty());
-    }
-
-    #[test]
-    fn rejects_malformed_or_wrongly_typed_output() {
-        for bytes in [
-            &b"invalid"[..],
-            &br#"{}"#[..],
-            &br#"[{"path":"/tmp/no-branch"}]"#[..],
-            &br#"[{"branch":"missing-path"}]"#[..],
-            &br#"[{"branch":"null-path","path":null}]"#[..],
-            &br#"[{"branch":"a","path":42}]"#[..],
-        ] {
-            assert!(parse_worktrees(bytes).is_err());
-        }
     }
 }

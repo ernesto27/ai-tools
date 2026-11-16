@@ -64,8 +64,41 @@ impl FactoryRun {
         processes.run(execution_id, command)
     }
 
+    pub fn check_bin() -> bool {
+        Self::bin_command()
+            .arg("-h")
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
+
+    pub fn install_bin() -> Result<(), String> {
+        let output = Command::new("bash")
+            .args([
+                "-o",
+                "pipefail",
+                "-c",
+                "curl -fsSL https://raw.githubusercontent.com/ernesto27/ai-tools/master/soft-factory/install.sh | bash",
+            ])
+            .output()
+            .map_err(|error| format!("Could not start installer: {error}"))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "software-factory installation failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn bin_command() -> Command {
+        Command::new("software-factory")
+    }
+
     fn command(&self) -> Command {
-        let mut command = Command::new("software-factory");
+        let mut command = Self::bin_command();
         command.current_dir(&self.repository);
         command
     }

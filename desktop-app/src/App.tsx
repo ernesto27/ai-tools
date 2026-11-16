@@ -10,6 +10,8 @@ import { Config } from "./screens/Config";
 import { NewRun } from "./screens/NewRun";
 import { Settings } from "./screens/Settings";
 import { AddRepo } from "./screens/AddRepo";
+import { DependencySetup } from "./screens/DependencySetup";
+import { useDependencySetup } from "./hooks/useDependencySetup";
 import { useDesktopRuns, type DesktopRuns } from "./hooks/useDesktopRuns";
 import { useDesktopAudits, type DesktopAudits } from "./hooks/useDesktopAudits";
 import { useTheme } from "./hooks/useTheme";
@@ -23,8 +25,26 @@ import type { BranchWorktree } from "./worktrees";
 const HOME: Route = { screen: "home" };
 
 function App() {
-  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const {
+    dependencies, ready, needsConfirmation, acceptInstallation, declineInstallation,
+    canRecheck, recheck,
+  } = useDependencySetup();
+
+  return ready
+    ? <MainApp theme={theme} toggleTheme={toggleTheme} />
+    : <DependencySetup
+        dependencies={dependencies}
+        needsConfirmation={needsConfirmation}
+        onAccept={acceptInstallation}
+        onDecline={declineInstallation}
+        canRecheck={canRecheck}
+        onRecheck={recheck}
+      />;
+}
+
+function MainApp({ theme, toggleTheme }: { theme: Theme; toggleTheme: () => void }) {
+  const { t } = useTranslation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [route, setRoute] = useState<Route>(HOME);
   const lastBranchRoute = useRef<Route>(HOME);

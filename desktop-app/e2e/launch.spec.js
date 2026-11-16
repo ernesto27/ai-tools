@@ -18,6 +18,7 @@ import { remote } from "webdriverio";
 import { prepareNavigationFixture } from "./navigationFixture.js";
 import { runNavigationChecks } from "./navigationChecks.js";
 import { runLanguageChecks } from "./languageChecks.js";
+import { runDependencySetupChecks } from "./dependencySetupChecks.js";
 import { runThemeChecks } from "./themeChecks.js";
 import { runSidebarSearchChecks } from "./sidebarSearchChecks.js";
 
@@ -180,6 +181,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     });
     await browser.execute(() => localStorage.removeItem("soft-factory.language"));
     await browser.refresh();
+    await runDependencySetupChecks(browser);
     await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
     await runLanguageChecks(browser, navigationFixture, artifacts);

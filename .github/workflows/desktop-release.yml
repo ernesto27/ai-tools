@@ -27,6 +27,7 @@ jobs:
             host_arch: x86_64
             target: x86_64-unknown-linux-gnu
             bundle: appimage
+            build_bundles: appimage
             extension: AppImage
           - runner: macos-15
             platform: darwin
@@ -34,6 +35,7 @@ jobs:
             host_arch: arm64
             target: aarch64-apple-darwin
             bundle: dmg
+            build_bundles: app,dmg
             extension: dmg
     defaults:
       run:
@@ -43,6 +45,7 @@ jobs:
       RELEASE_TAG: ${{ github.ref_name }}
       TARGET: ${{ matrix.target }}
       BUNDLE: ${{ matrix.bundle }}
+      BUILD_BUNDLES: ${{ matrix.build_bundles }}
       EXTENSION: ${{ matrix.extension }}
       PLATFORM: ${{ matrix.platform }}
       ARCH: ${{ matrix.arch }}
@@ -99,7 +102,7 @@ jobs:
           CI: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri -- build --target "$TARGET" --bundles "$BUNDLE" -- --locked
+        run: npm run tauri -- build --target "$TARGET" --bundles "$BUILD_BUNDLES" -- --locked
 
       - name: Verify package payload and stage installer
         env:

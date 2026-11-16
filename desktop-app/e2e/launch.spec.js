@@ -21,6 +21,7 @@ import { runLanguageChecks } from "./languageChecks.js";
 import { runDependencySetupChecks } from "./dependencySetupChecks.js";
 import { runThemeChecks } from "./themeChecks.js";
 import { runSidebarSearchChecks } from "./sidebarSearchChecks.js";
+import { runDesktopUpdateChecks } from "./desktopUpdateChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(testDirectory, "..");
@@ -182,6 +183,9 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     await browser.execute(() => localStorage.removeItem("soft-factory.language"));
     await browser.refresh();
     await runDependencySetupChecks(browser);
+    await t.test("Debug binary cannot offer or install production updates", async () => {
+      await runDesktopUpdateChecks(browser);
+    });
     await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
     await runLanguageChecks(browser, navigationFixture, artifacts);

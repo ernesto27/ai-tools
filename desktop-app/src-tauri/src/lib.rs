@@ -1,11 +1,13 @@
 use tauri::Manager;
 mod agent_sandbox_run;
+mod desktop_updates;
 mod factory_config;
 mod factory_process;
 mod factory_run;
 mod stage_log;
 
 use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
+use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_update};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
 use factory_run::FactoryRun;
@@ -338,12 +340,16 @@ async fn list_skills(path: String) -> Result<Vec<Skill>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(DesktopUpdates::default())
         .plugin(tauri_plugin_notification::init())
         .manage(RunProcesses::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
+            check_desktop_update,
+            install_desktop_update,
             greet,
             inspect_folder,
             save_repo,

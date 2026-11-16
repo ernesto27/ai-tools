@@ -239,5 +239,9 @@
   "dependencyAcceptInstall": "Instalar herramientas faltantes",
   "dependencyDeclineInstall": "Ahora no",
   "dependencyInstallationDeclined": "Rechazaste la instalación. Ambas herramientas deben estar instaladas para usar la app. Instalalas por separado y elegí Verificar de nuevo.",
-  "dependencyCheckAgain": "Verificar de nuevo"
+  "dependencyCheckAgain": "Verificar de nuevo",
+  "desktopUpdateAvailable": "Soft Factory {{version}} está disponible.",
+  "updateAndRestart": "Actualizar y reiniciar",
+  "updatingDesktop": "Actualizando la aplicación…",
+  "later": "Más tarde"
 }

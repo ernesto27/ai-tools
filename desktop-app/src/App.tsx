@@ -21,18 +21,21 @@ import { Icon } from "./components/Icon";
 import type { Theme } from "./theme";
 
 import type { BranchWorktree } from "./worktrees";
+import { useDesktopUpdater, type DesktopUpdater } from "./hooks/useDesktopUpdater";
+import { DesktopUpdateBanner } from "./components/DesktopUpdateBanner";
 
 const HOME: Route = { screen: "home" };
 
 function App() {
   const { theme, toggleTheme } = useTheme();
+  const updater = useDesktopUpdater();
   const {
     dependencies, ready, needsConfirmation, acceptInstallation, declineInstallation,
     canRecheck, recheck,
   } = useDependencySetup();
 
   return ready
-    ? <MainApp theme={theme} toggleTheme={toggleTheme} />
+    ? <MainApp theme={theme} toggleTheme={toggleTheme} updater={updater} />
     : <DependencySetup
         dependencies={dependencies}
         needsConfirmation={needsConfirmation}
@@ -43,7 +46,11 @@ function App() {
       />;
 }
 
-function MainApp({ theme, toggleTheme }: { theme: Theme; toggleTheme: () => void }) {
+function MainApp({ theme, toggleTheme, updater }: {
+  theme: Theme;
+  toggleTheme: () => void;
+  updater: DesktopUpdater;
+}) {
   const { t } = useTranslation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [route, setRoute] = useState<Route>(HOME);
@@ -139,6 +146,7 @@ function MainApp({ theme, toggleTheme }: { theme: Theme; toggleTheme: () => void
     <div className="app-shell flex h-dvh overflow-hidden">
       <Sidebar hidden={!sidebarVisible} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <DesktopUpdateBanner updater={updater} />
         <div className="flex shrink-0 px-4 pt-3">
           <button
             type="button"

@@ -239,5 +239,9 @@
   "dependencyAcceptInstall": "Install missing tools",
   "dependencyDeclineInstall": "Not now",
   "dependencyInstallationDeclined": "Installation was declined. Both tools must be installed before you can use the app. Install them separately and choose Check again.",
-  "dependencyCheckAgain": "Check again"
+  "dependencyCheckAgain": "Check again",
+  "desktopUpdateAvailable": "Soft Factory {{version}} is available.",
+  "updateAndRestart": "Update and restart",
+  "updatingDesktop": "Updating desktop…",
+  "later": "Later"
 }

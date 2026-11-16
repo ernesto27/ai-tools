@@ -27,6 +27,7 @@ tempfile = "3"
 sha2 = "0.10"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-updater = "2.14.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

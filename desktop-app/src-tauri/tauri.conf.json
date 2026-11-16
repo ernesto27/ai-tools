@@ -34,6 +34,16 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "requireSignedVersion": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVENkNDQjg0MkI1RDg5QTEKUldTaGlWMHJoTXRzWGVsRmgvck5hYVhqL1ZMVmhrZkhZS1JKZGNCa1dNVjhySDE1aTlibThnTTcK",
+      "endpoints": [
+        "https://github.com/ernesto27/ai-tools/releases/download/desktop-updates/latest.json"
+      ]
+    }
   }
 }

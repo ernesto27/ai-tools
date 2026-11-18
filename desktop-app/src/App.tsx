@@ -121,15 +121,19 @@ function MainApp({ theme, toggleTheme, updater }: {
       if ("repo" in lastBranchRoute.current && lastBranchRoute.current.repo === repo.name) {
         lastBranchRoute.current = HOME;
       }
-      setRoute((current) => "repo" in current && current.repo === repo.name ? HOME : current);
+      setRoute((current) => {
+        const isRemoved = current.screen === "config"
+          ? current.repoPath === repo.path
+          : "repo" in current && current.repo === repo.name;
+        return isRemoved ? HOME : current;
+      });
     } finally {
       removingRepo.current = false;
     }
   };
 
-  const loadRepos = () => {
+  const loadRepos = () =>
     invoke<SavedRepo[]>("list_repos").then(setSavedRepos).catch(console.error);
-  };
 
   useEffect(() => {
     loadRepos();
@@ -179,9 +183,8 @@ function MainApp({ theme, toggleTheme, updater }: {
             }
             navigate={navigate}
             back={() => navigate(route.screen === "settings" ? settingsReturnRoute.current : lastBranchRoute.current)}
-            repoAdded={() => {
-              loadRepos();
-              navigate(lastBranchRoute.current);
+            repoAdded={(path) => {
+              void loadRepos().then(() => navigate({ screen: "config", repoPath: path }));
             }}
           />
         </main>
@@ -212,7 +215,7 @@ function Screen({
   route: Route;
   navigate: (r: Route) => void;
   back: () => void;
-  repoAdded: () => void;
+  repoAdded: (path: string) => void;
   repoPath?: string;
 }) {
   const { t } = useTranslation();
@@ -241,7 +244,7 @@ function Screen({
                       <h2 className="text-xl font-semibold tracking-[-0.02em]">{repo.name}</h2>
                       <p className="truncate font-mono text-xs text-muted" title={repo.path}>{repo.path}</p>
                     </div>
-                    <button type="button" className="ml-auto min-h-10 shrink-0 rounded-md border border-field-line px-3 text-sm hover:bg-hover" onClick={() => navigate({ screen: "config", repo: repo.name })}>{t("config")}</button>
+                    <button type="button" className="ml-auto min-h-10 shrink-0 rounded-md border border-field-line px-3 text-sm hover:bg-hover" onClick={() => navigate({ screen: "config", repoPath: repo.path })}>{t("config")}</button>
                   </div>
                   <div className="repository-branches">
                     {branches.map((entry) => (
@@ -269,8 +272,9 @@ function Screen({
   }
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
   if (route.screen === "config") {
-    if (!repoPath) return <p>{t("repositoryFolderNotFound")}</p>;
-    return <Config key={repoPath} repo={route.repo} repoPath={repoPath} />;
+    const repo = repos.find((saved) => saved.path === route.repoPath);
+    if (!repo) return <p>{t("repositoryFolderNotFound")}</p>;
+    return <Config key={repo.path} repo={repo.name} repoPath={repo.path} />;
   }
 
   switch (route.screen) {

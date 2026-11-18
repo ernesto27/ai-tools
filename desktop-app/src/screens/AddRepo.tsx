@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 
 interface Props {
-  onDone: () => void;
+  onDone: (path: string) => void;
 }
 
 interface FolderInfo {
@@ -65,8 +65,8 @@ export function AddRepo({ onDone }: Props) {
 
   async function addRepo() {
     try {
-      await invoke("save_repo", { path });
-      onDone();
+      await invoke<void>("save_repo", { path });
+      onDone(path);
     } catch (e) {
       setError(String(e));
     }

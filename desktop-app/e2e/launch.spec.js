@@ -123,6 +123,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     for (const executable of ["git", "software-factory", "agent-sandbox", "tauri-driver", "WebKitWebDriver"]) {
       command(executable, ["--help"]);
     }
+    command("xdotool", ["--version"]);
     await requireFreePort(4444);
     await requireFreePort(4445);
 
@@ -136,7 +137,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     t.diagnostic(`Temporary desktop test fixture: ${fixture}`);
     const navigationFixture = prepareNavigationFixture(fixture, command);
     projectLogs = navigationFixture.projectLogs;
-    const environment = navigationFixture.environment;
+    const environment = { ...navigationFixture.environment, GTK_USE_PORTAL: "0" };
     t.diagnostic(`Temporary project run logs: ${projectLogs}`);
 
     mkdirSync(join(testDirectory, "artifacts"), { recursive: true });
@@ -212,6 +213,44 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
         }
         throw error;
       }
+    });
+    await t.test("Adding a repository opens its Config", async () => {
+      const repoName = "new-repository";
+      const repoPath = join(dirname(navigationFixture.repo), repoName);
+      command("git", ["init", "--initial-branch=main", repoPath]);
+
+      const openAddRepo = await browser.$('//nav//button[normalize-space(.)="Add repository"]');
+      await openAddRepo.waitForClickable({ timeout: 15_000 });
+      await openAddRepo.click();
+      const browse = await browser.$('//main//button[normalize-space(.)="Browse"]');
+      await browse.waitForClickable({ timeout: 15_000 });
+      await browse.click();
+
+      // WebDriver operates the WebView. The folder chooser is a native GTK window.
+      const chooser = command("xdotool", ["search", "--sync", "--onlyvisible", "--name", "^Select Folder$"],
+        { timeout: 10_000 }).trim();
+      assert.match(chooser, /^\d+$/, "Expected one visible folder chooser");
+      command("xdotool", ["windowfocus", "--sync", chooser, "key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
+      // The trailing space stops GTK path completion. GTK strips it on submit.
+      command("xdotool", ["type", "--clearmodifiers", `${repoPath} `]);
+      command("xdotool", ["key", "--clearmodifiers", "Return"]);
+
+      const folder = await browser.$("#folder");
+      await browser.waitUntil(async () => (await folder.getValue()) !== "", {
+        timeout: 15_000,
+        timeoutMsg: "Expected the folder picker to return a path",
+      });
+      assert.equal(await folder.getValue(), repoPath);
+
+      const addRepo = await browser.$('//main//button[normalize-space(.)="Add repository"]');
+      await addRepo.waitForClickable({ timeout: 15_000 });
+      await addRepo.click();
+
+      await browser.waitUntil(async () => await browser.execute(() =>
+        document.querySelector("main h1")?.textContent === "Config"),
+      { timeout: 15_000, timeoutMsg: "Expected Config to open after adding the repository" });
+      const repository = await browser.$('//main//header//h1[normalize-space(.)="Config"]/preceding-sibling::span[1]');
+      assert.equal(await repository.getProperty("innerText"), `${repoName} · ${repoPath}`);
     });
   } catch (error) {
     if (browser && artifacts) {

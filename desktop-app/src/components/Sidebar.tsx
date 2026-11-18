@@ -210,8 +210,8 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                   <div className="ml-3 flex flex-col gap-px border-l border-line pl-3">
                     <NavItem
                       className="text-md"
-                      aria-current={route.screen === "config" && route.repo === repo.name ? "page" : undefined}
-                      onClick={() => navigate({ screen: "config", repo: repo.name })}
+                      aria-current={route.screen === "config" && route.repoPath === saved.path ? "page" : undefined}
+                      onClick={() => navigate({ screen: "config", repoPath: saved.path })}
                     >
                       {t("config")}
                     </NavItem>

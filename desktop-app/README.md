@@ -87,11 +87,12 @@ Run the following commands from this directory. The suite requires Node.js
 22.19 or newer, Rust, the [Tauri Linux prerequisites](https://v2.tauri.app/start/prerequisites/#linux),
 and real `git`, `software-factory`, and `agent-sandbox` executables on `PATH`.
 
-Install the test drivers and virtual display tools (Ubuntu/Debian):
+Install the test drivers and X11 tools (Ubuntu/Debian). The folder picker
+check uses `xdotool` to enter the repository path in the native dialog.
 
 ```bash
 cargo install tauri-driver --locked
-sudo apt-get install webkit2gtk-driver xvfb xauth
+sudo apt-get install webkit2gtk-driver xvfb xauth xdotool
 export PATH="$HOME/.cargo/bin:$PATH"
 ```
 

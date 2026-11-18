@@ -51,7 +51,8 @@ jobs:
             patchelf \
             webkitgtk-webdriver \
             xvfb \
-            xauth
+            xauth \
+            xdotool
 
       - name: Install Agent Sandbox
         run: |

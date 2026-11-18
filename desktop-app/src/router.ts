@@ -15,7 +15,7 @@ export type Route =
   | { screen: "settings" }
   | { screen: "branch"; repo: string; branch: string }
   | { screen: "run"; repo: string; branch: string; runId: string }
-  | { screen: "config"; repo: string }
+  | { screen: "config"; repoPath: string }
   | { screen: "newRun"; repo: string; branch: string; mode: NewRunMode }
   | { screen: "addRepo" };
 

@@ -6,6 +6,7 @@ import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 import { runSkillAutocompleteChecks } from "./skillAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
 import { runPullRequestChecks } from "./pullRequestChecks.js";
+import { runWalkthroughChecks } from "./walkthroughChecks.js";
 
 export async function runNavigationChecks(t, browser, fixture, artifacts) {
   const { repoName, branch, runId, logText } = fixture;
@@ -242,5 +243,6 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
       { timeout: 15_000 });
     await runStageTimingChecks(browser, fixture, artifacts, { text, openRuns, click });
     await runPullRequestChecks(browser, fixture, artifacts, { text, openRuns, click });
+    await runWalkthroughChecks(browser, fixture, artifacts, { text, click });
   }, 120_000);
 }

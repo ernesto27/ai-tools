@@ -1,8 +1,6 @@
 import { messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { implementationPullRequestUrl } from "../runPullRequest";
 import { useRunLogs } from "../hooks/useRunLogs";
@@ -14,6 +12,7 @@ import { RUN_MODE, type Navigate } from "../router";
 import { StageSummary } from "../components/StageSummary";
 import { AuditDuration } from "../components/AuditDuration";
 import { AuditReportLink } from "../components/AuditReportLink";
+import { WalkthroughMarkdown, WalkthroughReader } from "../components/Walkthrough";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
 type Tab = "log" | "summary" | "walk";
@@ -280,7 +279,10 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                     {following ? t("followingLive") : t("followLive")}
                   </TextButton>
                 )}
-                <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
+                  {tab === "walk" && output?.content && <WalkthroughReader content={output.content} />}
+                </div>
               </div>
 
               <div
@@ -300,9 +302,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 ) : output.content.length === 0 ? (
                   <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("thisFileIsEmpty")}</p>
                 ) : tab === "walk" ? (
-                  <article className="walkthrough-markdown p-5">
-                    <Markdown remarkPlugins={[remarkGfm]}>{output.content}</Markdown>
-                  </article>
+                  <WalkthroughMarkdown content={output.content} className="p-5" />
                 ) : (
                   <div className="py-4 font-mono text-sm leading-[1.8]">
                     {output.content.replace(/\r\n/g, "\n").split("\n").map((line, index) => (

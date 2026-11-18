@@ -77,6 +77,8 @@
   "reviewChanges": "Revisión de cambios",
   "risk": "Riesgo",
   "walkthrough": "Explicación de los cambios",
+  "expandWalkthrough": "Ampliar explicación",
+  "closeWalkthrough": "Cerrar",
   "saveFindings": "Guardar hallazgos",
   "disabled": "Deshabilitada",
   "disableStage": "Deshabilitar {{stage}}",

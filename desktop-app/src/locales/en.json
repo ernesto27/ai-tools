@@ -77,6 +77,8 @@
   "reviewChanges": "Review changes",
   "risk": "Risk",
   "walkthrough": "Walkthrough",
+  "expandWalkthrough": "Expand walkthrough",
+  "closeWalkthrough": "Close",
   "saveFindings": "Save findings",
   "disabled": "Disabled",
   "disableStage": "Disable {{stage}}",

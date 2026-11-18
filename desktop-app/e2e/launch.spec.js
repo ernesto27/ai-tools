@@ -230,7 +230,9 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
       const chooser = command("xdotool", ["search", "--sync", "--onlyvisible", "--name", "^Select Folder$"],
         { timeout: 10_000 }).trim();
       assert.match(chooser, /^\d+$/, "Expected one visible folder chooser");
-      command("xdotool", ["windowfocus", "--sync", chooser, "key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
+      // An empty Recent view can keep Open disabled. Start from the home directory.
+      command("xdotool", ["windowfocus", "--sync", chooser, "key", "--clearmodifiers", "alt+Home"]);
+      command("xdotool", ["key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
       // The trailing space stops GTK path completion. GTK strips it on submit.
       command("xdotool", ["type", "--clearmodifiers", `${repoPath} `]);
       command("xdotool", ["key", "--clearmodifiers", "Return"]);

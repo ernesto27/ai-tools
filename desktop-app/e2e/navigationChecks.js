@@ -180,6 +180,19 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await openRepo();
     await click(navButton("New run"));
     await mode("Run", "Full workflow: implement, review, classify risk, explain.");
+    const branchInput = await visible('main input[placeholder="feature/my-task"]');
+    const startButton = await visible('//main//button[normalize-space(.)="Start run"]');
+    assert.equal(await startButton.isEnabled(), true);
+    await branchInput.click();
+    await browser.keys(["Control", "a"]);
+    await browser.keys("Backspace");
+    assert.equal(await branchInput.getValue(), "");
+    assert.equal(await startButton.isEnabled(), false);
+    await branchInput.setValue("   ");
+    assert.equal(await branchInput.getValue(), "   ");
+    assert.equal(await startButton.isEnabled(), false);
+    await branchInput.setValue(branch);
+    assert.equal(await startButton.isEnabled(), true);
   });
 
   await screen("New run Continue", async () => {

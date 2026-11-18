@@ -94,9 +94,11 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     };
   }, [repoPath]);
 
+  const targetBranch = mode === RUN_MODE.RUN ? runBranch.trim() : branch;
+  const missingRunBranch = mode === RUN_MODE.RUN && !targetBranch;
   const inputConfig = applyTaskInputs(loadedConfig, {
     ...taskValues,
-    ...(mode === RUN_MODE.RUN ? { branch: runBranch } : {}),
+    ...(mode === RUN_MODE.RUN ? { branch: targetBranch } : {}),
   });
 
   const taskConfig = mode === RUN_MODE.CONTINUE
@@ -106,11 +108,11 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const resumeConfig = withResumeBranch(loadedConfig, branch);
 
   function startRun() {
-    if (mode === RUN_MODE.RESUME || loadingConfig || configError || desktopRuns.busy(repoPath)) return;
+    if (mode === RUN_MODE.RESUME || missingRunBranch || loadingConfig || configError
+      || desktopRuns.busy(repoPath)) return;
     setSaveError(null);
 
     try {
-      const targetBranch = mode === RUN_MODE.RUN ? runBranch.trim() || branch : branch;
       const id = desktopRuns.start({
         mode,
         repo, repoPath, branch: targetBranch, config: taskConfig,
@@ -178,8 +180,8 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <div className="flex flex-col gap-3">
               <fieldset disabled={loadingConfig || !!configError} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
                 {mode === RUN_MODE.RUN && (
-                  <Field label={t("branchName")} hint={t("setsTheSharedBranchForTheWorkflow")}>
-                    <Input mono large className="w-full" placeholder="feature/my-task" value={runBranch}
+                  <Field label={t("branchName")} hint={t("branchNameRequiredForRun")}>
+                    <Input required mono large className="w-full" placeholder="feature/my-task" value={runBranch}
                       onChange={(event) => {
                         setRunBranch(event.target.value);
                         setSaveError(null);
@@ -249,7 +251,8 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
             <PrimaryButton
               size="lg"
               className="self-start"
-              disabled={!!activeRun || loadingConfig || !!configError || (mode === RUN_MODE.RESUME && resumeDisabled)}
+              disabled={!!activeRun || loadingConfig || !!configError || missingRunBranch
+                || (mode === RUN_MODE.RESUME && resumeDisabled)}
               onClick={mode === RUN_MODE.RESUME ? resumeRun : startRun}
             >
               {t(cta)}

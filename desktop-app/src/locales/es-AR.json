@@ -124,7 +124,7 @@
   "noConfigurationFoundConfigureThisRepositoryBeforeResumingARun": "No se encontró una configuración. Configurá este repositorio antes de reanudar una ejecución.",
   "noConfigurationYetSavingWillCreateSoftwareFactoryJson": "Todavía no hay configuración. Al guardar se creará software-factory.json.",
   "branchName": "Nombre de la rama",
-  "setsTheSharedBranchForTheWorkflow": "Define la rama compartida del flujo de trabajo.",
+  "branchNameRequiredForRun": "Se requiere un nombre de rama para iniciar el flujo de trabajo.",
   "failedOrInterruptedRuns": "Ejecuciones fallidas o interrumpidas",
   "noFailedOrInterruptedRunsRecordedForThisBranch": "No hay ejecuciones fallidas o interrumpidas registradas para esta rama.",
   "lastRecordedStageStage": "Última etapa registrada: {{stage}}",

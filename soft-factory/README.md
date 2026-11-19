@@ -168,9 +168,8 @@ working directory, so relative task, image, and mounted-file paths resolve
 from the project root. `--filePrompt` selects a task prompt, not a
 configuration file; no `--config` flag is added.
 
-Section `apiKey` and `reviewers` are temporarily ignored, even when nonempty.
-They are never sent through flags, environment variables, or files, or logged.
-Continue using Agent Sandbox's existing host authentication.
+Soft Factory ignores section `apiKey`. Use Agent Sandbox's existing host authentication.
+
 `agentSandbox` is required. If it is `null` or `{}`, Factory supplies no sandbox
 settings and Agent Sandbox applies defaults and command requirements. A missing
 local task path may still cause a contextual Factory file-read error. The
@@ -253,7 +252,6 @@ Common settings in either section:
 | `filePrompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
 | `baseImage` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
-| `apiKey`, `reviewers` | Temporarily ignored in both sections, even when configured. Values are never forwarded or logged. Use existing host authentication; API-key authentication and PR reviewer assignment are not supported by this transport. |
 | `push` | Commit and push changes after a sandbox stage. The examples leave this disabled. |
 | `pr` | Commit, push, and create or reuse a GitHub pull request after a sandbox stage. The examples leave this disabled. |
 | `commitMessage` | Optional commit message when `push` or `pr` is enabled. |
@@ -262,6 +260,9 @@ Common settings in either section:
 | `effort` | Optional effort setting, validated by Agent Sandbox. |
 | `image` | Optional list of image paths to attach for agents that support them. |
 | `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
+
+Set `run.reviewers` to a list of GitHub usernames to request when implementation
+creates a new PR with `pr: true`.
 
 Soft Factory supplies generated prompts for reviews and for tasks with supporting context or Jira input. Do not set a separate review prompt in `resume`.
 

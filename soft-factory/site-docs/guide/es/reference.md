@@ -19,8 +19,7 @@ Ejecuta los comandos del flujo de trabajo desde la carpeta del proyecto.
 `--config` y `-c` no están disponibles. Soft Factory siempre lee
 `software-factory.json` desde la raíz del proyecto, incluidos los ajustes
 `agentSandbox`. No genera un archivo de configuración del sandbox; los ajustes
-admitidos se pasan mediante opciones. `apiKey` y `reviewers` de las secciones
-se ignoran temporalmente; usa la autenticación existente del host.
+admitidos se pasan mediante opciones. Usa la autenticación del host.
 
 Consulta la [configuración](configuration.md) para las propiedades JSON y los
 [informes](reports.md) para las ubicaciones de salida y los estados de revisión.

@@ -70,6 +70,23 @@ support them. `commitMessage` applies when publishing changes.
 Section values replace shared values, including explicit `false`, empty
 strings, and empty lists. Omitted options use Agent Sandbox defaults.
 
+### GitHub pull request reviewers
+
+Set `agentSandbox.run.pr` to `true` and list GitHub usernames in
+`agentSandbox.run.reviewers`. Agent Sandbox requests these reviewers
+when implementation creates a new pull request.
+
+```json
+{
+  "agentSandbox": {
+    "run": {
+      "pr": true,
+      "reviewers": ["alice", "bob"]
+    }
+  }
+}
+```
+
 ## Stage agents and models
 
 Use `stages` to change individual steps:
@@ -187,8 +204,7 @@ configuration file. Relative paths keep the project folder as their base.
 Factory's generated prompts and stage controls take priority over configured
 values.
 
-`apiKey` and `reviewers` are currently ignored in `run` and `resume`. They are
-never forwarded or logged. Use host authentication.
+Factory ignores section `apiKey`. Use host authentication.
 
 ::: tip Migrating an older configuration
 Rename `config.json` to `software-factory.json`; `--config` and `-c` are no

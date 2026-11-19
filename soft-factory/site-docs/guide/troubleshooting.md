@@ -14,9 +14,8 @@ Run from the project root containing `software-factory.json`. Use the
 
 The `agentSandbox` property is required; use `{}` when you need no sandbox
 settings. Settings travel through CLI flags; no sandbox configuration JSON is
-generated. `apiKey` and `reviewers` in either section are temporarily ignored.
-Authenticate the agent on the host. Agent Sandbox reports sandbox validation
-failures; see [transport details](configuration.md#sandbox-settings-transport).
+generated. Authenticate the agent on the host. Agent Sandbox reports validation
+failures. See [transport details](configuration.md#sandbox-settings-transport).
 
 ## The sandbox branch cannot be found
 

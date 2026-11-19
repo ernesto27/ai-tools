@@ -85,6 +85,9 @@ func sandboxArgs(options ExecuteOptions) []string {
 	addString("filePrompt", "", section.FilePrompt)
 	addString("commitMessage", "", section.CommitMessage)
 	addList("image", nil, section.Image)
+	if options.Args[0] == "run" {
+		addList("reviewers", section.Reviewers, nil)
+	}
 	if options.Stage == config.StageSecurityReview && options.Config.Stages.SecurityReview.SaveFindings {
 		// In the pinned sandbox, FullPrompt requests commits when PR OR Push
 		// is true. With both false it explicitly forbids staging and commits;

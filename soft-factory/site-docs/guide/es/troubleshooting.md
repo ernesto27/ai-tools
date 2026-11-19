@@ -14,9 +14,8 @@ las [propiedades camelCase documentadas](configuration.md).
 
 La propiedad `agentSandbox` es obligatoria; usa `{}` si no necesitas ajustes del
 sandbox. Los ajustes se pasan como opciones de la CLI; no se genera un JSON de
-configuración del sandbox. `apiKey` y `reviewers` se ignoran temporalmente en
-ambas secciones. Autentica el agente en el host. Agent Sandbox informa los
-fallos de validación del sandbox; consulta los [detalles del transporte](configuration.md#sandbox-settings-transport).
+configuración del sandbox. Autentica el agente en el host. Agent Sandbox informa
+los fallos de validación. Consulta los [detalles del transporte](configuration.md#sandbox-settings-transport).
 
 ## No se encuentra la rama del sandbox
 

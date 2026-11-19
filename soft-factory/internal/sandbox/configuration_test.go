@@ -27,6 +27,47 @@ func taskFileConfig(t *testing.T) config.Config {
 	return decodeConfig(t, `{"run":{"filePrompt":"task.txt"}}`)
 }
 
+func TestSandboxReviewerArgs(t *testing.T) {
+	for _, tt := range []struct {
+		name, settings   string
+		invocation, want []string
+	}{
+		{"multiple reviewers", `{"run":{"reviewers":["alice","bob"]}}`, []string{"run"}, []string{"run", "--reviewers", "alice", "--reviewers", "bob"}},
+		{"omitted reviewers", `{"run":{}}`, []string{"run"}, []string{"run"}},
+		{"null reviewers", `{"run":{"reviewers":null}}`, []string{"run"}, []string{"run"}},
+		{"empty reviewers", `{"run":{"reviewers":[]}}`, []string{"run"}, []string{"run"}},
+		{"explicit override", `{"run":{"reviewers":["alice"]}}`, []string{"run", "--reviewers=bob"}, []string{"run", "--reviewers=bob"}},
+		{"resume", `{"run":{"reviewers":["alice"]},"resume":{"reviewers":["bob"]}}`, []string{"resume"}, []string{"resume"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := decodeConfig(t, tt.settings)
+			require.Equal(t, tt.want, sandboxArgs(ExecuteOptions{Config: cfg, Args: tt.invocation}))
+		})
+	}
+}
+
+func TestRunTransportsConfiguredReviewers(t *testing.T) {
+	capture := preparePromptSandbox(t)
+	require.NoError(t, os.WriteFile("software-factory.json", []byte(`{
+		"agentSandbox": {
+			"run": {
+				"filePrompt": "task.txt",
+				"pr": true,
+				"reviewers": ["alice", "bob"]
+			}
+		}
+	}`), 0600))
+	cfg, err := config.Load("software-factory.json")
+	require.NoError(t, err)
+
+	require.NoError(t, Run(TaskContext{Config: cfg}))
+
+	got := readPromptCapture(t, capture)
+	require.Equal(t, []string{"run", "--pr=true", "--filePrompt", "task.txt", "--reviewers", "alice", "--reviewers", "bob"}, got.Args)
+	require.Equal(t, "file task {{literal}} 100%", got.Prompt)
+	assertNoConfigArtifacts(t)
+}
+
 func TestSandboxArgumentTransport(t *testing.T) {
 	for _, tt := range []struct {
 		name, settings   string
@@ -34,7 +75,7 @@ func TestSandboxArgumentTransport(t *testing.T) {
 		branch           string
 		branchSet        bool
 	}{
-		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run","reviewers":["secret-reviewer"]}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
+		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run"}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
 		{name: "resume explicit zeros replace shared", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"shared","branch":"shared","push":true,"pr":true,"hn":true,"file":["shared"],"resume":{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false,"file":[],"image":[],"query":"","filePrompt":"","commitMessage":"","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false", "--query", "", "--filePrompt", "", "--commitMessage", ""}},
 		{name: "shared zeros use sandbox defaults", settings: `{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false}`, invocation: []string{"run"}, want: []string{"run"}},
 		{name: "workflow controls and independent agent override", settings: `{"agent":"shared","model":"shared-model","branch":"shared","push":true,"pr":true,"resume":{"agent":"section","model":"section-model","branch":"section","query":"ignored","filePrompt":"ignored","file":["replacement"]}}`, invocation: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage"}, branch: "workflow", want: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage", "--model", "section-model", "--branch", "workflow", "--file", "replacement"}},

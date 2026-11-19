@@ -49,6 +49,6 @@ Always use `software-factory-vMAJOR.MINOR.PATCH` for Soft Factory release tags. 
 
 Create local `software-factory.json`, for example `{"documents":[],"agentSandbox":{"agent":"codex","branch":"factory-task","run":{"filePrompt":"task.txt"}}}`. It is the only workflow configuration source. Preserve all existing stage assignments when migrating. Document and sandbox paths retain project-root context. The local task always comes from `agentSandbox.run.filePrompt`, including resume-mode workflows.
 
-Factory forwards supported settings as CLI flags, never sandbox configuration JSON. Section `apiKey` and `reviewers` are temporarily ignored without forwarding or logging; use host authentication.
+Factory forwards supported settings as CLI flags, never sandbox configuration JSON. Factory forwards `agentSandbox.run.reviewers` for new GitHub pull requests. Section `apiKey` is ignored without forwarding or logging. Use host authentication.
 
 Reuse Agent Sandbox's exported configuration types and pointer semantics. Factory validates only its own fields; sandbox constraints and defaults remain upstream. Invocation controls and stage overrides take priority over sections, then shared fields. Test argument transport using controlled subprocesses without Docker or credentials. Local configuration and `docs/` are ignored; keep credentials and sensitive task content out of commits.

@@ -31,8 +31,7 @@ Create `software-factory.json`:
 ```
 
 Factory passes `agentSandbox` settings as CLI flags and creates no sandbox
-configuration JSON. Section `apiKey` and `reviewers` are temporarily ignored;
-use host authentication. See [transport details](configuration.md#sandbox-settings-transport).
+configuration JSON. Use host authentication. See [transport details](configuration.md#sandbox-settings-transport).
 
 The shared agent, branch, and publishing settings apply to both `run` and
 `resume`. Keep the local task file in `run.filePrompt`. Choose a new branch

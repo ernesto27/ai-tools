@@ -71,6 +71,23 @@ Los valores de sección reemplazan los compartidos, incluidos `false` explícito
 cadenas vacías y listas vacías. Las opciones omitidas usan los valores
 predeterminados de Agent Sandbox.
 
+### Revisores de pull requests en GitHub {#github-pull-request-reviewers}
+
+Establece `agentSandbox.run.pr` en `true` e indica los nombres de usuario de
+GitHub en `agentSandbox.run.reviewers`. Agent Sandbox solicita la revisión
+a estos usuarios cuando la implementación crea un pull request nuevo.
+
+```json
+{
+  "agentSandbox": {
+    "run": {
+      "pr": true,
+      "reviewers": ["alice", "bob"]
+    }
+  }
+}
+```
+
 ## Agentes y modelos por etapa {#stage-agents-and-models}
 
 Usa `stages` para modificar pasos individuales:
@@ -192,8 +209,7 @@ archivo de configuración del sandbox. Las rutas relativas conservan la carpeta
 del proyecto como base. Los prompts generados y los controles de etapa de Factory
 tienen prioridad sobre los valores configurados.
 
-`apiKey` y `reviewers` se ignoran actualmente en `run` y `resume`. Nunca se
-reenvían ni se registran. Usa la autenticación del host.
+Factory ignora `apiKey` en ambas secciones. Usa la autenticación del host.
 
 ::: tip Migrar una configuración anterior
 Renombra `config.json` a `software-factory.json`; `--config` y `-c` ya no están

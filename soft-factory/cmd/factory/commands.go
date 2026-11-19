@@ -13,7 +13,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "software-factory",
 		Short:         "Implement a task, review it, classify risk, and explain the final changes.",
-		Long:          "Implement a task, review it, classify risk, and explain the final changes.\n\nReads software-factory.json from the project root, including agentSandbox settings.\nSettings use CLI flags; no sandbox configuration JSON is generated.\nSection apiKey and reviewers are ignored for now; use host authentication.",
+		Long:          "Implement a task, review it, classify risk, and explain the final changes.\n\nReads software-factory.json from the project root, including agentSandbox settings.\nSettings use CLI flags; no sandbox configuration JSON is generated.\nSet agentSandbox.run.reviewers to request GitHub reviewers on new pull requests. Use host authentication.",
 		Version:       version,
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,

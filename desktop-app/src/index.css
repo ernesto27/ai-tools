@@ -3,13 +3,15 @@
 .stage-activity {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 24px;
+  justify-content: space-between;
+  gap: 2px;
+  height: 20px;
 }
 
 .stage-activity > span {
-  width: 4px;
-  height: 22px;
+  flex: 1;
+  max-width: 4px;
+  height: 18px;
   border-radius: 999px;
   background: var(--color-info);
   animation: stage-signal 1.6s ease-in-out infinite;

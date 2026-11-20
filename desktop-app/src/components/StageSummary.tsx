@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { RunLog } from "../hooks/useRunLogs";
 import { STAGES, type stageProgress } from "../runProgress";
-import { statusClass, statusLabel } from "../runStatus";
+import { STAGE_STATUS, statusClass, statusLabel } from "../runStatus";
 import { formatStageDuration, latestStageTiming } from "../stageTiming";
 import { cx } from "./ui";
 
@@ -37,6 +37,7 @@ export function StageSummary({ statuses, logs, live, selectedStage, onSelectStag
     <div aria-label={t("stages")} className="grid shrink-0 grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 border-y border-line py-5">
       {STAGES.map((stage) => {
         const status = statuses.get(stage.id);
+        const active = live && (status === STAGE_STATUS.RUNNING || status === STAGE_STATUS.STARTED);
         const timing = timings.get(stage.id);
         const recorded = status !== undefined
           || logs.some((log) => log.filename === stage.filename);
@@ -50,10 +51,13 @@ export function StageSummary({ statuses, logs, live, selectedStage, onSelectStag
               disabled={!recorded}
               aria-pressed={selectedStage === stage.id}
               onClick={() => onSelectStage(stage.id)}
-              className="flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2 text-left enabled:hover:bg-hover aria-pressed:bg-selected disabled:cursor-default"
+              className={cx(
+                "grid min-w-0 items-center gap-x-2 gap-y-0.5 rounded-md px-2.5 py-2 text-left enabled:hover:bg-hover aria-pressed:bg-selected disabled:cursor-default",
+                active ? "grid-cols-[minmax(0,1fr)_minmax(0,30%)] inset-ring-1 inset-ring-info/25" : "grid-cols-1",
+              )}
             >
-              <span className="text-sm text-muted">{t(stage.label)}</span>
-              <span className={cx("text-xl font-medium", statusClass(status))}>
+              <span className="col-span-full text-sm text-muted">{t(stage.label)}</span>
+              <span className={cx("col-span-full text-xl font-medium wrap-anywhere", statusClass(status))}>
                 {!status && live ? t("pending") : statusLabel(status, t)}
               </span>
               {duration !== null && (
@@ -61,8 +65,8 @@ export function StageSummary({ statuses, logs, live, selectedStage, onSelectStag
                   {duration}
                 </span>
               )}
-              {live && (status === "RUNNING" || status === "STARTED") && (
-                <span aria-hidden="true" className="stage-activity mt-2">
+              {active && (
+                <span aria-hidden="true" className="stage-activity w-full max-w-22 justify-self-end">
                   {Array.from({ length: 9 }, (_, index) => (
                     <span key={index} style={{ animationDelay: `${index * -140}ms` }} />
                   ))}

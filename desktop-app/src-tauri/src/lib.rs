@@ -126,6 +126,15 @@ async fn list_branches(path: String) -> Result<Vec<Worktree>, String> {
 }
 
 #[tauri::command]
+async fn delete_worktree(path: String, branch: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        AgentSandboxRun::new(path).delete_worktree(&branch)
+    })
+    .await
+    .map_err(|error| format!("Could not wait for worktree deletion: {error}"))?
+}
+
+#[tauri::command]
 async fn create_factory_config(path: String, config: serde_json::Value) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || FactoryConfigFile::new(&path).create(&config))
         .await
@@ -358,6 +367,7 @@ pub fn run() {
             list_repos,
             remove_repo,
             list_branches,
+            delete_worktree,
             list_branch_runs,
             load_run_detail,
             create_factory_config,

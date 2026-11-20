@@ -27,7 +27,7 @@ export async function runLanguageChecks(browser, fixture, artifacts) {
     { timeout: 5_000 });
   };
   const openRepo = async () => {
-    const selector = 'nav[data-testid="main-nav"] button[aria-haspopup="menu"]';
+    const selector = `nav[data-testid="main-nav"] [data-sidebar-repo="${fixture.repo}"] > button`;
     const element = await visible(selector);
     if (await element.getAttribute("aria-expanded") !== "true") await click(selector);
   };

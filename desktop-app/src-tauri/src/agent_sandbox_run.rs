@@ -49,6 +49,13 @@ impl AgentSandboxRun {
         parse_worktrees(&Self::output(command)?)
     }
 
+    pub fn delete_worktree(&self, branch: &str) -> Result<(), String> {
+        let mut command = Self::command();
+        command.current_dir(&self.repository);
+        command.args(["worktree-delete", "-b", branch]);
+        Self::output(command).map(|_| ())
+    }
+
     pub fn check_bin() -> bool {
         Self::command()
             .arg("-h")

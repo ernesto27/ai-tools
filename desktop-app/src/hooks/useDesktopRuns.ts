@@ -49,7 +49,10 @@ export function isDesktopRunActive(run: DesktopRun): boolean {
     || run.state === RUN_STATE.STOPPING;
 }
 
-export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchWorktree) => void) {
+export function useDesktopRuns(
+  onBranchCreated: (path: string, worktree: BranchWorktree) => void,
+  isDeletingWorktree: (path: string, branch: string) => boolean,
+) {
   const sessions = useRef<Record<string, DesktopRun>>({});
   const [runs, setRuns] = useState<Record<string, DesktopRun>>({});
   const [supportsStop, setSupportsStop] = useState(false);
@@ -92,12 +95,20 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
     }
   }
 
-  function busy(repoPath: string) {
+  function busy(repoPath: string, branch?: string) {
     return Object.values(sessions.current).find((run) =>
-      run.repoPath === repoPath && isDesktopRunActive(run));
+      run.repoPath === repoPath && (branch === undefined || run.branch === branch)
+        && isDesktopRunActive(run));
+  }
+
+  function checkWorktreeDeletion(repoPath: string, branch: string) {
+    if (isDeletingWorktree(repoPath, branch)) {
+      throw new AppMessageError({ key: "worktreeDeletionInProgress" });
+    }
   }
 
   function start(input: StartDesktopRun): string {
+    checkWorktreeDeletion(input.repoPath, input.branch);
     if (busy(input.repoPath)) throw new AppMessageError({ key: "thisRepositoryAlreadyHasAnActiveRun" });
     const id = `desktop:${crypto.randomUUID()}`;
     update(id, {
@@ -207,6 +218,7 @@ export function useDesktopRuns(onBranchCreated: (path: string, worktree: BranchW
   }
 
   function resume(input: ResumeDesktopRun): string {
+    checkWorktreeDeletion(input.repoPath, input.branch);
     if (busy(input.repoPath)) throw new AppMessageError({ key: "thisRepositoryAlreadyHasAnActiveRun" });
     const id = `desktop:${crypto.randomUUID()}`;
     update(id, {

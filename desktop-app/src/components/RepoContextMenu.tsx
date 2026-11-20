@@ -7,11 +7,12 @@ interface Props {
   x: number;
   y: number;
   trigger: HTMLButtonElement;
+  deleteLabel?: string;
   onDelete: () => void;
   onClose: () => void;
 }
 
-export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Props) {
+export function RepoContextMenu({ label, x, y, trigger, deleteLabel, onDelete, onClose }: Props) {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
@@ -68,7 +69,7 @@ export function RepoContextMenu({ label, x, y, trigger, onDelete, onClose }: Pro
         className="min-h-9 w-full rounded px-3 text-left text-bad hover:bg-selected focus:bg-selected"
         onClick={onDelete}
       >
-        {t("delete")}
+        {deleteLabel ?? t("delete")}
       </button>
     </div>,
     document.body,

@@ -52,7 +52,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
   }
 
   async function openRepo() {
-    const selector = 'nav[data-testid="main-nav"] button[aria-haspopup="menu"]';
+    const selector = `nav[data-testid="main-nav"] [data-sidebar-repo="${fixture.repo}"] > button`;
     await text(`${selector} span[title="${repoName}"]`, repoName);
     if (await (await browser.$(selector)).getAttribute("aria-expanded") !== "true") {
       await click(selector);

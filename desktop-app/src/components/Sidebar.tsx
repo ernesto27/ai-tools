@@ -1,4 +1,3 @@
-import { messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import type { BranchWorktree } from "../worktrees";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
@@ -7,6 +6,7 @@ import { RUN_MODE, type Navigate, type Route } from "../router";
 import { Dot } from "./Dot";
 import { cx, Input } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { Icon } from "./Icon";
 import { version } from "../../package.json";
 import appIcon from "../../src-tauri/icons/128x128.png";
@@ -18,13 +18,20 @@ interface Props {
   onRefreshBranches: (path: string) => Promise<void>;
   route: Route;
   navigate: Navigate;
-  onRemoveRepo: (repo: SavedRepo) => Promise<void>;
+  onDeleteRepo: (repo: SavedRepo) => Promise<void>;
+  onDeleteWorktree: (repo: SavedRepo, branch: string) => Promise<void>;
 }
 
 export interface SavedRepo {
   name: string;
   path: string;
 }
+
+type MenuTarget =
+  | { kind: "repo"; repo: SavedRepo }
+  | { kind: "worktree"; repo: SavedRepo; branch: string };
+
+type MenuSelection = { target: MenuTarget; trigger: HTMLButtonElement };
 
 function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tall?: boolean }) {
   return (
@@ -41,7 +48,7 @@ function NavItem({ tall, className, ...props }: ComponentProps<"button"> & { tal
   );
 }
 
-export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranches, route, navigate, onRemoveRepo }: Props) {
+export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranches, route, navigate, onDeleteRepo, onDeleteWorktree }: Props) {
   const { t } = useTranslation();
   const activeRepo = "repo" in route ? route.repo : null;
   const activeBranch = "branch" in route ? route.branch : null;
@@ -76,24 +83,55 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
     !searching || saved.name.toLowerCase().includes(query) || visibleBranches.length > 0,
   );
 
-  const [repoMenu, setRepoMenu] = useState<{
-    repo: SavedRepo;
-    x: number;
-    y: number;
-    trigger: HTMLButtonElement;
-  } | null>(null);
-  const [removeError, setRemoveError] = useState<UiMessage | null>(null);
+  const [repoMenu, setRepoMenu] = useState<(MenuSelection & { x: number; y: number }) | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MenuSelection | null>(null);
   const closeRepoMenu = useCallback(() => setRepoMenu(null), []);
+  const menuBranch = repoMenu?.target.kind === "worktree" ? repoMenu.target.branch : undefined;
+
+  function menuTriggerProps(target: MenuTarget): Pick<
+    ComponentProps<"button">, "aria-haspopup" | "onContextMenu" | "onKeyDown"
+  > {
+    return {
+      "aria-haspopup": "menu",
+      onContextMenu(event) {
+        event.preventDefault();
+        setRepoMenu({ target, trigger: event.currentTarget, x: event.clientX, y: event.clientY });
+      },
+      onKeyDown(event) {
+        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+        event.preventDefault();
+        const { left, bottom } = event.currentTarget.getBoundingClientRect();
+        setRepoMenu({ target, trigger: event.currentTarget, x: left, y: bottom });
+      },
+    };
+  }
 
   const deleteFromMenu = () => {
     if (!repoMenu) return;
-    const { repo } = repoMenu;
+    const { target, trigger } = repoMenu;
+    setDeleteTarget({ target, trigger });
     closeRepoMenu();
-    setRemoveError(null);
-    void onRemoveRepo(repo).catch((error: unknown) => {
-      setRemoveError({ key: "couldNotDeleteNameError", values: { name: repo.name, error: String(error) } });
-    });
   };
+
+  let confirmation = null;
+  if (deleteTarget) {
+    const { target, trigger } = deleteTarget;
+    const { repo } = target;
+    const isWorktree = target.kind === "worktree";
+    confirmation = (
+      <DeleteConfirmationDialog
+        name={isWorktree ? target.branch : repo.name}
+        title={t(isWorktree ? "deleteWorktree" : "removeRepository")}
+        description={isWorktree
+          ? t("confirmDeleteWorktree", { branch: target.branch, repo: repo.name })
+          : t("confirmRemoveRepository", { name: repo.name })}
+        pendingLabel={t(isWorktree ? "deletingWorktree" : "removingRepository")}
+        trigger={trigger}
+        onDelete={() => isWorktree ? onDeleteWorktree(repo, target.branch) : onDeleteRepo(repo)}
+        onClose={() => setDeleteTarget(null)}
+      />
+    );
+  }
 
   useEffect(() => {
     const paths = new Set(repos.map((repo) => repo.path));
@@ -101,7 +139,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
     setOpenRepo((previous) => names.has(previous) ? previous : "");
     setOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
     setSearchOpenBranch((previous) => previous && names.has(previous.repo) ? previous : null);
-    setRepoMenu((previous) => previous && paths.has(previous.repo.path) ? previous : null);
+    setRepoMenu((previous) => previous && paths.has(previous.target.repo.path) ? previous : null);
   }, [repos]);
 
   // Which branch sub-item (Runs / Continue / Resume) is current.
@@ -168,19 +206,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
               <div key={saved.path} data-sidebar-repo={saved.path} className="flex flex-col">
                 <button
                   type="button"
-                  aria-haspopup="menu"
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setRemoveError(null);
-                    setRepoMenu({ repo: saved, x: event.clientX, y: event.clientY, trigger: event.currentTarget });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-                    event.preventDefault();
-                    const bounds = event.currentTarget.getBoundingClientRect();
-                    setRemoveError(null);
-                    setRepoMenu({ repo: saved, x: bounds.left, y: bounds.bottom, trigger: event.currentTarget });
-                  }}
+                  {...menuTriggerProps({ kind: "repo", repo: saved })}
                   aria-expanded={isOpen}
                   onClick={() => {
                     if (!searching) setOpenRepo(isOpen ? "" : repo.name);
@@ -237,6 +263,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                           <NavItem
                             className="font-mono text-sm"
                             title={b.name}
+                            {...menuTriggerProps({ kind: "worktree", repo: saved, branch: b.name })}
                             aria-expanded={expanded}
                             onClick={() => {
                               if (searching) setSearchOpenBranch(expanded ? null : at);
@@ -287,7 +314,6 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
             );
           })}
         </div>
-        {removeError && <p role="alert" className="px-2 pt-3 text-sm text-bad">{messageText(removeError, t)}</p>}
       </div>
       <div className="mt-5 flex shrink-0 flex-col gap-2 border-t border-line pt-3">
         <NavItem tall data-testid="nav-settings"
@@ -300,8 +326,9 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
       </div>
       {repoMenu && (
         <RepoContextMenu
-          key={repoMenu.repo.path}
-          label={repoMenu.repo.name}
+          key={JSON.stringify([repoMenu.target.repo.path, menuBranch])}
+          label={menuBranch ?? repoMenu.target.repo.name}
+          deleteLabel={repoMenu.target.kind === "worktree" ? t("deleteWorktree") : undefined}
           x={repoMenu.x}
           y={repoMenu.y}
           trigger={repoMenu.trigger}
@@ -309,6 +336,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
           onClose={closeRepoMenu}
         />
       )}
+      {confirmation}
     </nav>
   );
 }

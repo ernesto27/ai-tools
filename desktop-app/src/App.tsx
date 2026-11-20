@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ask } from "@tauri-apps/plugin-dialog";
-import type { Route } from "./router";
+import { RUN_MODE, type Route } from "./router";
+import { AppMessageError } from "./messages";
 import { Sidebar, type SavedRepo } from "./components/Sidebar";
 import { BranchRuns } from "./screens/BranchRuns";
 import { RunDetail } from "./screens/RunDetail";
@@ -76,21 +76,6 @@ function MainApp({ theme, toggleTheme, updater }: {
     }
   }, []);
 
-  function addBranch(path: string, worktree: BranchWorktree) {
-    if (!savedPaths.current.has(path)) return;
-    branchRequests.current.delete(path);
-    setBranchesByPath((previous) => {
-      const branches = previous[path] ?? [];
-      const exists = branches.some((entry) => entry.branch === worktree.branch);
-      return {
-        ...previous,
-        [path]: exists
-          ? branches.map((entry) => entry.branch === worktree.branch ? worktree : entry)
-          : [worktree, ...branches],
-      };
-    });
-  }
-
   useEffect(() => {
     savedPaths.current = new Set(savedRepos.map((repo) => repo.path));
     setBranchesByPath((previous) => Object.fromEntries(
@@ -103,34 +88,55 @@ function MainApp({ theme, toggleTheme, updater }: {
     };
   }, [savedRepos, refreshBranches]);
 
-  const desktopRuns = useDesktopRuns(addBranch);
+  const deletingWorktree = useRef<{ path: string; branch: string } | null>(null);
+  const desktopRuns = useDesktopRuns(
+    (path) => { void refreshBranches(path); },
+    (path, branch) => deletingWorktree.current?.path === path && deletingWorktree.current.branch === branch,
+  );
   const desktopAudits = useDesktopAudits();
-  const removingRepo = useRef(false);
-
-  const removeRepo = async (repo: SavedRepo) => {
-    if (removingRepo.current) return;
-    removingRepo.current = true;
-    try {
-      const confirmed = await ask(
-        t("areYouSureToRemoveName", { name: repo.name }),
-        { title: t("deleteProject"), kind: "warning", okLabel: t("delete"), cancelLabel: t("cancel") },
-      );
-      if (!confirmed) return;
-      await invoke<void>("remove_repo", { path: repo.path });
-      setSavedRepos((previous) => previous.filter((saved) => saved.path !== repo.path));
-      if ("repo" in lastBranchRoute.current && lastBranchRoute.current.repo === repo.name) {
-        lastBranchRoute.current = HOME;
-      }
-      setRoute((current) => {
-        const isRemoved = current.screen === "config"
-          ? current.repoPath === repo.path
-          : "repo" in current && current.repo === repo.name;
-        return isRemoved ? HOME : current;
-      });
-    } finally {
-      removingRepo.current = false;
+  const deleteRepo = async (repo: SavedRepo) => {
+    await invoke<void>("remove_repo", { path: repo.path });
+    setSavedRepos((previous) => previous.filter((saved) => saved.path !== repo.path));
+    if ("repo" in lastBranchRoute.current && lastBranchRoute.current.repo === repo.name) {
+      lastBranchRoute.current = HOME;
     }
+    setRoute((current) => {
+      const isRemoved = current.screen === "config"
+        ? current.repoPath === repo.path
+        : "repo" in current && current.repo === repo.name;
+      return isRemoved ? HOME : current;
+    });
   };
+
+  async function deleteWorktree(repo: SavedRepo, branch: string): Promise<void> {
+    if (desktopRuns.busy(repo.path, branch)) {
+      throw new AppMessageError({ key: "cannotDeleteWorktreeWithActiveRun" });
+    }
+    if (deletingWorktree.current) {
+      throw new AppMessageError({ key: "worktreeDeletionInProgress" });
+    }
+    deletingWorktree.current = { path: repo.path, branch };
+    try {
+      await invoke<void>("delete_worktree", { path: repo.path, branch });
+      branchRequests.current.delete(repo.path);
+      setBranchesByPath((previous) => ({
+        ...previous,
+        [repo.path]: (previous[repo.path] ?? []).filter((entry) => entry.branch !== branch),
+      }));
+
+      const config: Route = { screen: "config", repoPath: repo.path };
+      const wasDeletedBranch = (current: Route) =>
+        "branch" in current && current.repo === repo.name && current.branch === branch
+        && savedRepos.find((entry) => entry.name === current.repo)?.path === repo.path
+        && !(current.screen === "newRun" && current.mode === RUN_MODE.RUN);
+      if (wasDeletedBranch(lastBranchRoute.current)) lastBranchRoute.current = config;
+      if (wasDeletedBranch(settingsReturnRoute.current)) settingsReturnRoute.current = config;
+      setRoute((current) => wasDeletedBranch(current) ? config : current);
+    } finally {
+      void refreshBranches(repo.path);
+      deletingWorktree.current = null;
+    }
+  }
 
   const loadRepos = () =>
     invoke<SavedRepo[]>("list_repos").then(setSavedRepos).catch(console.error);
@@ -148,7 +154,7 @@ function MainApp({ theme, toggleTheme, updater }: {
 
   return (
     <div className="app-shell flex h-dvh overflow-hidden">
-      <Sidebar hidden={!sidebarVisible} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onRemoveRepo={removeRepo} />
+      <Sidebar hidden={!sidebarVisible} repos={savedRepos} branchesByPath={branchesByPath} onRefreshBranches={refreshBranches} route={route} navigate={navigate} onDeleteRepo={deleteRepo} onDeleteWorktree={deleteWorktree} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <DesktopUpdateBanner updater={updater} />
         <div className="flex shrink-0 px-4 pt-3">

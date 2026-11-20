@@ -14,13 +14,14 @@ import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { remote } from "webdriverio";
+import { Key, remote } from "webdriverio";
 import { prepareNavigationFixture } from "./navigationFixture.js";
 import { runNavigationChecks } from "./navigationChecks.js";
 import { runLanguageChecks } from "./languageChecks.js";
 import { runDependencySetupChecks } from "./dependencySetupChecks.js";
 import { runThemeChecks } from "./themeChecks.js";
 import { runSidebarSearchChecks } from "./sidebarSearchChecks.js";
+import { runWorktreeDeletionChecks } from "./worktreeDeletionChecks.js";
 import { runDesktopUpdateChecks } from "./desktopUpdateChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
@@ -214,7 +215,10 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
         throw error;
       }
     });
-    await t.test("Adding a repository opens its Config", async () => {
+    await t.test("Delete a sandbox worktree from the sidebar", { timeout: 120_000 }, async () => {
+      await runWorktreeDeletionChecks(browser, navigationFixture, artifacts, command);
+    });
+    await t.test("Add and remove a saved repository", async () => {
       const repoName = "new-repository";
       const repoPath = join(dirname(navigationFixture.repo), repoName);
       command("git", ["init", "--initial-branch=main", repoPath]);
@@ -253,6 +257,39 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
       { timeout: 15_000, timeoutMsg: "Expected Config to open after adding the repository" });
       const repository = await browser.$('//main//header//h1[normalize-space(.)="Config"]/preceding-sibling::span[1]');
       assert.equal(await repository.getProperty("innerText"), `${repoName} · ${repoPath}`);
+
+      const repoRow = () => browser.$(`#main-sidebar [data-sidebar-repo="${repoPath}"] > button`);
+      const dialog = () => browser.$('dialog[open]');
+      const menuAction = () => browser.$('//button[@role="menuitem" and normalize-space(.)="Delete"]');
+      const dialogButton = (label) => browser.$(`//dialog[@open]//button[normalize-space(.)="${label}"]`);
+      async function openRemovalDialog() {
+        await (await repoRow()).click({ button: "right" });
+        await (await menuAction()).click();
+        await (await dialog()).waitForDisplayed({ timeout: 15_000 });
+      }
+
+      await (await repoRow()).click();
+      await browser.keys([Key.Shift, Key.F10]);
+      await (await menuAction()).waitForDisplayed({ timeout: 15_000 });
+      await browser.keys(Key.Escape);
+      await (await menuAction()).waitForExist({ reverse: true, timeout: 15_000 });
+      assert.equal(await browser.execute(() =>
+        document.activeElement?.parentElement?.getAttribute("data-sidebar-repo")), repoPath);
+
+      await openRemovalDialog();
+      assert.match(await (await dialog()).getText(), /remove "new-repository" from your saved repositories/);
+      assert.equal(await browser.execute(() => document.activeElement?.textContent?.trim()), "Cancel");
+      await browser.saveScreenshot(join(artifacts, "remove-repository-confirmation.png"));
+      await (await dialogButton("Cancel")).click();
+      await (await dialog()).waitForExist({ reverse: true, timeout: 15_000 });
+      assert.ok(await (await repoRow()).isExisting());
+
+      await openRemovalDialog();
+      await (await dialogButton("Remove repository")).click();
+      await (await repoRow()).waitForExist({ reverse: true, timeout: 15_000 });
+      await (await dialog()).waitForExist({ reverse: true, timeout: 15_000 });
+      assert.equal(await (await browser.$("main h1")).getText(), "Select a repository");
+      assert.equal(command("git", ["-C", repoPath, "rev-parse", "--is-inside-work-tree"]).trim(), "true");
     });
   } catch (error) {
     if (browser && artifacts) {

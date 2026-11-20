@@ -1,6 +1,9 @@
 [x] - implementaion stage should accept custom skill
-[] - Support multiple files in agentSandbox.run.filePrompt: accept an array of paths, combine contents in the listed order, and preserve support for a single file path.
+[] - Support multiple files in agentSandbox.run.filePrompt: accept an array of paths
 [x] - add efffort setting in stage
+[] - add schedules task 
+[] - event task agent
+[] - add prop in json to set critical files or directores, this should be add in pull request or block in some way
 []- 3. Compare agents on the same task — run Codex and Claude in separate worktrees and compare their diffs, test results, duration, and token usage.
 [] - check The screenshot shows the command launches, but Software Factory ignores run.query when building the task prompt. It tries to read run.filePrompt, which is absent, and attempts to open "".
 I confirmed this in runner.go (/home/eponce/code/ai-enginering/ai-tools/soft-factory/internal/sandbox/runner.go:352).

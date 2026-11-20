@@ -279,17 +279,6 @@
   padding-top: 40px;
 }
 
-.brand-mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  place-items: center;
-  border-radius: 10px 10px 10px 3px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-
 .nav-item[aria-current="page"] {
   box-shadow: inset 3px 0 var(--color-accent);
 }

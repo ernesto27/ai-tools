@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-type IconName = "repository" | "branch" | "plus" | "settings" | "chevron" | "factory" | "sidebar";
+type IconName = "repository" | "branch" | "plus" | "settings" | "chevron" | "sidebar";
 
 const paths: Record<IconName, string> = {
   sidebar: "M4 4h16v16H4ZM9 4v16",
@@ -9,7 +9,6 @@ const paths: Record<IconName, string> = {
   plus: "M12 5v14M5 12h14",
   settings: "M9 3h6l1 4 4 1v8l-4 1-1 4H9l-1-4-4-1V8l4-1 1-4Zm6 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   chevron: "m9 5 7 7-7 7",
-  factory: "M4 19V9l8 4V5l8 4v10H4ZM8 16h1m6 0h1",
 };
 
 export function Icon({ name, ...props }: ComponentProps<"svg"> & { name: IconName }) {

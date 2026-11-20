@@ -9,6 +9,7 @@ import { cx, Input } from "./ui";
 import { RepoContextMenu } from "./RepoContextMenu";
 import { Icon } from "./Icon";
 import { version } from "../../package.json";
+import appIcon from "../../src-tauri/icons/128x128.png";
 
 interface Props {
   hidden?: boolean;
@@ -109,7 +110,7 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
   return (
     <nav id="main-sidebar" hidden={hidden} data-testid="main-nav" aria-label={t("main")} className="app-sidebar flex w-nav flex-none flex-col overflow-hidden border-r border-line px-4 py-6 text-base">
       <div className="flex shrink-0 items-center gap-3 px-2 pb-7">
-        <span className="brand-mark"><Icon name="factory" width="24" height="24" /></span>
+        <img src={appIcon} alt="" width={36} height={36} className="size-9 shrink-0" />
         <span className="text-xl font-semibold tracking-[-0.04em]">soft·factory</span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">

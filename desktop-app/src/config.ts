@@ -24,7 +24,13 @@ export interface FactoryConfig {
     push?: boolean;
     pr?: boolean;
     hn?: boolean;
-    run?: { branch?: string; query?: string; filePrompt?: string; [key: string]: unknown };
+    run?: {
+      branch?: string;
+      query?: string;
+      filePrompt?: string;
+      reviewers?: string[] | null;
+      [key: string]: unknown;
+    };
     resume?: { branch?: string; [key: string]: unknown };
     [key: string]: unknown;
   };
@@ -66,12 +72,21 @@ export function withResumeBranch(
   };
 }
 
+function parseReviewers(value: string): string[] {
+  return value.split(",").map((name) => name.trim()).filter(Boolean);
+}
+
+export function invalidReviewerNames(value: string): string[] {
+  return parseReviewers(value).filter((name) => !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(name));
+}
+
 export function applyTaskInputs(original: FactoryConfig | null, values: {
   task: string;
   file: string;
   folder: string;
   jira: string;
   branch?: string;
+  reviewers?: string;
 }): FactoryConfig {
   const config = { ...original };
   const agentSandbox = { ...original?.agentSandbox };
@@ -89,6 +104,11 @@ export function applyTaskInputs(original: FactoryConfig | null, values: {
   if (values.branch !== undefined) {
     setOptionalString(agentSandbox, "branch", values.branch.trim());
     delete run.branch;
+  }
+  if (values.reviewers !== undefined) {
+    const reviewers = parseReviewers(values.reviewers);
+    if (reviewers.length) run.reviewers = reviewers;
+    else delete run.reviewers;
   }
 
   if (Object.keys(run).length || agentSandbox.run !== undefined) agentSandbox.run = run;
@@ -128,6 +148,9 @@ export function parseFactoryConfig(value: unknown): FactoryConfig {
     if (value.agentSandbox.run !== undefined) {
       requireObject(value.agentSandbox.run, "agentSandbox.run");
       checkFields(value.agentSandbox.run, ["branch", "query", "filePrompt"], "string", "agentSandbox.run");
+      if (value.agentSandbox.run.reviewers !== null) {
+        checkStringList(value.agentSandbox.run.reviewers, "agentSandbox.run.reviewers");
+      }
     }
   }
   if (value.stages !== undefined) {

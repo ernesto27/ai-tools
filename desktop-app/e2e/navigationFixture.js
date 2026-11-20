@@ -19,7 +19,8 @@ export function prepareNavigationFixture(fixture, command) {
     agentSandbox: {
       agent: "codex",
       branch,
-      run: { query: "Desktop navigation fixture task" },
+      pr: true,
+      run: { query: "Desktop navigation fixture task", pr: false },
       resume: { branch },
     },
   }, null, 2) + "\n");

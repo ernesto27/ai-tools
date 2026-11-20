@@ -194,6 +194,25 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     assert.equal(await startButton.isEnabled(), false);
     await branchInput.setValue(branch);
     assert.equal(await startButton.isEnabled(), true);
+
+    const reviewersInput = await visible('main input[placeholder="alice, bob"]');
+    const preview = await visible('main pre code');
+    const previewReviewers = async () => JSON.parse(await preview.getText()).agentSandbox.run?.reviewers;
+    assert.equal(await reviewersInput.getValue(), "");
+    assert.equal(await previewReviewers(), undefined);
+    await mainHasText("Pull request creation is off in this run’s configuration.");
+    await reviewersInput.setValue(" alice, , bob-2, ");
+    assert.deepEqual(await previewReviewers(), ["alice", "bob-2"]);
+    assert.equal(await startButton.isEnabled(), true);
+    await reviewersInput.setValue("@alice, alice bob");
+    await text("#pr-reviewers-error",
+      "Use plain GitHub usernames for @alice, alice bob. Start each name with a letter or digit and use only letters, digits, or hyphens.");
+    assert.equal(await startButton.isEnabled(), false);
+    await browser.keys(["Control", "a"]);
+    await browser.keys("Backspace");
+    assert.equal(await (await browser.$("#pr-reviewers-error")).isExisting(), false);
+    assert.equal(await previewReviewers(), undefined);
+    assert.equal(await startButton.isEnabled(), true);
   });
 
   await screen("New run Continue", async () => {

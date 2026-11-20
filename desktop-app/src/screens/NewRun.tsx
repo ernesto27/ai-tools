@@ -2,7 +2,7 @@ import { toUiMessage, messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { applyTaskInputs, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
+import { applyTaskInputs, invalidReviewerNames, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
 import { useBranchRuns } from "../hooks/useBranchRuns";
 import { stageLabel, statusClass, statusLabel } from "../runStatus";
 import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
@@ -45,6 +45,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const { t } = useTranslation();
   const [source, setSource] = useState<TaskSource>("task");
   const [runBranch, setRunBranch] = useState("");
+  const [reviewers, setReviewers] = useState("");
   const [taskValues, setTaskValues] = useState<Record<TaskSource, string>>({
     task: "", file: "", folder: "", jira: "",
   });
@@ -75,6 +76,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
         const config = value === null ? null : parseFactoryConfig(value);
         setLoadedConfig(config);
         setRunBranch(config?.agentSandbox?.branch ?? "");
+        setReviewers(config?.agentSandbox?.run?.reviewers?.join(", ") ?? "");
         setTaskValues({
           task: config?.agentSandbox?.run?.query ?? "",
           file: config?.agentSandbox?.run?.filePrompt ?? "",
@@ -96,9 +98,12 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
   const targetBranch = mode === RUN_MODE.RUN ? runBranch.trim() : branch;
   const missingRunBranch = mode === RUN_MODE.RUN && !targetBranch;
+  const invalidReviewers = mode === RUN_MODE.RUN ? invalidReviewerNames(reviewers) : [];
+  const hasInvalidReviewers = invalidReviewers.length > 0;
+  const pullRequestsDisabled = loadedConfig?.agentSandbox?.run?.pr === false;
   const inputConfig = applyTaskInputs(loadedConfig, {
     ...taskValues,
-    ...(mode === RUN_MODE.RUN ? { branch: targetBranch } : {}),
+    ...(mode === RUN_MODE.RUN ? { branch: targetBranch, reviewers } : {}),
   });
 
   const taskConfig = mode === RUN_MODE.CONTINUE
@@ -108,7 +113,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const resumeConfig = withResumeBranch(loadedConfig, branch);
 
   function startRun() {
-    if (mode === RUN_MODE.RESUME || missingRunBranch || loadingConfig || configError
+    if (mode === RUN_MODE.RESUME || missingRunBranch || hasInvalidReviewers || loadingConfig || configError
       || desktopRuns.busy(repoPath)) return;
     setSaveError(null);
 
@@ -197,6 +202,28 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
                     setSaveError(null);
                   }}
                 />
+                {mode === RUN_MODE.RUN && (
+                  <div className="flex flex-col gap-1.5">
+                    <Field label={t("prReviewersOptional")} hint={t("prReviewersHint")}>
+                      <Input className="w-full" placeholder="alice, bob" value={reviewers}
+                        autoCapitalize="none" spellCheck={false}
+                        aria-invalid={hasInvalidReviewers || undefined}
+                        aria-describedby={hasInvalidReviewers ? "pr-reviewers-error" : undefined}
+                        onChange={(event) => {
+                          setReviewers(event.target.value);
+                          setSaveError(null);
+                        }} />
+                    </Field>
+                    {hasInvalidReviewers && (
+                      <p id="pr-reviewers-error" role="alert" className="text-sm break-words text-bad">
+                        {t("prReviewersInvalid", { names: invalidReviewers.join(", ") })}
+                      </p>
+                    )}
+                    {pullRequestsDisabled && (
+                      <p className="text-xs text-muted">{t("prReviewersPrDisabled")}</p>
+                    )}
+                  </div>
+                )}
               </fieldset>
             </div>
           )}
@@ -252,7 +279,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
               size="lg"
               className="self-start"
               disabled={!!activeRun || loadingConfig || !!configError || missingRunBranch
-                || (mode === RUN_MODE.RESUME && resumeDisabled)}
+                || hasInvalidReviewers || (mode === RUN_MODE.RESUME && resumeDisabled)}
               onClick={mode === RUN_MODE.RESUME ? resumeRun : startRun}
             >
               {t(cta)}

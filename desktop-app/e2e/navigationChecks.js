@@ -195,6 +195,8 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await branchInput.setValue(branch);
     assert.equal(await startButton.isEnabled(), true);
 
+    await checkTaskFiles();
+
     const reviewersInput = await visible('main input[placeholder="alice, bob"]');
     const preview = await visible('main pre code');
     const previewReviewers = async () => JSON.parse(await preview.getText()).agentSandbox.run?.reviewers;
@@ -215,10 +217,87 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     assert.equal(await startButton.isEnabled(), true);
   });
 
+  async function checkTaskFiles() {
+    const sourceTab = (name) => `//main//*[@role="tablist" and @aria-label="Task source"]//button[normalize-space(.)="${name}"]`;
+    const rows = () => browser.$$('main input[placeholder="Path to your task file"]');
+    const files = async () => JSON.parse(await (await visible("main pre code")).getText()).agentSandbox.run?.filePrompt;
+    const remove = (number) => click(`main button[aria-label="Remove task file ${number}"]`);
+    const add = () => click('//main//button[normalize-space(.)="Add task file"]');
+    const expectFocus = async (index) => {
+      assert.equal(await browser.execute((input) => document.activeElement === input, (await rows())[index]), true);
+    };
+
+    await click(sourceTab("File"));
+    assert.deepEqual(await Promise.all((await rows()).map((row) => row.getValue())), ["task.txt", "context notes.md"]);
+    await add();
+    assert.equal((await rows()).length, 3);
+    await expectFocus(2);
+    await (await rows())[2].setValue("task.txt");
+    assert.deepEqual(await files(), ["task.txt", "context notes.md", "task.txt"]);
+    await remove(2);
+    await expectFocus(1);
+    assert.deepEqual(await files(), ["task.txt", "task.txt"]);
+    await (await rows())[1].setValue("  ");
+    assert.deepEqual(await files(), ["task.txt"]);
+    await click(sourceTab("Task"));
+    await click(sourceTab("File"));
+    assert.deepEqual(await Promise.all((await rows()).map((row) => row.getValue())), ["task.txt", "  "]);
+    await remove(1);
+    await remove(1);
+    assert.equal((await rows()).length, 1);
+    assert.equal(await (await rows())[0].getValue(), "");
+    await expectFocus(0);
+    assert.equal(await files(), undefined);
+    await (await rows())[0].setValue("task.txt");
+    await add();
+    await (await rows())[1].setValue("context notes.md");
+    assert.deepEqual(await files(), ["task.txt", "context notes.md"]);
+    // Switching modes within this view must retain unsaved file values.
+    await (await rows())[1].setValue("unsaved context.md");
+    await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Continue"]');
+    assert.deepEqual(await files(), ["task.txt", "unsaved context.md"]);
+    await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Run"]');
+    assert.deepEqual(await files(), ["task.txt", "unsaved context.md"]);
+    await (await rows())[1].setValue("context notes.md");
+  }
+
   await screen("New run Continue", async () => {
     await openBranch();
     await click(navButton("Continue"));
     await mode("Continue", "Rerun implementation and later stages on the existing resume.branch worktree.");
+    await checkTaskFiles();
+    await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Continue"]');
+  });
+
+  await t.test("Task file configuration schema", async () => {
+    const configPath = join(fixture.repo, "software-factory.json");
+    const original = readFileSync(configPath, "utf8");
+    try {
+      for (const filePrompt of [undefined, [], ["one.md"], ["one.md", "two.md"], "legacy.md", null, ["one.md", 42]]) {
+        const config = JSON.parse(original);
+        if (filePrompt === undefined) delete config.agentSandbox.run.filePrompt;
+        else config.agentSandbox.run.filePrompt = filePrompt;
+        writeFileSync(configPath, JSON.stringify(config));
+        await openRuns();
+        await click(navButton("Continue"));
+        const valid = filePrompt === undefined || (Array.isArray(filePrompt) && filePrompt.every((path) => typeof path === "string"));
+        if (valid) {
+          const preview = await visible("main pre code");
+          assert.deepEqual(JSON.parse(await preview.getText()).agentSandbox.run?.filePrompt,
+            filePrompt?.length ? filePrompt : undefined);
+          await click('//main//*[@role="tablist" and @aria-label="Task source"]//button[normalize-space(.)="File"]');
+          assert.equal((await browser.$$('main input[placeholder="Path to your task file"]')).length,
+            filePrompt?.length || 1);
+        } else {
+          const alert = await visible('main [role="alert"]');
+          assert.equal(await alert.getText(), "agentSandbox.run.filePrompt must be a list of strings.");
+          assert.equal(await (await visible('//main//button[not(@role) and normalize-space(.)="Continue"]')).isEnabled(), false);
+        }
+      }
+    } finally {
+      writeFileSync(configPath, original);
+      await openRuns();
+    }
   });
 
   await screen("New run Resume", async () => {

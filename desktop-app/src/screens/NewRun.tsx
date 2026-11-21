@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { applyTaskInputs, invalidReviewerNames, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
 import { useBranchRuns } from "../hooks/useBranchRuns";
 import { stageLabel, statusClass, statusLabel } from "../runStatus";
-import { RunTaskInput, type TaskSource } from "../components/RunTaskInput";
+import { RunTaskInput, createTaskFiles, type TaskSource, type TaskValues } from "../components/RunTaskInput";
 import type { DesktopRuns } from "../hooks/useDesktopRuns";
 import { RUN_MODE, type Navigate, type NewRunMode } from "../router";
 import {
@@ -46,9 +46,9 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const [source, setSource] = useState<TaskSource>("task");
   const [runBranch, setRunBranch] = useState("");
   const [reviewers, setReviewers] = useState("");
-  const [taskValues, setTaskValues] = useState<Record<TaskSource, string>>({
-    task: "", file: "", folder: "", jira: "",
-  });
+  const [taskValues, setTaskValues] = useState<TaskValues>(() => ({
+    task: "", file: createTaskFiles([]), folder: "", jira: "",
+  }));
   const [selectedRunName, setSelectedRunName] = useState<string | null>(null);
   const branchRuns = useBranchRuns(repoPath, branch);
   const resumableRuns = branchRuns.entries.filter((entry) => {
@@ -79,7 +79,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
         setReviewers(config?.agentSandbox?.run?.reviewers?.join(", ") ?? "");
         setTaskValues({
           task: config?.agentSandbox?.run?.query ?? "",
-          file: config?.agentSandbox?.run?.filePrompt ?? "",
+          file: createTaskFiles(config?.agentSandbox?.run?.filePrompt ?? []),
           folder: config?.taskFolder ?? "",
           jira: config?.jiraUrl ?? "",
         });
@@ -103,6 +103,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const pullRequestsDisabled = loadedConfig?.agentSandbox?.run?.pr === false;
   const inputConfig = applyTaskInputs(loadedConfig, {
     ...taskValues,
+    file: taskValues.file.map((file) => file.path),
     ...(mode === RUN_MODE.RUN ? { branch: targetBranch, reviewers } : {}),
   });
 

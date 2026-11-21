@@ -14,17 +14,19 @@ export function prepareNavigationFixture(fixture, command) {
   const repo = realpathSync(repoDirectory);
   command("git", ["init", "--initial-branch=main", repo]);
   writeFileSync(join(repo, "README.md"), "# Desktop navigation fixture\n");
+  writeFileSync(join(repo, "task.txt"), "Prepared task file for desktop input checks.\n");
+  writeFileSync(join(repo, "context notes.md"), "# Prepared task context\n");
   writeFileSync(join(repo, "software-factory.json"), JSON.stringify({
     documents: [],
     agentSandbox: {
       agent: "codex",
       branch,
       pr: true,
-      run: { query: "Desktop navigation fixture task", pr: false },
+      run: { query: "Desktop navigation fixture task", filePrompt: ["task.txt", "context notes.md"], pr: false },
       resume: { branch },
     },
   }, null, 2) + "\n");
-  command("git", ["-C", repo, "add", "README.md", "software-factory.json"]);
+  command("git", ["-C", repo, "add", "README.md", "software-factory.json", "task.txt", "context notes.md"]);
   command("git", [
     "-C", repo,
     "-c", "user.name=Desktop UI Test",

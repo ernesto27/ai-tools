@@ -27,7 +27,7 @@ export interface FactoryConfig {
     run?: {
       branch?: string;
       query?: string;
-      filePrompt?: string;
+      filePrompt?: string[];
       reviewers?: string[] | null;
       [key: string]: unknown;
     };
@@ -82,7 +82,7 @@ export function invalidReviewerNames(value: string): string[] {
 
 export function applyTaskInputs(original: FactoryConfig | null, values: {
   task: string;
-  file: string;
+  file: string[];
   folder: string;
   jira: string;
   branch?: string;
@@ -100,7 +100,9 @@ export function applyTaskInputs(original: FactoryConfig | null, values: {
   setOptionalString(config, "taskFolder", values.folder);
   setOptionalString(config, "jiraUrl", values.jira);
   setOptionalString(run, "query", values.task);
-  setOptionalString(run, "filePrompt", values.file);
+  const files = values.file.filter((path) => path.trim());
+  if (files.length) run.filePrompt = files;
+  else delete run.filePrompt;
   if (values.branch !== undefined) {
     setOptionalString(agentSandbox, "branch", values.branch.trim());
     delete run.branch;
@@ -147,7 +149,8 @@ export function parseFactoryConfig(value: unknown): FactoryConfig {
     checkFields(value.agentSandbox, ["push", "pr", "hn"], "boolean", "agentSandbox");
     if (value.agentSandbox.run !== undefined) {
       requireObject(value.agentSandbox.run, "agentSandbox.run");
-      checkFields(value.agentSandbox.run, ["branch", "query", "filePrompt"], "string", "agentSandbox.run");
+      checkFields(value.agentSandbox.run, ["branch", "query"], "string", "agentSandbox.run");
+      checkStringList(value.agentSandbox.run.filePrompt, "agentSandbox.run.filePrompt");
       if (value.agentSandbox.run.reviewers !== null) {
         checkStringList(value.agentSandbox.run.reviewers, "agentSandbox.run.reviewers");
       }

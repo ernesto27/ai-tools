@@ -17,7 +17,7 @@ func newResumeCmd(state *commandState) *cobra.Command {
 	var flags runFlags
 
 	cmd := &cobra.Command{
-		Use:   "resume -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)",
+		Use:   "resume -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>...)",
 		Short: "Resume a sandbox worktree with plain terminal output",
 		Long: "Run a coding agent with plain output in a worktree recorded for this repository.\n" +
 			"The branch name is shown by worktree-list; its committed and uncommitted\n" +

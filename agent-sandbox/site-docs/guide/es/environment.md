@@ -73,7 +73,7 @@ por lo que debes referirte a sus rutas del contenedor cuando sea necesario.
 
 `--file` funciona con `run`, `resume`, `run-tui` y `resume-tui`. También puedes
 configurar un [arreglo JSON `file`](configuration.md#share-reference-files).
-Proporciona material de referencia; `-f` / `--filePrompt` lee las propias
+Proporciona material de referencia; `-f` / `--filePrompt` lee y combina en orden las propias
 instrucciones de la tarea.
 
 Pide al agente que lea o extraiga los archivos como parte de la tarea. No se

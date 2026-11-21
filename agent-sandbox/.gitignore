@@ -6,3 +6,4 @@ agent-sandbox.json
 software-factory.json
 logs/
 *.xlsm
+task*.txt

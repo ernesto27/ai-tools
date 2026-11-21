@@ -152,7 +152,7 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 	// An explicit command-line prompt source replaces the other source only
 	// when it came from JSON. Two CLI sources are still rejected by runArgs.
 	if cmd.Flags().Changed(flagQuery) && !cmd.Flags().Changed(flagFilePrompt) {
-		flags.FilePrompt = ""
+		flags.FilePrompt = nil
 	}
 	if cmd.Flags().Changed(flagFilePrompt) && !cmd.Flags().Changed(flagQuery) {
 		flags.Prompt = ""
@@ -276,7 +276,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 				return fmt.Errorf("%s: %s[%d] must be a plain GitHub username (letters, digits, and hyphens, starting with a letter or digit)", localConfigFile, fieldName, i)
 			}
 		}
-	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagFilePrompt, flagAPIKey:
+	case flagBranch, flagAgent, flagModel, flagEffort, flagBaseImage, flagQuery, flagCommitMessage, flagAPIKey:
 		var field string
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 			return fmt.Errorf("%s: %s must be a JSON string", localConfigFile, fieldName)
@@ -286,7 +286,7 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 		if string(value) == "null" || json.Unmarshal(value, &field) != nil {
 			return fmt.Errorf("%s: %s must be a JSON boolean", localConfigFile, fieldName)
 		}
-	case flagImage, flagFile:
+	case flagImage, flagFile, flagFilePrompt:
 		var images []json.RawMessage
 		if string(value) == "null" || json.Unmarshal(value, &images) != nil {
 			return fmt.Errorf("%s: %s must be an array of JSON strings", localConfigFile, fieldName)
@@ -295,6 +295,9 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 			var path string
 			if string(image) == "null" || json.Unmarshal(image, &path) != nil {
 				return fmt.Errorf("%s: %s[%d] must be a JSON string", localConfigFile, fieldName, i)
+			}
+			if key == flagFilePrompt && path == "" {
+				return fmt.Errorf("%s: %s[%d] path must not be empty", localConfigFile, fieldName, i)
 			}
 		}
 	default:

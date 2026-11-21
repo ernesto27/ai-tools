@@ -99,8 +99,8 @@ check service health. Without `--json`, the colored text report is unchanged.
 Browse the public OpenRouter model catalog with `agent-sandbox models`.
 
 ```text
-agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [--apiKey <key>] [--reviewers <username>]... [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>)
-agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>)
+agent-sandbox run [-b <branch>] -a <codex|claude|opencode|pi> [--apiKey <key>] [--reviewers <username>]... [-m <model>] [--effort <value>] [-i <image>] [--image <file>]... [--file <path>]... [--hn] [-p] [--pr] [-c <commitMessage>] (-q <query> | -f <prompt-file>...)
+agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <query> | -f <prompt-file>...)
 ```
 
 | Parameter | Description |
@@ -117,7 +117,7 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `--pr` | Commit and publish a PR. `run` creates or reuses one; `resume` appends to an existing open PR. Includes `--push`; see "GitHub pull requests". |
 | `-q`, `--query` | Instructions for the agent. |
 | `-c`, `--commitMessage` | Optional. With `--push` or `--pr`, instructs the agent to use this exact message for the commit inside the container. |
-| `-f`, `--filePrompt` | File whose contents are used as instructions for the agent, instead of `-q` or `--query`. |
+| `-f`, `--filePrompt` | Repeatable. Files whose contents form the agent instructions in order, instead of `-q` or `--query`. |
 | `--file <path>` | Optional and repeatable. Mounts any existing regular file read-only for every agent. Filenames are preserved under `/agent-sandbox-files/<number>/`; a filename-to-container-path list is added to the prompt. |
 | `--image <file>` | Optional and repeatable. Attaches images to the initial prompt for Codex or Claude Code. Each path must be an existing regular file on the host; opencode and pi ignore it. Use `--` before the text prompt so Codex does not interpret it as another image. |
 
@@ -136,8 +136,8 @@ or `--pr`, the agent must commit its changes before ending the session.
 where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `effort`, `baseImage`,
 `push`, `pr`, `hn`, and `file` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`, `effort`,
-`baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `filePrompt`, and
-`image` and `file` (arrays of paths), plus the `apiKey` field. Only `run`
+`baseImage`, `query`, `push`, `pr`, `hn`, and `commitMessage`, plus
+`filePrompt`, `image`, and `file` (arrays of paths), and the `apiKey` field. Only `run`
 accepts a JSON `reviewers` array. For `file`, CLI values replace the section
 array, which replaces the root array; arrays are not combined, and a section's
 empty array clears the root files. Explicit CLI image lists replace their
@@ -147,6 +147,13 @@ A section's `false` or empty string also overrides the shared value.
 The complete JSON file is validated even when CLI flags override its values.
 Neither `apiKey` nor `reviewers` is accepted at the JSON root; `resume.reviewers`
 is also invalid, even though resume accepts and ignores the CLI flag.
+
+`run.filePrompt` and `resume.filePrompt` accept only arrays of paths, for
+example `"filePrompt": ["context.md", "task.md"]
+flags. All four execution commands support repeated `-f` / `--filePrompt`.
+CLI paths replace the entire JSON list. An explicit CLI query replaces a JSON
+file prompt, and explicit CLI file prompts replace a JSON query.
+
 
 Multiword JSON keys and long CLI flags use camelCase: `baseImage`,
 `commitMessage`, `filePrompt`, and `apiKey`.
@@ -412,10 +419,10 @@ Run Codex with a Go image:
 agent-sandbox run -b fix-go-tests -a codex -i golang:1.26-alpine -q "run go test ./... and fix failures"
 ```
 
-Read the prompt from a file:
+Read the prompt from multiple files:
 
 ```bash
-agent-sandbox run -b prompt-file-test -a codex -f prompt.md
+agent-sandbox run -b prompt-file-test -a codex -f context.md -f task.md
 ```
 
 Attach one or more images to the initial prompt for Codex or Claude Code:
@@ -440,7 +447,7 @@ The prompt lists each file's container path. Duplicate filenames have separate
 numbered directories; use their container paths to distinguish them. Paths are
 resolved from the invocation directory, including JSON paths. `--file` is also
 available on `resume`, `run-tui`, and `resume-tui`. It does not replace `-f` /
-`--filePrompt`, which reads the instructions themselves from a file.
+`--filePrompt`, which reads the instructions themselves from files.
 
 Default and derived images include Poppler tools for PDF text extraction and
 inspection. PDF tools are installed when images are built; there is no runtime

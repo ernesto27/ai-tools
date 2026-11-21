@@ -63,7 +63,7 @@ Las opciones cortas (`-i`, `-c`, `-f`) y los nombres `hn` y `pr` no cambian.
 | Solo `run` | `reviewers` |
 
 Usa cadenas para los campos de texto, booleanos para `push`, `pr` y `hn`, y
-arreglos de cadenas para `image`, `file` y `reviewers`. Se rechazan los campos
+arreglos de cadenas para `filePrompt`, `image`, `file` y `reviewers`. Se rechazan los campos
 desconocidos, `null` y los tipos incorrectos. Ambas secciones se validan aunque
 solo uses una, incluso si las opciones de la CLI reemplazan valores inválidos.
 
@@ -127,3 +127,26 @@ Un `--effort` explícito reemplaza el valor de la sección, que reemplaza el de 
 raíz. Se quitan los espacios de los extremos. Un valor omitido, vacío o formado
 solo por espacios se resuelve como `high`. Los valores se pasan sin validar los
 niveles permitidos. El agente informa si el valor no es compatible con su modelo.
+
+
+## Combinar archivos de prompt {#compose-a-prompt-from-files}
+
+```json
+{"run": {"filePrompt": ["context.md", "task.md"]}}
+```
+
+`run.filePrompt` y `resume.filePrompt` requieren arreglos. Reemplaza las cadenas
+anteriores por arreglos de un elemento. Se rechazan cadenas, `null`, elementos
+que no sean cadenas y rutas vacías, incluso si la CLI reemplaza el campo.
+`[]` no proporciona un prompt de archivo, por lo que se necesita una consulta.
+Los archivos vacíos que se puedan leer son válidos.
+
+Repite `-f` / `--filePrompt` en cualquiera de los cuatro comandos de ejecución.
+Las rutas de la CLI reemplazan todo el arreglo JSON. Una consulta explícita de
+la CLI reemplaza el prompt de archivo JSON y viceversa. Fuera de esos reemplazos,
+no se pueden combinar consultas y archivos de prompt.
+
+Las rutas son relativas al directorio de invocación. Se conservan el contenido
+exacto, el orden y los duplicados, con dos caracteres de salto de línea (`\n\n`)
+entre archivos y sin encabezados. Un archivo faltante o ilegible detiene la
+ejecución antes de iniciar el agente.

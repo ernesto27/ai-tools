@@ -62,7 +62,7 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 | `run` only | `reviewers` |
 
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
-of strings for `image`, `file`, and `reviewers`. Unknown fields, `null`, and wrong
+of strings for `filePrompt`, `image`, `file`, and `reviewers`. Unknown fields, `null`, and wrong
 types are rejected. Both command sections are validated even when only one
 is being used, including when CLI flags override invalid values.
 
@@ -126,3 +126,24 @@ value. Leading and trailing whitespace is trimmed. Omitted, empty, or
 whitespace-only effort resolves to `high`. Values are passed through without
 checking allowed levels. The agent
 reports unsupported values for its selected model.
+
+
+## Compose a prompt from files
+
+```json
+{"run": {"filePrompt": ["context.md", "task.md"]}}
+```
+
+Both `run.filePrompt` and `resume.filePrompt` require arrays. Replace old strings
+with one-element arrays; strings, `null`, non-string entries, and empty paths
+are rejected even when CLI flags override the field. `[]` supplies no file
+prompt, so a query is required. Readable empty files are allowed.
+
+Repeat `-f` / `--filePrompt` on any of the four execution commands. CLI paths
+replace the entire JSON list. An explicit CLI query replaces a JSON file prompt,
+and explicit CLI file prompts replace a JSON query. Query and file prompts
+cannot otherwise be combined.
+
+Files are read from the invocation directory in order, preserving exact contents
+and duplicates, with two newline characters (`\n\n`) between files and no
+filename headings. Missing or unreadable files fail before the agent starts.

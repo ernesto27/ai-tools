@@ -16,10 +16,10 @@ que necesite.
 
 ## Usar un archivo de prompt {#use-a-prompt-file}
 
-Para tareas largas, coloca las instrucciones en un archivo:
+Para tareas largas, coloca las instrucciones en archivos y repite `-f` para combinarlos:
 
 ```bash
-agent-sandbox run -a claude -f prompt.md
+agent-sandbox run -a claude -f context.md -f task.md
 ```
 
 Proporciona exactamente una fuente: `-q`, `-f` o la configuración JSON

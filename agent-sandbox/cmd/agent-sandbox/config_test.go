@@ -94,7 +94,7 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 		},
 		{
 			name:       "CLI query shorthand overrides JSON query and file prompt",
-			config:     `{"run":{"agent":"codex","query":"JSON task","filePrompt":"prompt.md"}}`,
+			config:     `{"run":{"agent":"codex","query":"JSON task","filePrompt":["prompt.md"]}}`,
 			args:       []string{"-q", "CLI task"},
 			wantPrompt: "CLI task",
 		},
@@ -173,7 +173,7 @@ func TestRunAndResumeQuerySources(t *testing.T) {
 			assert.Equal(t, tt.wantCommit, opts.CommitMessage)
 			assert.Equal(t, tt.wantPush, opts.Push)
 			assert.Equal(t, tt.wantHostNetwork, opts.HostNetwork)
-			assert.Equal(t, "", opts.FilePrompt)
+			assert.Empty(t, opts.FilePrompt)
 		})
 	}
 }
@@ -210,7 +210,7 @@ func TestLocalConfigFieldsAndValidation(t *testing.T) {
 		config  string
 		wantErr string
 	}{
-		{name: "all typed fields", config: `{"run":{"branch":"fix","agent":"codex","apiKey":"key","model":"model","baseImage":"alpine:latest","query":"task","push":false,"pr":true,"hn":false,"commitMessage":"commit","filePrompt":"prompt.md","image":["one.png","two.png"]}}`},
+		{name: "all typed fields", config: `{"run":{"branch":"fix","agent":"codex","apiKey":"key","model":"model","baseImage":"alpine:latest","query":"task","push":false,"pr":true,"hn":false,"commitMessage":"commit","filePrompt":["prompt.md"],"image":["one.png","two.png"]}}`},
 		{name: "unknown section", config: `{"other":{}}`, wantErr: `unknown section "other"`},
 		{name: "unknown field", config: `{"resume":{"typo":true}}`, wantErr: `unknown field resume.typo`},
 		{name: "null section", config: `{"run":null}`, wantErr: `run must be a JSON object`},
@@ -252,7 +252,7 @@ func TestLocalConfigFieldsAndValidation(t *testing.T) {
 			require.NotNil(t, section.CommitMessage)
 			require.Equal(t, "commit", *section.CommitMessage)
 			require.NotNil(t, section.FilePrompt)
-			require.Equal(t, "prompt.md", *section.FilePrompt)
+			require.Equal(t, []string{"prompt.md"}, *section.FilePrompt)
 			require.NotNil(t, section.Image)
 			require.Len(t, *section.Image, 2)
 			require.Equal(t, "two.png", (*section.Image)[1])

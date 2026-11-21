@@ -71,6 +71,11 @@ cmd/agent-sandbox -> config
   requests and read-only confirmation after an ambiguous create failure.
 - [internal/utils](../internal/utils/utils.go) provides prompt-file loading.
 
+Prompt files use ordered `[]string` options and section-only JSON arrays. Shared
+CLI bindings accept repeated `-f` / `--filePrompt`; `sandbox.NewOptions` reads
+all selected files before execution and joins their exact contents with two
+newline characters. The TUI displays all source paths.
+
 ## Execution and worktree ownership
 
 [Run and Resume](../internal/sandbox/sandbox.go) resolve the repository and

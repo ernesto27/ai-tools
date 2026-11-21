@@ -30,7 +30,7 @@ type Options struct {
 	Reviewers     []string
 	Prompt        string
 	CommitMessage string
-	FilePrompt    string
+	FilePrompt    []string
 	Images        []string
 	Files         []string
 	Folders       []string
@@ -102,12 +102,20 @@ func NewOptions(opts Options) (Options, error) {
 		opts.Branch = randomBranch
 	}
 
-	if opts.FilePrompt != "" {
-		prompt, err := utils.GetContentFile(opts.FilePrompt)
-		if err != nil {
-			return Options{}, err
+	if len(opts.FilePrompt) > 0 {
+		contents := make([]string, 0, len(opts.FilePrompt))
+		for i, path := range opts.FilePrompt {
+			if path == "" {
+				return Options{}, usageErrorf("--filePrompt[%d] path must not be empty", i)
+			}
+			prompt, err := utils.GetContentFile(path)
+			if err != nil {
+				return Options{}, err
+			}
+			contents = append(contents, prompt)
 		}
-		opts.Prompt = prompt
+		// Preserve file contents exactly; separators belong only between files.
+		opts.Prompt = strings.Join(contents, "\n\n")
 	}
 
 	return opts, nil

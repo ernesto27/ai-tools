@@ -42,7 +42,7 @@ These flags apply to `run`, `resume`, and their TUI equivalents:
 | `-m`, `--model` | Override the model selected for the agent. |
 | `--effort` | Agent effort. Defaults to `high`; the agent checks supported levels. |
 | `-q`, `--query` | Task instructions. |
-| `-f`, `--filePrompt` | Read task instructions from a file, instead of `-q`. |
+| `-f`, `--filePrompt` | Repeatable. Read task instructions from files in order, instead of `-q`. |
 | `-i`, `--baseImage` | Build the sandbox image from a compatible external base. |
 | `--image` | Attach an image to Codex or Claude Code; repeat for multiple files. |
 | `--file` | Mount a regular file read-only for any agent; repeat for multiple files. See [reference files](environment.md#mount-reference-files). |

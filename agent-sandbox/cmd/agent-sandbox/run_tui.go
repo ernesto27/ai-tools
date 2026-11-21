@@ -27,12 +27,12 @@ func newResumeTUICmd(state *commandState) *cobra.Command {
 // branch selection, and the worker's sandbox entry point depend on the mode.
 func newLiveCommand(state *commandState, mode string) *cobra.Command {
 	var flags runFlags
-	use := "run-tui [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)"
+	use := "run-tui [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>...)"
 	short := "Run a real agent with live output and details in a terminal view"
 	lead := "Run a coding agent in a new sandbox worktree with a two-panel terminal view.\n"
 	branchHelp := "worktree branch name (default: generated)"
 	if mode == "resume" {
-		use = "resume-tui -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>)"
+		use = "resume-tui -b <branch-name> -a <agent> [flags] (-q <query> | -f <prompt-file>...)"
 		short = "Resume a sandbox worktree with live output and details in a terminal view"
 		lead = "Run a coding agent in an existing, recorded sandbox worktree with a terminal view.\n" +
 			"The branch is shown by worktree-list; committed and uncommitted work stays in place.\n"

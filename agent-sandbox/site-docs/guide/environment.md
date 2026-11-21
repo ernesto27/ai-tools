@@ -71,7 +71,7 @@ separate numbered directories, so refer to their container paths when needed.
 
 `--file` works with `run`, `resume`, `run-tui`, and `resume-tui`. You can also
 set a [JSON `file` array](configuration.md#share-reference-files). It supplies
-reference material; `-f` / `--filePrompt` reads the task instructions themselves.
+reference material; `-f` / `--filePrompt` reads and combines the task instructions from files in order.
 
 Ask the agent to read or extract the files as part of your task. Files are not
 automatically converted. Poppler tools are installed when images are built;

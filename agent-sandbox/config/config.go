@@ -31,7 +31,7 @@ type Section struct {
 	PR            *bool     `json:"pr"`
 	HostNetwork   *bool     `json:"hn"`
 	CommitMessage *string   `json:"commitMessage"`
-	FilePrompt    *string   `json:"filePrompt"`
+	FilePrompt    *[]string `json:"filePrompt"`
 	File          *[]string `json:"file"`
 	Image         *[]string `json:"image"`
 	Reviewers     []string  `json:"reviewers"`

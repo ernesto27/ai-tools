@@ -16,10 +16,10 @@ it needs up front.
 
 ## Use a prompt file
 
-For longer tasks, put the instructions in a file:
+For longer tasks, put the instructions in files and repeat `-f` to combine them:
 
 ```bash
-agent-sandbox run -a claude -f prompt.md
+agent-sandbox run -a claude -f context.md -f task.md
 ```
 
 Provide exactly one prompt source: `-q`, `-f`, or the corresponding JSON

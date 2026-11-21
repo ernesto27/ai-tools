@@ -42,7 +42,7 @@ Estas opciones se aplican a `run`, `resume` y sus equivalentes con interfaz de t
 | `-m`, `--model` | Reemplaza el modelo seleccionado para el agente. |
 | `--effort` | Esfuerzo del agente. Por defecto `high`; el agente comprueba los niveles compatibles. |
 | `-q`, `--query` | Instrucciones de la tarea. |
-| `-f`, `--filePrompt` | Lee las instrucciones desde un archivo, en lugar de `-q`. |
+| `-f`, `--filePrompt` | Repetible. Lee las instrucciones desde archivos en orden, en lugar de `-q`. |
 | `-i`, `--baseImage` | Construye la imagen del sandbox desde una base externa compatible. |
 | `--image` | Adjunta una imagen a Codex o Claude Code; repite para varios archivos. |
 | `--file` | Monta un archivo regular de solo lectura para cualquier agente; repite para varios. Consulta [archivos de referencia](environment.md#mount-reference-files). |

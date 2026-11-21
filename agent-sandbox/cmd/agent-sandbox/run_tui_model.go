@@ -187,8 +187,8 @@ func (m liveModel) detailContent(width int, palette livePalette) string {
 		phase = "Cancelling · waiting for cleanup"
 	}
 	source := "query"
-	if m.opts.FilePrompt != "" {
-		source = m.opts.FilePrompt
+	if len(m.opts.FilePrompt) > 0 {
+		source = strings.Join(m.opts.FilePrompt, "\n")
 	}
 	sections := []struct{ title, content string }{
 		{"Query", paragraph(m.opts.Prompt)},

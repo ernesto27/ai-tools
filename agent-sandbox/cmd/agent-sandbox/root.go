@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -96,7 +97,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 	var flags runFlags
 
 	cmd := &cobra.Command{
-		Use:   "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>)",
+		Use:   "run [-b <branch-name>] -a <agent> [flags] (-q <query> | -f <prompt-file>...)",
 		Short: "Run a coding agent with plain terminal output",
 		Long: "Run a coding agent in a new sandbox worktree with plain output. Supply the\n" +
 			"branch with -b or --branch; otherwise one is generated. Supply the\n" +
@@ -145,7 +146,7 @@ func (f *runFlags) bind(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&f.Push, flagPush, "p", false, "commit the agent's work and push the branch")
 	cmd.Flags().BoolVar(&f.PR, flagPR, false, "commit, push to origin, and create or reuse a GitHub pull request")
 	cmd.Flags().StringVarP(&f.CommitMessage, flagCommitMessage, "c", "", "commit message (default: resolved prompt)")
-	cmd.Flags().StringVarP(&f.FilePrompt, flagFilePrompt, "f", "", "path to a file containing the agent prompt")
+	cmd.Flags().StringArrayVarP(&f.FilePrompt, flagFilePrompt, "f", nil, "prompt file path (repeatable; contents joined in order)")
 	cmd.Flags().StringArrayVar(&f.Images, flagImage, nil, "image to attach to the initial Codex prompt (repeatable)")
 	cmd.Flags().StringArrayVar(&f.Files, flagFile, nil, "file to mount read-only for the agent (repeatable)")
 	cmd.Flags().StringArrayVar(&f.Folders, flagFolder, nil, "folders to mount read-only for the agent")
@@ -163,19 +164,29 @@ func runArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return sandbox.NewUsageError(errors.New("positional prompts are not supported; use -q or --query"))
 	}
-	filePrompt, err := cmd.Flags().GetString(flagFilePrompt)
+	filePrompt, err := cmd.Flags().GetStringArray(flagFilePrompt)
 	if err != nil {
 		return sandbox.NewUsageError(err)
+	}
+	// pflag serializes a single empty array entry like an empty list.
+	// Reject it explicitly so an empty CLI path cannot clear JSON defaults.
+	if cmd.Flags().Changed(flagFilePrompt) && len(filePrompt) == 0 {
+		return sandbox.NewUsageError(errors.New("--filePrompt path must not be empty"))
+	}
+	for i, path := range filePrompt {
+		if path == "" {
+			return sandbox.NewUsageError(fmt.Errorf("--filePrompt[%d] path must not be empty", i))
+		}
 	}
 	query, err := cmd.Flags().GetString(flagQuery)
 	if err != nil {
 		return sandbox.NewUsageError(err)
 	}
 
-	if query == "" && filePrompt == "" {
+	if query == "" && len(filePrompt) == 0 {
 		return sandbox.UsageError{}
 	}
-	if query != "" && filePrompt != "" {
+	if query != "" && len(filePrompt) > 0 {
 		return sandbox.NewUsageError(errors.New("--query and --filePrompt cannot be used together"))
 	}
 	return nil

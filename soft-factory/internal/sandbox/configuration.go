@@ -82,7 +82,7 @@ func sandboxArgs(options ExecuteOptions) []string {
 	addBool("hn", shared.HostNetwork, section.HostNetwork)
 	addList("file", shared.File, section.File)
 	addString("query", "", section.Query)
-	addString("filePrompt", "", section.FilePrompt)
+	addList("filePrompt", nil, section.FilePrompt)
 	addString("commitMessage", "", section.CommitMessage)
 	addList("image", nil, section.Image)
 	if options.Args[0] == "run" {

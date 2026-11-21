@@ -24,14 +24,14 @@ Crea `software-factory.json`:
     "push": false,
     "pr": false,
     "run": {
-      "filePrompt": "task.txt"
+      "filePrompt": ["task.txt"]
     }
   }
 }
 ```
 
 Los ajustes compartidos del agente, la rama y la publicación se aplican tanto
-a `run` como a `resume`. Conserva la ruta de la tarea local en `run.filePrompt`.
+a `run` como a `resume`. Conserva las rutas de la tarea local en `run.filePrompt`.
 Elige una rama nueva para cada tarea nueva. Consulta la
 [configuración](configuration.md) para elegir agentes y documentos contexto.
 

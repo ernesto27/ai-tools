@@ -52,13 +52,15 @@ func TestPromptSandboxHelper(t *testing.T) {
 		interrupted = make(chan os.Signal, 1)
 		signal.Notify(interrupted, os.Interrupt)
 	}
+	var promptContents []string
 	for i, arg := range args {
 		if (arg == "-f" || arg == "--filePrompt") && i+1 < len(args) && os.Getenv("SOFT_FACTORY_ARGS_ONLY") != "1" {
 			text, err := os.ReadFile(args[i+1])
 			require.NoError(t, err)
-			capture.Prompt = string(text)
+			promptContents = append(promptContents, string(text))
 		}
 	}
+	capture.Prompt = strings.Join(promptContents, "\n\n")
 	data, err := json.Marshal(capture)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(os.Getenv("SOFT_FACTORY_CAPTURE"), data, 0600))
@@ -299,7 +301,7 @@ func TestImplementationCustomSkillPromptModes(t *testing.T) {
 		t.Run(fmt.Sprintf("continue=%t", continuing), func(t *testing.T) {
 			path := preparePromptSandbox(t)
 			// Resume must still use the local run task as its source.
-			cfg := decodeConfig(t, `{"run":{"filePrompt":"task.txt"},"resume":{"filePrompt":"missing-resume-task.txt"}}`)
+			cfg := decodeConfig(t, `{"run":{"filePrompt":["task.txt"]},"resume":{"filePrompt":["missing-resume-task.txt"]}}`)
 			require.NoError(t, Run(TaskContext{
 				Branch: "main", Continue: continuing, Config: cfg,
 				CustomSkills: ProjectSkills{Implementation: &ProjectSkill{
@@ -334,4 +336,93 @@ func TestPromptCleanupAfterSandboxFailure(t *testing.T) {
 			require.ErrorIs(t, err, os.ErrNotExist)
 		}
 	}
+}
+
+func TestMultipleTaskFilesIntegration(t *testing.T) {
+	for _, mode := range []string{
+		"run", "continue", "context", "custom-skill", "logged-run",
+		"review", "security", "risk", "walkthrough", "override",
+	} {
+		t.Run(mode, func(t *testing.T) {
+			capturePath := preparePromptSandbox(t)
+			require.NoError(t, os.WriteFile("a,b c.md", []byte("second task\n"), 0600))
+			cfg := decodeConfig(t, `{"run":{"filePrompt":["task.txt","a,b c.md"]},"resume":{"filePrompt":["missing-resume.txt"]}}`)
+			input := TaskContext{Config: cfg, Branch: "main"}
+			if mode == "continue" {
+				input.Continue = true
+			}
+			if mode == "context" {
+				input.Documents = "supporting context"
+			}
+			if mode == "custom-skill" {
+				input.CustomSkills.Implementation = &ProjectSkill{Name: "project", Content: "extra instructions"}
+			}
+			if mode == "walkthrough" || mode == "logged-run" {
+				run, err := executionlog.NewRun("main", executionlog.CommandRun, nil)
+				require.NoError(t, err)
+				input.Log = run
+				t.Cleanup(func() { run.Finish(nil) })
+				if mode == "logged-run" {
+					run.StartStage(config.StageImplementation)
+				}
+			}
+			if mode == "override" {
+				input.TaskOverride = "Jira override task"
+				input.Config = decodeConfig(t, `{"run":{"filePrompt":["missing-local.txt"]}}`)
+			}
+			var err error
+			switch mode {
+			case "review":
+				_, err = Review(input)
+			case "security":
+				_, err = SecurityReview(input)
+			case "risk":
+				err = RiskClassification(input, nil, []config.Stage{config.StageCodeReview, config.StageSecurityReview})
+			case "walkthrough":
+				err = ReviewChanges(input)
+			default:
+				err = Run(input)
+			}
+			require.NoError(t, err)
+			got := readPromptCapture(t, capturePath)
+			combined := "file task {{literal}} 100%\n\nsecond task\n"
+			if mode == "override" {
+				require.Contains(t, got.Prompt, "Jira override task")
+				require.NotContains(t, got.Prompt, "file task")
+			} else {
+				require.Contains(t, got.Prompt, combined)
+			}
+			require.NotContains(t, got.Args, "missing-resume.txt")
+			if mode == "run" {
+				require.Equal(t, combined, got.Prompt)
+				require.Equal(t, []string{"run", "--branch", "main", "--filePrompt", "task.txt", "--filePrompt", "a,b c.md"}, got.Args)
+			} else {
+				require.NotContains(t, got.Args, "task.txt")
+				require.NotContains(t, got.Args, "a,b c.md")
+				prompts := 0
+				for i, arg := range got.Args {
+					if arg == "-f" {
+						prompts++
+						_, statErr := os.Stat(got.Args[i+1])
+						require.ErrorIs(t, statErr, os.ErrNotExist)
+					}
+				}
+				require.Equal(t, 1, prompts)
+			}
+			assertNoConfigArtifacts(t)
+		})
+	}
+}
+
+func TestMissingTaskFileStopsGeneratedStage(t *testing.T) {
+	capturePath := preparePromptSandbox(t)
+	cfg := decodeConfig(t, `{"run":{"filePrompt":["task.txt","missing.txt"]}}`)
+	err := Run(TaskContext{Config: cfg, Continue: true, Branch: "main"})
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorContains(t, err, `filePrompt[1] "missing.txt"`)
+	_, statErr := os.Stat(capturePath)
+	require.ErrorIs(t, statErr, os.ErrNotExist)
+	files, err := filepath.Glob(filepath.Join(os.Getenv("TMPDIR"), "factory-prompt-*.txt"))
+	require.NoError(t, err)
+	require.Empty(t, files)
 }

@@ -119,7 +119,7 @@ func TestUnifiedSandboxConfiguration(t *testing.T) {
 		name, input string
 		wantErr     bool
 	}{
-		{"shared and section pointers", `{"documents":["support.md"],"stages":{"reviewChanges":{"disabled":true},"implementation":{"agent":"stage-agent","model":"stage-model"},"codeReview":{"customSkill":"project"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":"task path.txt","apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
+		{"shared and section pointers", `{"documents":["support.md"],"stages":{"reviewChanges":{"disabled":true},"implementation":{"agent":"stage-agent","model":"stage-model"},"codeReview":{"customSkill":"project"}},"agentSandbox":{"agent":"invalid-agent","model":"invalid-model","push":true,"file":["shared"],"run":{"filePrompt":["task path.txt"],"apiKey":"ignored","reviewers":["ignored"]},"resume":{"push":false,"branch":"","file":[],"apiKey":"ignored","reviewers":["ignored"]}}}`, false},
 		{"absent", `{"documents":[]}`, true},
 		{"null", `{"agentSandbox":null}`, false},
 		{"empty", `{"agentSandbox":{}}`, false},
@@ -277,6 +277,47 @@ func TestStageEffortConfiguration(t *testing.T) {
 					require.Equal(t, tc.want, *settings.Effort)
 				} else {
 					require.Nil(t, settings.Effort)
+				}
+			})
+		}
+	}
+}
+
+func TestFilePromptArrayContract(t *testing.T) {
+	for _, section := range []string{"run", "resume"} {
+		for _, tc := range []struct {
+			name, value         string
+			invalid, nilPointer bool
+			want                []string
+		}{
+			{name: "null", value: `null`, nilPointer: true},
+			{name: "empty", value: `[]`, want: []string{}},
+			{name: "one", value: `["task.txt"]`, want: []string{"task.txt"}},
+			{name: "multiple", value: `["task.txt","a,b c.md","task.txt"]`, want: []string{"task.txt", "a,b c.md", "task.txt"}},
+			{name: "legacy string", value: `"task.txt"`, invalid: true},
+			{name: "mixed types", value: `["task.txt",42]`, invalid: true},
+		} {
+			t.Run(section+"/"+tc.name, func(t *testing.T) {
+				t.Chdir(t.TempDir())
+				data := `{"agentSandbox":{"` + section + `":{"filePrompt":` + tc.value + `}}}`
+				require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
+				cfg, err := Load("software-factory.json")
+				if tc.invalid {
+					require.ErrorContains(t, err, "parse factory configuration")
+					var typeErr *json.UnmarshalTypeError
+					require.ErrorAs(t, err, &typeErr)
+					return
+				}
+				require.NoError(t, err)
+				selected := cfg.AgentSandbox.Run
+				if section == "resume" {
+					selected = cfg.AgentSandbox.Resume
+				}
+				if tc.nilPointer {
+					require.Nil(t, selected.FilePrompt)
+				} else {
+					require.NotNil(t, selected.FilePrompt)
+					require.Equal(t, tc.want, *selected.FilePrompt)
 				}
 			})
 		}

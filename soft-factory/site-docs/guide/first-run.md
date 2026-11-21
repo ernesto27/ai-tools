@@ -24,7 +24,7 @@ Create `software-factory.json`:
     "push": false,
     "pr": false,
     "run": {
-      "filePrompt": "task.txt"
+      "filePrompt": ["task.txt"]
     }
   }
 }
@@ -34,7 +34,7 @@ Factory passes `agentSandbox` settings as CLI flags and creates no sandbox
 configuration JSON. Use host authentication. See [transport details](configuration.md#sandbox-settings-transport).
 
 The shared agent, branch, and publishing settings apply to both `run` and
-`resume`. Keep the local task file in `run.filePrompt`. Choose a new branch
+`resume`. Keep the local task paths in `run.filePrompt`. Choose a new branch
 for each new task.
 See [configuration](configuration.md) for agent options and supporting documents.
 

@@ -11,7 +11,7 @@ allí. Empieza con esta configuración:
     "push": false,
     "pr": false,
     "run": {
-      "filePrompt": "task.txt"
+      "filePrompt": ["task.txt"]
     }
   }
 }
@@ -45,6 +45,17 @@ valor en la sección. Todas las etapas de una ejecución usan la misma rama.
 
 La tarea local siempre proviene de `run.filePrompt`, incluso en la continuación
 y recuperación. Para usar una incidencia de Jira, pasa [`--jira`](jira.md).
+
+Define `run.filePrompt` como un arreglo, incluso para un solo archivo:
+`["task.txt"]`. Para varios archivos, usa `["task.txt", "constraints.md"]`.
+Los contenidos se unen en orden con dos caracteres de salto de línea entre
+archivos. Se conservan los espacios, los saltos de línea existentes y las
+rutas repetidas. Las rutas relativas parten de la carpeta del proyecto.
+
+Reemplaza los valores de texto anteriores por arreglos; las cadenas ya no
+son compatibles. Una lista ausente o vacía no puede proporcionar una tarea
+local. Un archivo ilegible detiene la etapa e indica su ruta e índice en el
+arreglo. La entrada de Jira reemplaza la tarea local.
 
 ### Opciones del sandbox {#sandbox-options}
 

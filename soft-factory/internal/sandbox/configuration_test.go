@@ -24,7 +24,7 @@ func decodeConfig(t *testing.T, sandbox string) config.Config {
 }
 
 func taskFileConfig(t *testing.T) config.Config {
-	return decodeConfig(t, `{"run":{"filePrompt":"task.txt"}}`)
+	return decodeConfig(t, `{"run":{"filePrompt":["task.txt"]}}`)
 }
 
 func TestSandboxReviewerArgs(t *testing.T) {
@@ -48,10 +48,11 @@ func TestSandboxReviewerArgs(t *testing.T) {
 
 func TestRunTransportsConfiguredReviewers(t *testing.T) {
 	capture := preparePromptSandbox(t)
+	require.NoError(t, os.WriteFile("second task.md", []byte("second task"), 0600))
 	require.NoError(t, os.WriteFile("software-factory.json", []byte(`{
 		"agentSandbox": {
 			"run": {
-				"filePrompt": "task.txt",
+				"filePrompt": ["task.txt", "second task.md"],
 				"pr": true,
 				"reviewers": ["alice", "bob"]
 			}
@@ -63,8 +64,8 @@ func TestRunTransportsConfiguredReviewers(t *testing.T) {
 	require.NoError(t, Run(TaskContext{Config: cfg}))
 
 	got := readPromptCapture(t, capture)
-	require.Equal(t, []string{"run", "--pr=true", "--filePrompt", "task.txt", "--reviewers", "alice", "--reviewers", "bob"}, got.Args)
-	require.Equal(t, "file task {{literal}} 100%", got.Prompt)
+	require.Equal(t, []string{"run", "--pr=true", "--filePrompt", "task.txt", "--filePrompt", "second task.md", "--reviewers", "alice", "--reviewers", "bob"}, got.Args)
+	require.Equal(t, "file task {{literal}} 100%\n\nsecond task", got.Prompt)
 	assertNoConfigArtifacts(t)
 }
 
@@ -75,13 +76,21 @@ func TestSandboxArgumentTransport(t *testing.T) {
 		branch           string
 		branchSet        bool
 	}{
-		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":"task path","commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run"}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
-		{name: "resume explicit zeros replace shared", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"shared","branch":"shared","push":true,"pr":true,"hn":true,"file":["shared"],"resume":{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false,"file":[],"image":[],"query":"","filePrompt":"","commitMessage":"","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false", "--query", "", "--filePrompt", "", "--commitMessage", ""}},
+		{name: "all run settings", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"go image","branch":"task branch","push":true,"pr":false,"hn":true,"file":["a b","$(touch forbidden);x"],"run":{"query":"do $stuff; now","filePrompt":["task path"],"commitMessage":"commit !","image":["one,two.png","two.png"],"apiKey":"secret-run"}}`, invocation: []string{"run"}, want: []string{"run", "--agent", "codex", "--model", "shared", "--effort", "high", "--baseImage", "go image", "--branch", "task branch", "--push=true", "--hn=true", "--file", "a b", "--file", "$(touch forbidden);x", "--query", "do $stuff; now", "--filePrompt", "task path", "--commitMessage", "commit !", "--image", "one,two.png", "--image", "two.png"}},
+		{name: "resume explicit zeros replace shared", settings: `{"agent":"codex","model":"shared","effort":"high","baseImage":"shared","branch":"shared","push":true,"pr":true,"hn":true,"file":["shared"],"resume":{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false,"file":[],"image":[],"query":"","filePrompt":[],"commitMessage":"","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--agent", "", "--model", "", "--effort", "", "--baseImage", "", "--branch", "", "--push=false", "--pr=false", "--hn=false", "--query", "", "--commitMessage", ""}},
 		{name: "shared zeros use sandbox defaults", settings: `{"agent":"","model":"","effort":"","baseImage":"","branch":"","push":false,"pr":false,"hn":false}`, invocation: []string{"run"}, want: []string{"run"}},
-		{name: "workflow controls and independent agent override", settings: `{"agent":"shared","model":"shared-model","branch":"shared","push":true,"pr":true,"resume":{"agent":"section","model":"section-model","branch":"section","query":"ignored","filePrompt":"ignored","file":["replacement"]}}`, invocation: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage"}, branch: "workflow", want: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage", "--model", "section-model", "--branch", "workflow", "--file", "replacement"}},
+		{name: "workflow controls and independent agent override", settings: `{"agent":"shared","model":"shared-model","branch":"shared","push":true,"pr":true,"resume":{"agent":"section","model":"section-model","branch":"section","query":"ignored","filePrompt":["ignored"],"file":["replacement"]}}`, invocation: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage"}, branch: "workflow", want: []string{"resume", "--push=false", "--pr=false", "-f", "generated path", "-a", "stage", "--model", "section-model", "--branch", "workflow", "--file", "replacement"}},
 		{name: "independent model override", settings: `{"agent":"shared","resume":{"agent":"section","model":"old"}}`, invocation: []string{"resume", "-m", "stage-model"}, want: []string{"resume", "-m", "stage-model", "--agent", "section"}},
 		{name: "empty workflow branch overrides resume", settings: `{"resume":{"branch":"other"}}`, invocation: []string{"resume"}, branchSet: true, want: []string{"resume", "--branch", ""}},
 		{name: "explicit invocation branch is emitted once", settings: `{"branch":"shared","resume":{"branch":"section"}}`, invocation: []string{"resume", "--branch", "explicit"}, branch: "workflow", branchSet: true, want: []string{"resume", "--branch", "explicit"}},
+		{name: "multiple prompt paths", settings: `{"run":{"filePrompt":["task path","a,b.md","task path"]}}`, invocation: []string{"run"}, want: []string{"run", "--filePrompt", "task path", "--filePrompt", "a,b.md", "--filePrompt", "task path"}},
+		{name: "resume prompt paths", settings: `{"resume":{"filePrompt":["first","second"]}}`, invocation: []string{"resume"}, want: []string{"resume", "--filePrompt", "first", "--filePrompt", "second"}},
+		{name: "null prompt paths", settings: `{"run":{"filePrompt":null}}`, invocation: []string{"run"}, want: []string{"run"}},
+		{name: "omitted prompt paths", settings: `{"run":{}}`, invocation: []string{"run"}, want: []string{"run"}},
+		{name: "empty prompt paths", settings: `{"run":{"filePrompt":[]}}`, invocation: []string{"run"}, want: []string{"run"}},
+		{name: "short generated prompt override", settings: `{"resume":{"filePrompt":["first","second"],"query":"ignored"}}`, invocation: []string{"resume", "-f", "generated"}, want: []string{"resume", "-f", "generated"}},
+		{name: "long generated prompt override", settings: `{"resume":{"filePrompt":["first","second"],"query":"ignored"}}`, invocation: []string{"resume", "--filePrompt=generated"}, want: []string{"resume", "--filePrompt=generated"}},
+		{name: "query override", settings: `{"run":{"filePrompt":["first","second"],"query":"ignored"}}`, invocation: []string{"run", "--query", "override"}, want: []string{"run", "--query", "override"}},
 		{name: "null sandbox", settings: `null`, invocation: []string{"run"}, want: []string{"run"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,7 +122,7 @@ func assertNoConfigArtifacts(t *testing.T) {
 
 func TestUnifiedTaskAndSelection(t *testing.T) {
 	capture := preparePromptSandbox(t)
-	cfg := decodeConfig(t, `{"agent":"shared","model":"shared-model","run":{"filePrompt":"task.txt","apiKey":"secret-run"},"resume":{"agent":"resume-agent","model":"resume-model","filePrompt":"missing.txt","apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`)
+	cfg := decodeConfig(t, `{"agent":"shared","model":"shared-model","run":{"filePrompt":["task.txt"],"apiKey":"secret-run"},"resume":{"agent":"resume-agent","model":"resume-model","filePrompt":["missing.txt"],"apiKey":"secret-resume","reviewers":["secret-reviewer"]}}`)
 	// Changing the config on disk cannot affect the already-loaded workflow.
 	require.NoError(t, os.WriteFile("software-factory.json", []byte(`{"agentSandbox":{"agent":"wrong"}}`), 0600))
 	log, err := executionlog.NewRun("main", executionlog.CommandContinue, nil)
@@ -182,13 +191,20 @@ func TestExecutionFailureAndCancellation(t *testing.T) {
 }
 
 func TestMissingUnifiedTaskPath(t *testing.T) {
-	for _, settings := range []string{`null`, `{}`, `{"run":{"filePrompt":"missing task.txt"}}`} {
+	for _, settings := range []string{
+		`null`, `{}`, `{"run":{"filePrompt":[]}}`,
+		`{"run":{"filePrompt":["missing task.txt"]}}`,
+	} {
 		t.Run(settings, func(t *testing.T) {
 			t.Chdir(t.TempDir())
-			require.NoError(t, os.WriteFile("agent-sandbox.json", []byte(`{"run":{"filePrompt":"legacy task.txt"}}`), 0600))
+			require.NoError(t, os.WriteFile("agent-sandbox.json", []byte(`{"run":{"filePrompt":["legacy task.txt"]}}`), 0600))
 			_, err := buildTaskPrompt(TaskContext{Config: decodeConfig(t, settings)})
-			require.ErrorIs(t, err, os.ErrNotExist)
 			require.ErrorContains(t, err, "software-factory.json: agentSandbox.run.filePrompt")
+			if strings.Contains(settings, "missing task.txt") {
+				require.ErrorIs(t, err, os.ErrNotExist)
+			} else {
+				require.ErrorContains(t, err, "must contain at least one path")
+			}
 			require.NotContains(t, err.Error(), "legacy task.txt")
 		})
 	}
@@ -288,7 +304,7 @@ func TestStageEffortIntegration(t *testing.T) {
 					}
 					property += `"saveFindings":true`
 				}
-				data := `{"agentSandbox":{"effort":"low","run":{"filePrompt":"task.txt","effort":"run-effort"},"resume":{"effort":"resume-effort"}},"stages":{"` + key + `":{` + property + `}}}`
+				data := `{"agentSandbox":{"effort":"low","run":{"filePrompt":["task.txt"],"effort":"run-effort"},"resume":{"effort":"resume-effort"}},"stages":{"` + key + `":{` + property + `}}}`
 				require.NoError(t, os.WriteFile("software-factory.json", []byte(data), 0600))
 				cfg, err := config.Load("software-factory.json")
 				require.NoError(t, err)

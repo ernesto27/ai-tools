@@ -357,17 +357,20 @@ func buildTaskPrompt(input TaskContext) (string, error) {
 }
 
 func readTaskFile(settings sandboxconfig.Config) (string, error) {
-	var taskPath string
-	if settings.Run != nil && settings.Run.FilePrompt != nil {
-		taskPath = *settings.Run.FilePrompt
+	if settings.Run == nil || settings.Run.FilePrompt == nil || len(*settings.Run.FilePrompt) == 0 {
+		return "", fmt.Errorf("read software-factory.json: agentSandbox.run.filePrompt must contain at least one path")
 	}
 
-	task, err := os.ReadFile(taskPath)
-	if err != nil {
-		return "", fmt.Errorf("read software-factory.json: agentSandbox.run.filePrompt %q: %w", taskPath, err)
+	paths := *settings.Run.FilePrompt
+	contents := make([]string, 0, len(paths))
+	for i, path := range paths {
+		task, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("read software-factory.json: agentSandbox.run.filePrompt[%d] %q: %w", i, path, err)
+		}
+		contents = append(contents, string(task))
 	}
-
-	return string(task), nil
+	return strings.Join(contents, "\n\n"), nil
 }
 
 func writePrompt(prompt string) (string, error) {

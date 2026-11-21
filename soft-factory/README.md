@@ -42,7 +42,7 @@ Minimal example:
   "agentSandbox": {
     "agent": "codex",
     "branch": "factory-task",
-    "run": {"filePrompt": "task.txt"},
+    "run": {"filePrompt": ["task.txt"]},
     "resume": {"push": false},
     "pr": false
   }
@@ -198,7 +198,7 @@ Example for a local task:
     "run": {
       "agent": "codex",
       "branch": "factory-task",
-      "filePrompt": "task.txt",
+      "filePrompt": ["task.txt"],
       "push": false,
       "pr": false
     },
@@ -249,7 +249,7 @@ Common settings in either section:
 | --- | --- |
 | `agent` | Agent to use: `codex`, `claude`, `opencode`, or `pi`. Reviews require subagent support. |
 | `branch` | Sandbox branch to create (`run`) or continue (`resume`). |
-| `filePrompt` | Local task file, relative to the working directory. Set it in `run` for local tasks; Soft Factory supplies the review prompts. |
+| `filePrompt` | Ordered array of local task paths, relative to the working directory. Set it in `run`, including for resume workflows; Soft Factory supplies review prompts. |
 | `model` | Optional model selection; otherwise use the agent's default. |
 | `baseImage` | Optional container image with the tools your task needs, such as `golang:1.26-alpine` for Go tasks. |
 | `push` | Commit and push changes after a sandbox stage. The examples leave this disabled. |
@@ -260,6 +260,14 @@ Common settings in either section:
 | `effort` | Optional effort setting, validated by Agent Sandbox. |
 | `image` | Optional list of image paths to attach for agents that support them. |
 | `query` | Inline prompt supported by `agent-sandbox`. For Soft Factory, use `run.filePrompt` or `--jira` to keep the original task available to every stage. |
+
+`run.filePrompt` accepts an array, even for one file: `["task.txt"]`.
+For multiple files, use `["task.txt", "constraints.md"]`. Contents are joined
+in order with two newline characters between files, preserving whitespace
+and repeated paths. Change older string values to arrays; strings are no
+longer supported. A missing or empty list cannot supply a local task, and
+an unreadable file stops the stage with its path and array index.
+`--jira` supplies the task instead of reading these files.
 
 Set `run.reviewers` to a list of GitHub usernames to request when implementation
 creates a new PR with `pr: true`.

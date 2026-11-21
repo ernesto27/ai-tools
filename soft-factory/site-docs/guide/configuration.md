@@ -11,7 +11,7 @@ Start with this configuration:
     "push": false,
     "pr": false,
     "run": {
-      "filePrompt": "task.txt"
+      "filePrompt": ["task.txt"]
     }
   }
 }
@@ -45,6 +45,15 @@ uses the same selected branch.
 
 The local task always comes from `run.filePrompt`, including continuation and
 recovery. To use a Jira issue instead, pass [`--jira`](jira.md).
+
+Set `run.filePrompt` to an array, even for one file: `["task.txt"]`.
+For multiple files, use `["task.txt", "constraints.md"]`. Contents are joined
+in order with two newline characters between files. Whitespace and repeated
+paths are preserved. Relative paths start in the project folder.
+
+Replace older string values with arrays; strings are no longer supported.
+A missing or empty list cannot supply a local task. An unreadable file stops
+the stage with its path and array index. Jira input replaces the local task.
 
 ### Sandbox options
 

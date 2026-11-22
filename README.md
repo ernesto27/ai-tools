@@ -1,5 +1,14 @@
 # AI Tools
 
+## Video 
+
+
+
+https://github.com/user-attachments/assets/e472f74c-1891-445f-bb62-3516b6929a01
+
+
+
+
 Command-line tools and a desktop app for running AI coding agents and development workflows.
 
 | Project | Description | Documentation |

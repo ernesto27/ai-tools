@@ -109,9 +109,6 @@ function MainApp({ theme, toggleTheme, updater }: {
   };
 
   async function deleteWorktree(repo: SavedRepo, branch: string): Promise<void> {
-    if (desktopRuns.busy(repo.path, branch)) {
-      throw new AppMessageError({ key: "cannotDeleteWorktreeWithActiveRun" });
-    }
     if (deletingWorktree.current) {
       throw new AppMessageError({ key: "worktreeDeletionInProgress" });
     }

@@ -114,8 +114,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const resumeConfig = withResumeBranch(loadedConfig, branch);
 
   function startRun() {
-    if (mode === RUN_MODE.RESUME || missingRunBranch || hasInvalidReviewers || loadingConfig || configError
-      || desktopRuns.busy(repoPath)) return;
+    if (mode === RUN_MODE.RESUME || missingRunBranch || hasInvalidReviewers || loadingConfig || configError) return;
     setSaveError(null);
 
     try {
@@ -133,7 +132,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
   function resumeRun() {
     if (!selectedRun || !loadedConfig || loadingConfig || configError
-      || branchRuns.loading || branchRuns.error || desktopRuns.busy(repoPath)) return;
+      || branchRuns.loading || branchRuns.error) return;
     setSaveError(null);
 
     try {
@@ -148,7 +147,6 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
   const setMode = (m: NewRunMode) => navigate({ screen: "newRun", repo, branch, mode: m });
 
-  const activeRun = desktopRuns.busy(repoPath);
   const resumeDisabled = !loadedConfig || !selectedRun || branchRuns.loading || !!branchRuns.error;
   const cta = mode === RUN_MODE.RUN ? "startRun" : mode === RUN_MODE.CONTINUE ? "continue" : "resume";
 
@@ -268,18 +266,11 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
 
           {saveError && <p role="alert" className="text-sm whitespace-pre-wrap break-words text-bad">{messageText(saveError, t)}</p>}
 
-          {activeRun && (
-            <button type="button" className="self-start text-sm underline" onClick={() => navigate({
-              screen: "run", repo, branch: activeRun.branch, runId: activeRun.id,
-            })}>
-              {t("thisRepositoryHasAnActiveRunOpenActiveRun")}
-            </button>
-          )}
           <div className="flex border-t border-line pt-4">
             <PrimaryButton
               size="lg"
               className="self-start"
-              disabled={!!activeRun || loadingConfig || !!configError || missingRunBranch
+              disabled={loadingConfig || !!configError || missingRunBranch
                 || hasInvalidReviewers || (mode === RUN_MODE.RESUME && resumeDisabled)}
               onClick={mode === RUN_MODE.RESUME ? resumeRun : startRun}
             >

@@ -37,6 +37,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   const { t } = useTranslation();
   const session = desktopRuns.find(repoPath, branch, runId);
   const live = session !== undefined && isDesktopRunActive(session);
+  const trackingUnavailable = session?.tracking === "unavailable";
   const showStop = desktopRuns.supportsStop
     && session !== undefined
     && live;
@@ -53,7 +54,8 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     || (!live && run?.stages[run.stages.length - 1]?.status === "INTERRUPTED");
   const title = session?.runId ?? (
     session
-      ? session.state === RUN_STATE.STOPPING ? t("stoppingRun")
+      ? trackingUnavailable ? t("run")
+        : session.state === RUN_STATE.STOPPING ? t("stoppingRun")
         : interrupted ? t("stoppedRun")
         : live ? t("startingRun")
         : session.state === RUN_STATE.FAILED ? t("failedRun")
@@ -68,7 +70,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
 
   const [following, setFollowing] = useState(true);
   const outputPanel = useRef<HTMLDivElement>(null);
-  const progress = stageProgress(run?.stages ?? [], logs, live, session !== undefined);
+  const progress = stageProgress(run?.stages ?? [], logs, live, session !== undefined && !trackingUnavailable);
 
   useEffect(() => {
     if (following && progress.followStage) {
@@ -165,7 +167,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 {session.state === RUN_STATE.STOPPING ? t("stopping") : t("stop")}
               </OutlineButton>
             )}
-            <PrimaryButton disabled={!!desktopRuns.busy(repoPath)} onClick={() => navigate({
+            <PrimaryButton onClick={() => navigate({
               screen: "newRun", repo, branch,
               mode: interrupted ? RUN_MODE.RESUME : RUN_MODE.CONTINUE,
             })}>
@@ -177,14 +179,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
 
       {session && (
         <div className="shrink-0 space-y-2">
-          <p role="status" className="text-sm text-muted">
+          {!trackingUnavailable && <p role="status" className="text-sm text-muted">
             {session.state === RUN_STATE.STARTING ? t("startingRunProgress")
               : session.state === RUN_STATE.STOPPING ? t("stoppingRunWaitingForCleanup")
               : live ? (session.directory ? t("liveUpdatesEverySecond") : t("waitingForExecutionLogDirectory"))
               : session.state === RUN_STATE.SUCCEEDED ? t("runCompleted")
               : session.state === RUN_STATE.INTERRUPTED ? t("runStoppedUseResumeToContinue")
               : t("runFailed")}
-          </p>
+          </p>}
           {session.error && <p role="alert" className="whitespace-pre-wrap break-words text-bad">{messageText(session.error, t)}</p>}
           {session.stopError && (
             <p role="alert" className="whitespace-pre-wrap break-words text-bad">{messageText(session.stopError, t)}</p>
@@ -228,7 +230,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
                 <div className="flex min-w-0 flex-col items-start gap-2 px-2.5" data-testid={`audit-${stage.id}`}>
                   <OutlineButton
                     disabled={stopping || (auditing ? !desktopRuns.supportsStop
-                      : !target || !hasLog || !!desktopRuns.busy(repoPath))}
+                      : !target || !hasLog)}
                     aria-label={t(stopping ? "stoppingAuditStage" : canStop ? "stopAuditStage"
                       : auditing ? "auditingStage" : "auditStage", { stage: t(stage.label) })}
                     aria-busy={auditing || stopping}

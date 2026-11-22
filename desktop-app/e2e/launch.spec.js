@@ -23,6 +23,7 @@ import { runThemeChecks } from "./themeChecks.js";
 import { runSidebarSearchChecks } from "./sidebarSearchChecks.js";
 import { runWorktreeDeletionChecks } from "./worktreeDeletionChecks.js";
 import { runDesktopUpdateChecks } from "./desktopUpdateChecks.js";
+import { runRecoveryChecks } from "./runRecoveryChecks.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(testDirectory, "..");
@@ -190,6 +191,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     });
     await runThemeChecks(browser, artifacts);
     await runNavigationChecks(t, browser, navigationFixture, artifacts);
+    await runRecoveryChecks(t, browser, navigationFixture, artifacts, command);
     await runLanguageChecks(browser, navigationFixture, artifacts);
     await t.test("Sidebar repository and branch search", { timeout: 120_000 }, async (searchContext) => {
       try {

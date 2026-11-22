@@ -7,23 +7,15 @@ import type { RunEntry } from "./useBranchRuns";
 import type { FactoryRunMode } from "../router";
 import { notifyRunCompletion } from "../notifications";
 import { RUN_STATE } from "../runState";
+import { readDesktopRuns, writeDesktopRuns, isRunTrackingUnavailable, type SavedDesktopRun } from "../desktopRunStorage";
+import { useRunDiscovery } from "./useRunDiscovery";
+import { isDesktopRunActive, type DesktopRun } from "../desktopRun";
+
+export { isDesktopRunActive, type DesktopRun, type RunState } from "../desktopRun";
 
 export { RUN_STATE } from "../runState";
 
-export type RunState = (typeof RUN_STATE)[keyof typeof RUN_STATE];
 type RunOutcome = typeof RUN_STATE.SUCCEEDED | typeof RUN_STATE.INTERRUPTED;
-
-export interface DesktopRun {
-  id: string;
-  repo: string;
-  repoPath: string;
-  branch: string;
-  runId: string | null;
-  directory: string | null;
-  state: RunState;
-  error: UiMessage | null;
-  stopError: UiMessage | null;
-}
 
 export interface StartDesktopRun {
   mode: FactoryRunMode;
@@ -43,19 +35,39 @@ export interface ResumeDesktopRun {
   run: RunEntry;
 }
 
-export function isDesktopRunActive(run: DesktopRun): boolean {
-  return run.state === RUN_STATE.STARTING
-    || run.state === RUN_STATE.RUNNING
-    || run.state === RUN_STATE.STOPPING;
-}
-
 export function useDesktopRuns(
   onBranchCreated: (path: string, worktree: BranchWorktree) => void,
   isDeletingWorktree: (path: string, branch: string) => boolean,
 ) {
-  const sessions = useRef<Record<string, DesktopRun>>({});
-  const [runs, setRuns] = useState<Record<string, DesktopRun>>({});
+  const [initial] = useState(() => {
+    const saved = readDesktopRuns();
+    const runs: Record<string, DesktopRun> = Object.fromEntries(saved.runs.map((run) => [run.id, {
+      ...run, state: RUN_STATE.RUNNING, error: null, stopError: null,
+      tracking: "restored", previousStopRequested: run.state === RUN_STATE.STOPPING,
+    }]));
+    return { runs, warning: saved.warning };
+  });
+  const sessions = useRef(initial.runs);
+  const [runs, setRuns] = useState(initial.runs);
   const [supportsStop, setSupportsStop] = useState(false);
+  const lifecycle = useRef({ active: true, leaving: false });
+
+  useEffect(() => {
+    if (initial.warning) console.warn("Run recovery storage:", initial.warning);
+    lifecycle.current.active = true;
+    function leave() {
+      if (lifecycle.current.leaving) return;
+      lifecycle.current.leaving = true;
+      persist(sessions.current);
+    }
+    window.addEventListener("beforeunload", leave);
+    window.addEventListener("pagehide", leave);
+    return () => {
+      lifecycle.current.active = false;
+      window.removeEventListener("beforeunload", leave);
+      window.removeEventListener("pagehide", leave);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -73,17 +85,40 @@ export function useDesktopRuns(
     };
   }, []);
 
+  function persist(next: Record<string, DesktopRun>): string | null {
+    const saved: SavedDesktopRun[] = [];
+    for (const run of Object.values(next)) {
+      if (run.tracking === "unavailable" || (run.state !== RUN_STATE.RUNNING && run.state !== RUN_STATE.STOPPING)) continue;
+      saved.push({
+        id: run.id, repo: run.repo, repoPath: run.repoPath, branch: run.branch,
+        runId: run.runId, directory: run.directory, state: run.previousStopRequested ? "stopping" : run.state, mode: run.mode,
+        previousDirectories: run.previousDirectories,
+      });
+    }
+    return writeDesktopRuns(saved);
+  }
+
+  function publish(next: Record<string, DesktopRun>) {
+    if (!lifecycle.current.active || lifecycle.current.leaving) return;
+    sessions.current = next;
+    setRuns(next);
+    const warning = persist(next);
+    if (warning) console.warn("Run recovery storage:", warning);
+  }
+
+  function add(run: DesktopRun) {
+    publish({ ...sessions.current, [run.id]: run });
+  }
+
   function update(id: string, patch: Partial<DesktopRun>) {
+    if (!lifecycle.current.active || lifecycle.current.leaving) return;
     const previous = sessions.current[id];
+    if (!previous || previous.tracking === "unavailable") return;
     const next = { ...previous, ...patch };
-    sessions.current = {
-      ...sessions.current,
-      [id]: next,
-    };
-    setRuns(sessions.current);
+    publish({ ...sessions.current, [id]: next });
 
     if (
-      previous
+      previous.tracking === "owned"
       && isDesktopRunActive(previous)
       && (next.state === RUN_STATE.SUCCEEDED || next.state === RUN_STATE.FAILED)
     ) {
@@ -95,10 +130,25 @@ export function useDesktopRuns(
     }
   }
 
-  function busy(repoPath: string, branch?: string) {
-    return Object.values(sessions.current).find((run) =>
-      run.repoPath === repoPath && (branch === undefined || run.branch === branch)
-        && isDesktopRunActive(run));
+  const discovery = useRunDiscovery(sessions, update, onBranchCreated, lifecycle);
+
+  function executionFailed(id: string, error: unknown) {
+    const message = error instanceof Error ? error.message : error;
+    if (message === "This run is already tracked.") {
+      // Tauri can retry a pending IPC request after a transport failure. The
+      // original execution still owns this ID; its completion callback is lost.
+      update(id, { state: RUN_STATE.RUNNING, tracking: "restored", error: null, stopError: null });
+    } else {
+      update(id, { state: RUN_STATE.FAILED, error: toUiMessage(error), stopError: null });
+    }
+  }
+
+  function forget(id: string, stopError: UiMessage | null = null) {
+    const run = sessions.current[id];
+    if (!run || run.tracking !== "restored") return;
+    publish({ ...sessions.current, [id]: {
+      ...run, tracking: "unavailable", error: null, stopError,
+    } });
   }
 
   function checkWorktreeDeletion(repoPath: string, branch: string) {
@@ -109,72 +159,16 @@ export function useDesktopRuns(
 
   function start(input: StartDesktopRun): string {
     checkWorktreeDeletion(input.repoPath, input.branch);
-    if (busy(input.repoPath)) throw new AppMessageError({ key: "thisRepositoryAlreadyHasAnActiveRun" });
     const id = `desktop:${crypto.randomUUID()}`;
-    update(id, {
+    add({
       id, repo: input.repo, repoPath: input.repoPath, branch: input.branch,
       runId: null, directory: null, state: RUN_STATE.STARTING, error: null,
-      stopError: null,
+      stopError: null, mode: input.mode, previousDirectories: [],
+      tracking: "owned", previousStopRequested: false,
     });
 
     void (async () => {
-      let stopped = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      let discovery = Promise.resolve();
-      let knownDirectories: Set<string> | undefined;
-      let branchFound = false;
-      let branchDiscovery = Promise.resolve();
-      function discoverBranch() {
-        branchDiscovery = branchDiscovery.then(async () => {
-          if (!knownDirectories || branchFound) return;
-          try {
-            const branches = await invoke<BranchWorktree[]>("list_branches", { path: input.repoPath });
-            const worktree = branches.find((entry) => entry.branch === input.branch);
-            if (worktree) {
-              branchFound = true;
-              onBranchCreated(input.repoPath, worktree);
-            }
-          } catch (error) {
-            console.error("Could not check run branch:", error);
-          }
-        });
-        return branchDiscovery;
-      }
-      function discoverDirectory() {
-        discovery = discovery.then(async () => {
-          const previousDirectories = knownDirectories;
-          if (!previousDirectories || sessions.current[id].directory) return;
-          try {
-            const entries = await invoke<RunEntry[]>("list_branch_runs", {
-              path: input.repoPath, branch: input.branch,
-            });
-            const candidates = entries.filter((entry) =>
-              entry.name.startsWith(`${input.mode}-`) && !previousDirectories.has(entry.directory));
-            if (candidates.length > 1) {
-              throw new AppMessageError({ key: "multipleNewRunDirectoriesFoundOpenTheRunFromTheBranchList" });
-            }
-            if (candidates.length === 1) {
-              const entry = candidates[0];
-              update(id, {
-                directory: entry.directory, runId: entry.name,
-                error: sessions.current[id].state === RUN_STATE.FAILED ? sessions.current[id].error : null,
-              });
-            }
-          } catch (error) {
-            if (isDesktopRunActive(sessions.current[id])) {
-              update(id, { error: error instanceof AppMessageError ? error.descriptor
-                : { key: "couldNotLocateRunLogsError", values: { error: String(error) } } });
-            }
-          }
-        });
-        return discovery;
-      }
-      async function pollDirectory() {
-        await Promise.all([discoverDirectory(), discoverBranch()]);
-        if (!stopped && (!sessions.current[id].directory || !branchFound)) {
-          timer = setTimeout(() => void pollDirectory(), 1000);
-        }
-      }
+      let dispatched = false;
       try {
         await invoke(input.createConfig ? "create_factory_config" : "update_factory_config", {
           path: input.repoPath, config: input.config,
@@ -182,16 +176,9 @@ export function useDesktopRuns(
         const previous = await invoke<RunEntry[]>("list_branch_runs", {
           path: input.repoPath, branch: input.branch,
         });
-        try {
-          const branches = await invoke<BranchWorktree[]>("list_branches", { path: input.repoPath });
-          const worktree = branches.find((entry) => entry.branch === input.branch);
-          branchFound = Boolean(worktree);
-          if (worktree) onBranchCreated(input.repoPath, worktree);
-        } catch (error) {
-          console.error("Could not check existing run branch:", error);
-        }
-        knownDirectories = new Set(previous.map((entry) => entry.directory));
-        update(id, { state: RUN_STATE.RUNNING });
+        if (!lifecycle.current.active || lifecycle.current.leaving) return;
+        update(id, { state: RUN_STATE.RUNNING, previousDirectories: previous.map((entry) => entry.directory) });
+        dispatched = true;
         const completion = invoke<RunOutcome>(
           "start_tracked_factory_run",
           {
@@ -201,17 +188,13 @@ export function useDesktopRuns(
             mode: input.mode,
           },
         );
-        void pollDirectory();
         const outcome = await completion;
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        update(id, { state: RUN_STATE.FAILED, error: toUiMessage(error), stopError: null });
+        executionFailed(id, error);
       } finally {
-        stopped = true;
-        if (timer !== undefined) clearTimeout(timer);
-        // A short run can finish before the first directory poll completes.
-        await discoverDirectory();
-        await discoverBranch();
+        // A short run can finish before the shared polling loop first sees it.
+        if (dispatched) await discovery.finish(id);
       }
     })();
     return id;
@@ -219,27 +202,32 @@ export function useDesktopRuns(
 
   function resume(input: ResumeDesktopRun): string {
     checkWorktreeDeletion(input.repoPath, input.branch);
-    if (busy(input.repoPath)) throw new AppMessageError({ key: "thisRepositoryAlreadyHasAnActiveRun" });
     const id = `desktop:${crypto.randomUUID()}`;
-    update(id, {
+    add({
       id, repo: input.repo, repoPath: input.repoPath, branch: input.branch,
       runId: input.run.name, directory: input.run.directory, state: RUN_STATE.STARTING, error: null,
-      stopError: null,
+      stopError: null, mode: "resume", previousDirectories: [],
+      tracking: "owned", previousStopRequested: false,
     });
 
     void (async () => {
+      let dispatched = false;
       try {
         await invoke("update_factory_config", {
           path: input.repoPath, config: input.config,
         });
+        if (!lifecycle.current.active || lifecycle.current.leaving) return;
         update(id, { state: RUN_STATE.RUNNING });
+        dispatched = true;
         const outcome = await invoke<RunOutcome>("resume_factory_run", {
           path: input.repoPath, branch: input.branch, runId: input.run.name,
           executionId: id,
         });
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        update(id, { state: RUN_STATE.FAILED, error: toUiMessage(error), stopError: null });
+        executionFailed(id, error);
+      } finally {
+        if (dispatched) await discovery.finish(id);
       }
     })();
     return id;
@@ -251,6 +239,7 @@ export function useDesktopRuns(
     if (
       !supportsStop
       || !run
+      || !isDesktopRunActive(run)
       || run.state !== RUN_STATE.RUNNING
     ) {
       return;
@@ -261,6 +250,11 @@ export function useDesktopRuns(
     try {
       await invoke<void>("stop_factory_run", { runId: id });
     } catch (error) {
+      // A restored ID may belong to a finished run or a previous app instance.
+      if (run.tracking === "restored" && isRunTrackingUnavailable(error)) {
+        forget(id, { key: "couldNotStopRunError", values: { error: String(error) } });
+        return;
+      }
       // Execution may have finished while the Stop request was pending.
       if (sessions.current[id]?.state === RUN_STATE.STOPPING) {
         update(id, {
@@ -277,9 +271,8 @@ export function useDesktopRuns(
     start,
     resume,
     stop,
-    busy,
     find: (repoPath: string, branch: string, runId: string) => Object.values(runs).reverse().find((run) =>
-      run.repoPath === repoPath && (run.id === runId || (run.runId === runId
+      run.repoPath === repoPath && run.branch === branch && (run.id === runId || (run.runId === runId
         && run.directory?.split(/[\\/]/).slice(-2)[0] === branch.replace(/[^a-zA-Z0-9._-]/g, "-")))),
   };
 }

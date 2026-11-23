@@ -3,8 +3,8 @@ export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
   // https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/models-manager/models.json
   // https://learn.chatgpt.com/docs/models?surface=cli
   codex: [
-    "gpt-6.2-astra",
-    "gpt-6.2-sol",
+    "gpt-6.2-astra", // Codex CLI 0.166.0+; not available on Free or K-12 plans.
+    "gpt-6.2-sol", // Codex CLI 0.166.0+; not available on Free or K-12 plans.
     "gpt-6-astra",
     "gpt-6.1-sol",
     "gpt-6.1-terra",

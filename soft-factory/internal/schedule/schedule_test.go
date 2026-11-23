@@ -48,15 +48,25 @@ func TestCronJobCapturesOutput(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("PATH", strings.Join([]string{dir, agentDir, toolsDir}, ":"))
-	if err := os.WriteFile(filepath.Join(agentDir, "agent-sandbox"), []byte("#!/bin/sh\necho startup-output\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(toolsDir, "gh"), []byte("#!/bin/sh\necho gh-output\n"), 0o700); err != nil {
-		t.Fatal(err)
+	unusedDir := filepath.Join(dir, "unused-path-entry")
+	t.Setenv("PATH", strings.Repeat(unusedDir+":", 24)+strings.Join([]string{dir, agentDir, toolsDir}, ":"))
+	for executable, output := range map[string]string{
+		filepath.Join(agentDir, "agent-sandbox"): "startup-output",
+		filepath.Join(agentDir, "docker"):        "docker-output",
+		filepath.Join(toolsDir, "git"):           "git-output",
+		filepath.Join(toolsDir, "gh"):            "gh-output",
+	} {
+		if err := os.WriteFile(executable, []byte("#!/bin/sh\necho "+output+"\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
 	}
 	executable := filepath.Join(dir, "software-factory")
-	const script = "#!/bin/sh\ncommand -v sh >/dev/null || exit 1\nagent-sandbox || exit 1\ngh || exit 1\necho startup-error >&2\nexit 23\n"
+	const script = `#!/bin/sh
+command -v sh >/dev/null || exit 1
+agent-sandbox && docker && git && gh || exit 1
+echo startup-error >&2
+exit 23
+`
 	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +81,9 @@ func TestCronJobCapturesOutput(t *testing.T) {
 			t.Fatal(err)
 		}
 		line := strings.Split(block, "\n")[1]
+		if len(line) >= 1000 || strings.Contains(line, unusedDir) {
+			t.Fatalf("expected a short cron entry without unused directories, got %q", line)
+		}
 		command, ok := strings.CutPrefix(line, timing+" ")
 		if !ok {
 			t.Fatalf("unexpected cron entry %q", line)
@@ -94,22 +107,34 @@ func TestCronJobCapturesOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output := string(data); !strings.HasPrefix(output, "startup-output\ngh-output\nstartup-error\n") || !strings.Contains(output, missing) {
+	if output := string(data); !strings.HasPrefix(output, "startup-output\ndocker-output\ngit-output\ngh-output\nstartup-error\n") || !strings.Contains(output, missing) {
 		t.Fatalf("cron output log = %q, want startup output followed by the cd error", output)
 	}
 }
 
 func TestQuoteCronSearchPath(t *testing.T) {
-	got, err := quoteCronSearchPath(":/first:relative:.:/second:", false)
-	if want := "'/first':'/second'"; err != nil || got != want {
+	first, second := t.TempDir(), t.TempDir()
+	for _, executable := range []string{
+		filepath.Join(first, "software-factory"),
+		filepath.Join(first, "git"),
+		filepath.Join(second, "git"),
+		filepath.Join(second, "gh"),
+	} {
+		if err := os.WriteFile(executable, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := strings.Join([]string{"", first, "relative", ".", second, first, ""}, ":")
+	got, err := quoteCronSearchPath(path, false)
+	if want := fmt.Sprintf("'%s':'%s'", first, second); err != nil || got != want {
 		t.Fatalf("quoteCronSearchPath() = %q, %v; want %q", got, err, want)
 	}
 	for _, invalid := range []string{"/bin%name", "/bin\rname", "/bin\nname", "/bin\x00name"} {
-		if _, err := quoteCronSearchPath("/bin:"+invalid, false); err == nil {
-			t.Errorf("quoteCronSearchPath() accepted %q", invalid)
+		if _, err := quoteCronPath(invalid); err == nil {
+			t.Errorf("quoteCronPath() accepted %q", invalid)
 		}
 	}
-	if _, err := quoteCronSearchPath(t.TempDir(), true); err == nil {
+	if _, err := quoteCronSearchPath(path, true); err == nil {
 		t.Fatal("quoteCronSearchPath() accepted a PATH without agent-sandbox")
 	}
 }
@@ -149,15 +174,15 @@ func TestScheduledTaskValidate(t *testing.T) {
 func TestScheduleChangesInstallCrontab(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	t.Setenv("PATH", dir+":/usr/bin:/bin")
+	t.Setenv("PATH", dir)
 	const fakeCrontab = `#!/bin/sh
 dir=${0%/*}
 case "$1" in
   -l)
     if [ -f "$dir/table" ]; then
-      cat "$dir/table"
+      /bin/cat "$dir/table"
     else
-      echo "no crontab for $(id -un)" >&2
+      echo "no crontab for $(/usr/bin/id -un)" >&2
       exit 1
     fi
     ;;
@@ -166,7 +191,7 @@ case "$1" in
       echo "installation failed" >&2
       exit 1
     fi
-    cat > "$dir/table"
+    /bin/cat > "$dir/table"
     ;;
   *) exit 2 ;;
 esac
@@ -201,7 +226,7 @@ esac
 
 	taskPath := filepath.Join(repoPath, task.FilePrompt)
 	outputPath := filepath.Join(filepath.Dir(schedule.filePath), "cron-output.log")
-	firstJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
+	firstJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
 	tablePath := filepath.Join(dir, "table")
 	assertCrontab := func(want string) {
 		t.Helper()
@@ -226,7 +251,7 @@ esac
 	if err := schedule.Create(repoPath, secondTask); err != nil {
 		t.Fatal(err)
 	}
-	secondJob := fmt.Sprintf("0 18 * * 0 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
+	secondJob := fmt.Sprintf("0 18 * * 0 (cd '%s' && PATH='%s'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
 	secondTable := cronBegin + "\n" + firstJob + secondJob + cronEnd + "\n" + unrelatedJob
 	assertCrontab(secondTable)
 
@@ -236,7 +261,7 @@ esac
 	if err := schedule.Edit(repoPath, editedTask); err != nil {
 		t.Fatal(err)
 	}
-	editedJob := fmt.Sprintf("0 9 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, filepath.Join(repoPath, editedTask.FilePrompt), outputPath)
+	editedJob := fmt.Sprintf("0 9 * * 1-5 (cd '%s' && PATH='%s'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, filepath.Join(repoPath, editedTask.FilePrompt), outputPath)
 	editedTable := cronBegin + "\n" + editedJob + secondJob + cronEnd + "\n" + unrelatedJob
 	assertCrontab(editedTable)
 

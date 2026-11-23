@@ -114,10 +114,25 @@ func renderCronBlock(tasks ScheduledTasks, outputPath string, requireAgent bool)
 }
 
 func quoteCronSearchPath(path string, requireAgent bool) (string, error) {
+	tools := []string{"software-factory", "agent-sandbox", "git", "docker", "gh"}
+	found := make(map[string]bool, len(tools))
 	var pathArgs []string
-	var agentFound bool
+
 	for _, dir := range filepath.SplitList(path) {
 		if !filepath.IsAbs(dir) {
+			continue
+		}
+		needed := false
+		for _, tool := range tools {
+			if found[tool] {
+				continue
+			}
+			if _, err := exec.LookPath(filepath.Join(dir, tool)); err == nil {
+				found[tool] = true
+				needed = true
+			}
+		}
+		if !needed {
 			continue
 		}
 		arg, err := quoteCronPath(dir)
@@ -125,13 +140,11 @@ func quoteCronSearchPath(path string, requireAgent bool) (string, error) {
 			return "", fmt.Errorf("schedule PATH: %w", err)
 		}
 		pathArgs = append(pathArgs, arg)
-		if requireAgent && !agentFound {
-			// An absolute argument checks this directory without searching the original PATH.
-			_, err := exec.LookPath(filepath.Join(dir, "agent-sandbox"))
-			agentFound = err == nil
+		if len(found) == len(tools) {
+			break
 		}
 	}
-	if requireAgent && !agentFound {
+	if requireAgent && !found["agent-sandbox"] {
 		return "", errors.New("agent-sandbox was not found on the absolute directories in PATH")
 	}
 	return strings.Join(pathArgs, ":"), nil

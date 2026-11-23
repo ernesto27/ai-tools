@@ -29,18 +29,18 @@ func TestScheduledTaskCreateEditAndDelete(t *testing.T) {
 
 	t.Chdir(project)
 	t.Setenv("HOME", dir)
-	t.Setenv("PATH", dir+":/usr/bin:/bin")
+	t.Setenv("PATH", dir)
 	const fakeCrontab = `#!/bin/sh
 table=${0%/*}/table
 case "$1" in
   -l)
     if [ -f "$table" ]; then
-      cat "$table"
+      /bin/cat "$table"
     else
       printf '%s\n' '15 2 * * * /usr/local/bin/backup'
     fi
     ;;
-  -) cat > "$table" ;;
+  -) /bin/cat > "$table" ;;
   *) exit 2 ;;
 esac
 `
@@ -73,7 +73,7 @@ esac
 		t.Fatal(err)
 	}
 	scheduleDir := filepath.Join(dir, ".config", "software-factory", "scheduled-tasks")
-	wantJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n",
+	wantJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n",
 		project, dir, filepath.Join(dir, "software-factory"), filepath.Join(project, prompt), filepath.Join(scheduleDir, "cron-output.log"))
 	wantTable := "15 2 * * * /usr/local/bin/backup\n# BEGIN SOFT FACTORY\n" + wantJob + "# END SOFT FACTORY\n"
 	if string(table) != wantTable {

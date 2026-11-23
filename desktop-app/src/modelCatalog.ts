@@ -31,7 +31,6 @@ export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
     "claude-sonnet-5-5",
     "claude-sonnet-5",
     "claude-sonnet-4-6",
-    "claude-sonnet-4-5", // Deprecated; selectable until 2026-11-30.
     "claude-haiku-5-5",
     "claude-haiku-4-5",
   ],

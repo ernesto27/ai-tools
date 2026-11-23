@@ -346,6 +346,46 @@ async fn list_skills(path: String) -> Result<Vec<Skill>, String> {
     .map_err(|error| format!("Could not load skills: {error}"))?
 }
 
+#[tauri::command]
+async fn scheduled_create_factory_run(
+    path: Option<String>,
+    name: String,
+    file: String,
+    cron: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let project_dir = path.as_deref().unwrap_or(".");
+        FactoryRun::new(project_dir).scheduled_task_create(&name, &file, &cron)
+    })
+    .await
+    .map_err(|error| format!("Could not wait for schedule creation: {error}"))?
+}
+
+#[tauri::command]
+async fn scheduled_edit_factory_run(
+    path: Option<String>,
+    name: String,
+    file: String,
+    cron: Option<String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let project_dir = path.as_deref().unwrap_or(".");
+        FactoryRun::new(project_dir).scheduled_task_edit(&name, &file, cron.as_deref())
+    })
+    .await
+    .map_err(|error| format!("Could not wait for schedule edit: {error}"))?
+}
+
+#[tauri::command]
+async fn scheduled_delete_factory_run(path: Option<String>, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let project_dir = path.as_deref().unwrap_or(".");
+        FactoryRun::new(project_dir).scheduled_task_delete(&name)
+    })
+    .await
+    .map_err(|error| format!("Could not wait for schedule deletion: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -378,6 +418,9 @@ pub fn run() {
             resume_factory_run,
             stop_factory_run,
             audit_factory_run,
+            scheduled_create_factory_run,
+            scheduled_edit_factory_run,
+            scheduled_delete_factory_run,
             list_skills,
             agent_sandbox_check_bin,
             software_factory_check_bin,

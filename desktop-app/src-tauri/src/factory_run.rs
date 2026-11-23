@@ -102,6 +102,65 @@ impl FactoryRun {
             .status();
     }
 
+    pub fn scheduled_task_create(&self, name: &str, file: &str, cron: &str) -> Result<(), String> {
+        self.run_scheduled_task("create", name, Some(file), Some(cron))
+    }
+
+    pub fn scheduled_task_edit(
+        &self,
+        name: &str,
+        file: &str,
+        cron: Option<&str>,
+    ) -> Result<(), String> {
+        self.run_scheduled_task("edit", name, Some(file), cron)
+    }
+
+    pub fn scheduled_task_delete(&self, name: &str) -> Result<(), String> {
+        self.run_scheduled_task("delete", name, None, None)
+    }
+
+    fn run_scheduled_task(
+        &self,
+        action: &str,
+        name: &str,
+        file: Option<&str>,
+        cron: Option<&str>,
+    ) -> Result<(), String> {
+        let output = self
+            .scheduled_task_command(action, name, file, cron)
+            .output()
+            .map_err(|error| format!("Could not start software-factory: {error}"))?;
+
+        if output.status.success() {
+            return Ok(());
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!(
+            "Could not {action} schedule ({}): {}",
+            output.status,
+            stderr.trim()
+        ))
+    }
+
+    fn scheduled_task_command(
+        &self,
+        action: &str,
+        name: &str,
+        file: Option<&str>,
+        cron: Option<&str>,
+    ) -> Command {
+        let mut command = self.command();
+        command.args(["scheduled-task", action, "--name", name]);
+        if let Some(file) = file {
+            command.args(["--file", file]);
+        }
+        if let Some(cron) = cron {
+            command.args(["--cron", cron]);
+        }
+        command
+    }
+
     pub fn install_bin() -> Result<(), String> {
         let output = Command::new("bash")
             .args([
@@ -153,6 +212,56 @@ mod tests {
         assert_eq!(command.get_program(), OsStr::new("software-factory"));
         assert_eq!(command.get_current_dir(), Some(repository.path()));
         assert_eq!(command.get_args().count(), 0);
+    }
+
+    #[test]
+    fn builds_scheduled_task_arguments() {
+        let factory = FactoryRun::new(".");
+        let cases = [
+            (
+                "create",
+                "weekday",
+                Some("task.txt"),
+                Some("30 8 * * 1-5"),
+                &[
+                    "scheduled-task",
+                    "create",
+                    "--name",
+                    "weekday",
+                    "--file",
+                    "task.txt",
+                    "--cron",
+                    "30 8 * * 1-5",
+                ][..],
+            ),
+            (
+                "edit",
+                "-weekday morning",
+                Some("-task prompt.txt"),
+                None,
+                &[
+                    "scheduled-task",
+                    "edit",
+                    "--name",
+                    "-weekday morning",
+                    "--file",
+                    "-task prompt.txt",
+                ][..],
+            ),
+            (
+                "delete",
+                "weekday",
+                None,
+                None,
+                &["scheduled-task", "delete", "--name", "weekday"][..],
+            ),
+        ];
+
+        for (action, name, file, cron, expected) in cases {
+            let command = factory.scheduled_task_command(action, name, file, cron);
+            let actual = command.get_args().collect::<Vec<_>>();
+            assert_eq!(actual.as_slice(), expected, "{action}");
+        }
     }
 
     #[test]

@@ -74,7 +74,7 @@ func TestResumedRunRecordsCodexCost(t *testing.T) {
 
 	summary, err := os.ReadFile(filepath.Join(path, summaryFile))
 	require.NoError(t, err)
-	require.Contains(t, string(summary), "   Tokens usage:  410K\n   Tokens cost:  $0.3300 USD\n")
+	require.Contains(t, string(summary), "| 410K        | $0.3300     |")
 }
 
 func TestReviewArchiveUsesStageIdentifier(t *testing.T) {

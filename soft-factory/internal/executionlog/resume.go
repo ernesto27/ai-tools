@@ -27,7 +27,11 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 	}
 	entries := 0
 	for _, line := range strings.Split(string(data), "\n") {
-		number, _, ok := strings.Cut(line, ". ")
+		heading, ok := strings.CutPrefix(line, "| ")
+		if !ok {
+			continue
+		}
+		number, _, ok := strings.Cut(heading, ". ")
 		if !ok {
 			continue
 		}
@@ -47,7 +51,7 @@ func OpenRun(path, branch string, planned []config.Stage) (*Run, error) {
 		status.Close()
 		return nil, fmt.Errorf("open existing summary: %w", err)
 	}
-	resumeHeader := fmt.Sprintf("\n%s\nRESUMED: %s\n\n", separator, timestamp())
+	resumeHeader := fmt.Sprintf("\n%s\nRESUMED: %s\n\n", separator, timestamp()) + summaryTableHeader()
 	if _, err := summary.WriteString(resumeHeader); err != nil {
 		summary.Close()
 		status.Close()

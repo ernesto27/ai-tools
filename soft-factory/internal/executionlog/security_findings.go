@@ -120,7 +120,7 @@ func securitySummary(path string) (string, error) {
 	field := func(label, value string) string {
 		value = strings.ReplaceAll(value, "\r\n", "\n")
 		value = strings.ReplaceAll(value, "\r", "\n")
-		return "   " + label + ": " + strings.ReplaceAll(value, "\n", "\n      ") + "\n"
+		return label + ": " + value + "\n"
 	}
 	text := field("Verdict", report.Verdict)
 	if len(report.Findings) == 0 {
@@ -130,7 +130,7 @@ func securitySummary(path string) (string, error) {
 			text += field("Findings", "No actionable findings established; review evidence is insufficient.")
 		}
 	} else {
-		text += "   Findings:\n"
+		text += "Findings:\n"
 		for _, f := range report.Findings {
 			if (f.Priority != "P0" && f.Priority != "P1" && f.Priority != "P2" && f.Priority != "P3") ||
 				!validText(f.Trigger) || !validText(f.Impact) || !validText(f.SuggestedFix) ||
@@ -151,7 +151,7 @@ func (r *Run) securitySummaryLocked() string {
 	text, err := securitySummary(r.securityFindingsPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: read security findings: %v\n", err)
-		return "   Verdict: BLOCKED\n   Findings: Security findings unavailable.\n   Checks: Unavailable.\n   Gaps: Final security report missing, unreadable, or invalid.\n"
+		return "Verdict: BLOCKED\nFindings: Security findings unavailable.\nChecks: Unavailable.\nGaps: Final security report missing, unreadable, or invalid.\n"
 	}
 	return text
 }

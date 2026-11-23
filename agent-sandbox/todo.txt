@@ -3,6 +3,9 @@
 [] - verification option flag to disable (screnshot , files in PR description)
 [] - Extend error categories and actionable recovery hints to Docker/image builds, authentication, agent failures, network requests, Git push/PR publication, and update failures.
 [] - 8. Resource limits — configure CPU, memory, and maximum execution time per sandbox.
+[] - check Starting implementation...
+--- ERROR ---
+read software-factory.json: agentSandbox.run.filePrompt must contain at least one path
 [x] - improve error messages in general
 [x] - container sandbox should commit changes
 [x] - command to get list of providers, models , pricing

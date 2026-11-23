@@ -58,30 +58,33 @@ func TestSummaryLifecycle(t *testing.T) {
 		require.Equal(t, want, string(data))
 	}
 
-	want := "SOFTWARE FACTORY — RUN SUMMARY\n==================================================\n\n"
+	want := "SOFTWARE FACTORY — RUN SUMMARY\n==================================================\n\n" + summaryTableHeader()
 	checkContents(want)
 
 	entries := []struct {
 		stage   config.Stage
 		elapsed time.Duration
 		err     error
-		line    string
+		row     summaryRow
 	}{
-		{"implementation", 60855 * time.Millisecond, nil, "1. IMPLEMENTATION\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  1 min 1 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 135183 * time.Millisecond, nil, "2. CODE REVIEW\n   Status:    SUCCEEDED\n   Agent:     \n   Model:     \n   Duration:  2 min 15 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n\n"},
-		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"), "3. CODE REVIEW\n   Status:    FAILED\n   Agent:     \n   Model:     \n   Duration:  18 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: exit status 1\n              verification failed\n\n"},
-		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled), "4. SECURITY REVIEW\n   Status:    INTERRUPTED\n   Agent:     \n   Model:     \n   Duration:  1 sec\n   Tokens usage:  unavailable\n   Tokens cost:  unavailable\n   Changes:   Change summary unavailable.\n   Error:     execute agent-sandbox: context canceled\n\n"},
+		{"implementation", 60855 * time.Millisecond, nil,
+			summaryRow{"1. IMPLEMENTATION", "SUCCEEDED", "", "1 min 1 sec", "unavailable", "unavailable", "Changes: Change summary unavailable."}},
+		{"codeReview", 135183 * time.Millisecond, nil,
+			summaryRow{"2. CODE REVIEW", "SUCCEEDED", "", "2 min 15 sec", "unavailable", "unavailable", "Changes: Change summary unavailable."}},
+		{"codeReview", 18 * time.Second, errors.New("execute agent-sandbox: exit status 1\nverification failed"),
+			summaryRow{"3. CODE REVIEW", "FAILED", "", "18 sec", "unavailable", "unavailable", "Changes: Change summary unavailable.\nError: execute agent-sandbox: exit status 1\nverification failed"}},
+		{"securityReview", time.Second, fmt.Errorf("execute agent-sandbox: %w", context.Canceled),
+			summaryRow{"4. SECURITY REVIEW", "INTERRUPTED", "", "1 sec", "unavailable", "unavailable", "Changes: Change summary unavailable.\nError: execute agent-sandbox: context canceled"}},
 	}
 	for _, entry := range entries {
 		require.NoError(t, run.RecordStageResult(entry.stage, entry.elapsed, entry.err))
-		want += entry.line
+		want += formatSummaryRow(entry.row) + summaryRule()
 		checkContents(want)
 	}
 
 	file := run.summary
 	run.Finish(nil)
 	run.Finish(nil) // Finishing twice must be safe.
-	want += "==================================================\n"
 
 	_, err = file.WriteString("unexpected\n")
 	require.ErrorIs(t, err, os.ErrClosed)
@@ -142,7 +145,7 @@ func TestSummaryStageTokenUsage(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 	require.NoError(t, err)
 	for _, want := range []string{"44K", "12", "73K", "427K", "unavailable"} {
-		require.Contains(t, string(data), "   Tokens usage:  "+want+"\n   Tokens cost:  ")
+		require.Contains(t, string(data), fmt.Sprintf("| %-11s |", want))
 	}
 }
 
@@ -172,18 +175,25 @@ func TestSummarySelectionLifecycle(t *testing.T) {
 		require.NoError(t, run.RecordStageResult(tt.stage, time.Second, tt.err))
 		data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 		require.NoError(t, err)
-		entry := fmt.Sprintf("%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  1 sec\n",
-			i+1, stageHeading(tt.stage), outcome(tt.err), tt.agent, tt.model)
-		require.Contains(t, string(data), entry)
+		row := summaryRow{
+			fmt.Sprintf("%d. %s", i+1, stageHeading(tt.stage)),
+			outcome(tt.err),
+			strings.TrimSuffix(tt.agent+"\n"+tt.model, "\n"),
+			"1 sec", "unavailable", "unavailable", "",
+		}
+		// Compare the columns before Result, which varies by stage.
+		for _, line := range strings.Split(strings.TrimSuffix(formatSummaryRow(row), "\n"), "\n") {
+			require.Contains(t, string(data), line[:strings.LastIndex(line[:len(line)-1], "|")+1])
+		}
 		require.NotContains(t, string(data), "earlier-")
 		require.NotContains(t, string(data), "details-")
 	}
-	require.NoError(t, run.RecordSkippedStage("Skipping disabled stage: codeReview"))
+	require.NoError(t, run.RecordSkippedStage(config.StageCodeReview))
 	data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 	require.NoError(t, err)
-	require.Equal(t, 4, strings.Count(string(data), "   Agent:"))
-	require.Equal(t, 4, strings.Count(string(data), "   Model:"))
-	require.True(t, strings.HasSuffix(string(data), "Skipping disabled stage: codeReview\n\n"))
+	require.True(t, strings.HasSuffix(string(data), formatSummaryRow(summaryRow{
+		"CODE REVIEW", "SKIPPED", "", "", "", "", "Disabled by configuration.",
+	})+summaryRule()))
 }
 
 func TestStageChangeReports(t *testing.T) {
@@ -193,7 +203,7 @@ func TestStageChangeReports(t *testing.T) {
 		missing bool
 		want    string
 	}{
-		{"two lines", "Added duration tracking.\r\nAdded tests.\r\n", false, "Added duration tracking.\n              Added tests."},
+		{"two lines", "Added duration tracking.\r\nAdded tests.\r\n", false, "Added duration tracking.\nAdded tests."},
 		{"no changes", "No code changes made.\n", false, "No code changes made."},
 		{"empty", " \n\r\n", false, "Change summary unavailable."},
 		{"missing", "", true, "Change summary unavailable."},
@@ -211,7 +221,9 @@ func TestStageChangeReports(t *testing.T) {
 			require.NoError(t, run.RecordStageResult("implementation", time.Second, nil))
 			data, err := os.ReadFile(filepath.Join(run.Path(), summaryFile))
 			require.NoError(t, err)
-			require.Contains(t, string(data), "   Changes:   "+tc.want+"\n")
+			require.Contains(t, string(data), formatSummaryRow(summaryRow{
+				"1. IMPLEMENTATION", "SUCCEEDED", "", "1 sec", "unavailable", "unavailable", "Changes: " + tc.want,
+			}))
 
 			_, err = os.Stat(report)
 			require.ErrorIs(t, err, os.ErrNotExist)

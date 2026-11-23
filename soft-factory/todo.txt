@@ -3,6 +3,20 @@
 [x] - add efffort setting in stage
 [] - add schedules task 
 [] - event task agent
+[] - when reload i can not stop a stage task
+
+[] - make resume of stages more easy to read 
+1. IMPLEMENTATION
+   Status:    SUCCEEDED
+   Agent:     codex
+   Model:     gpt-6.1-sol
+   Duration:  10 min 20 sec
+   Tokens usage:  3M
+   Tokens cost:  $0.6484 USD
+   Changes:   Implemented streamed Bash calls, strict batch validation, sequential agent rounds, merged output capture, and bounded stderr previews.
+              Split production modules, added unit and mock integration tests, and recorded Step 5 completion.
+
+
 [] - add prop in json to set critical files or directores, this should be add in pull request or block in some way
 []- 3. Compare agents on the same task — run Codex and Claude in separate worktrees and compare their diffs, test results, duration, and token usage.
 [] - check The screenshot shows the command launches, but Software Factory ignores run.query when building the task prompt. It tries to read run.filePrompt, which is absent, and attempts to open "".

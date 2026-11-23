@@ -74,7 +74,7 @@ func readRiskResult(path string) (string, bool) {
 
 func (r *Run) riskResultLocked() (string, func()) {
 	classification, collected := readRiskResult(r.riskResultPath)
-	line := "   Classification: " + classification + "\n"
+	line := "Classification: " + classification + "\n"
 	if !collected {
 		return line, nil
 	}

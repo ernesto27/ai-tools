@@ -120,7 +120,7 @@ func NewRun(branch, command string, planned []config.Stage) (*Run, error) {
 		return nil, fmt.Errorf("create stage status: %w", err)
 	}
 
-	summaryHeader := fmt.Sprintf("SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator)
+	summaryHeader := fmt.Sprintf("SOFTWARE FACTORY — RUN SUMMARY\n%s\n\n", separator) + summaryTableHeader()
 	_, writeErr := io.WriteString(file, summaryHeader)
 	if writeErr != nil {
 		file.Close()
@@ -366,11 +366,6 @@ func (r *Run) Finish(err error) {
 	}
 	r.finishStageLocked(err)
 	if r.summary != nil {
-		if _, writeErr := fmt.Fprintln(r.summary, separator); writeErr != nil {
-			r.failLocked(fmt.Errorf("write summary footer: %w", writeErr))
-		} else {
-			r.summaryText += separator + "\n"
-		}
 		if closeErr := r.summary.Close(); closeErr != nil {
 			r.failLocked(fmt.Errorf("close summary: %w", closeErr))
 		}
@@ -580,17 +575,6 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		totalTokens = formatTokenCount(total)
 		tokenCostText = fmt.Sprintf("$%.4f USD", tokenCostUsage)
 	}
-	entry := fmt.Sprintf(
-		"%d. %s\n   Status:    %s\n   Agent:     %s\n   Model:     %s\n   Duration:  %s\n   Tokens usage:  %s\n   Tokens cost:  %s\n",
-		r.summaryEntries+1,
-		stageHeading(stage),
-		status,
-		r.stageAgent,
-		r.stageModel, formatDuration(elapsed),
-		totalTokens,
-		tokenCostText,
-	)
-
 	var line string
 	var cleanup func()
 	switch stage {
@@ -600,21 +584,34 @@ func (r *Run) RecordStageResult(stage config.Stage, elapsed time.Duration, stage
 		// The walkthrough has no additional summary field.
 	default:
 		if stage == config.StageSecurityReview && r.securityReporting {
-			line = "   Changes:   No code changes made (saveFindings enabled).\n" + r.securitySummaryLocked()
+			line = "Changes: No code changes made (saveFindings enabled).\n" + r.securitySummaryLocked()
 		} else {
 			line, cleanup = r.changeSummaryLocked()
 		}
 	}
-	entry += line
+	result := strings.TrimSpace(line)
 	if stageErr != nil {
-		message := strings.ReplaceAll(stageErr.Error(), "\r\n", "\n")
-		entry += "   Error:     " + strings.ReplaceAll(message, "\n", "\n              ") + "\n"
+		if result != "" {
+			result += "\n"
+		}
+		result += "Error: " + stageErr.Error()
 	}
-	if _, err := io.WriteString(r.summary, entry+"\n"); err != nil {
-		return fmt.Errorf("write stage summary: %w", err)
+	if result == "" {
+		result = "—"
 	}
 
-	r.summaryText += entry + "\n"
+	row := summaryRow{
+		fmt.Sprintf("%d. %s", r.summaryEntries+1, stageHeading(stage)),
+		status,
+		strings.TrimSuffix(r.stageAgent+"\n"+r.stageModel, "\n"),
+		formatDuration(elapsed),
+		totalTokens,
+		strings.TrimSuffix(tokenCostText, " USD"),
+		result,
+	}
+	if err := r.appendSummaryRowLocked(row); err != nil {
+		return fmt.Errorf("write stage summary: %w", err)
+	}
 
 	r.summaryEntries++
 	if stage == config.StageSecurityReview && r.securityReporting {
@@ -649,7 +646,7 @@ func (r *Run) changeSummaryLocked() (string, func()) {
 			fmt.Fprintf(os.Stderr, "Warning: read stage change summary: %v\n", err)
 		}
 	}
-	line := "   Changes:   " + strings.ReplaceAll(changes, "\n", "\n              ") + "\n"
+	line := "Changes: " + changes
 	if !readReport {
 		return line, nil
 	}
@@ -665,17 +662,26 @@ func (r *Run) removeChangeSummaryLocked() {
 
 // RecordSkippedStage notes a disabled stage in the summary without numbering
 // it as an executed result or creating a stage file.
-func (r *Run) RecordSkippedStage(message string) error {
+func (r *Run) RecordSkippedStage(stage config.Stage) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	row := summaryRow{stageHeading(stage), "SKIPPED", "", "", "", "", "Disabled by configuration."}
+	if err := r.appendSummaryRowLocked(row); err != nil {
+		return fmt.Errorf("write skipped stage: %w", err)
+	}
+	return nil
+}
+
+func (r *Run) appendSummaryRowLocked(row summaryRow) error {
 	if r.closed || r.summary == nil {
 		return fmt.Errorf("summary file is closed or unavailable")
 	}
-	if _, err := io.WriteString(r.summary, message+"\n\n"); err != nil {
-		return fmt.Errorf("write skipped stage: %w", err)
+	text := formatSummaryRow(row) + summaryRule()
+	if _, err := io.WriteString(r.summary, text); err != nil {
+		return err
 	}
-	r.summaryText += message + "\n\n"
+	r.summaryText += text
 	return nil
 }
 

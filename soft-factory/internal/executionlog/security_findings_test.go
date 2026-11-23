@@ -35,7 +35,11 @@ func TestSecuritySummaryEvidence(t *testing.T) {
 			run := &Run{securityFindingsPath: path}
 			got := run.securitySummaryLocked()
 			require.Contains(t, got, tc.want)
+			for _, line := range strings.Split(got, "\n") {
+				require.False(t, strings.HasPrefix(line, " "), "unexpected indent in %q", line)
+			}
 			if tc.name == "unresolved" {
+				require.Contains(t, got, "Suggested fix: Pass arguments directly.\nAvoid the shell.\n")
 				for _, want := range []string{"UNRESOLVED", "P1", "handler.go:42", "Untrusted request", "Command execution", "Suggested fix", "Inspected handler", "No live service"} {
 					assert.Contains(t, got, want)
 				}

@@ -238,7 +238,7 @@ func runWorkflow(opts workflowOptions) error {
 
 	repository, err := github.RepositoryFromOrigin(ctx)
 	if err == nil {
-		err = github.AppendBody(ctx, repository, branch, runLog.Summary())
+		err = github.AppendPRSummary(ctx, repository, branch, runLog.Summary())
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr,
@@ -311,7 +311,7 @@ func skipStage(input sandbox.TaskContext, stage config.Stage) {
 	message := "Skipping disabled stage: " + string(stage)
 	fmt.Println("\n" + message)
 	if input.Log != nil {
-		if err := input.Log.RecordSkippedStage(message); err != nil {
+		if err := input.Log.RecordSkippedStage(stage); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: save skipped stage: %v\n", err)
 		}
 	}

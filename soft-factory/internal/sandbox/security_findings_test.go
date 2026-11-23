@@ -66,7 +66,7 @@ func TestSecurityReportingBoundary(t *testing.T) {
 	}
 	summary, err := os.ReadFile(filepath.Join(run.Path(), "summary.log"))
 	require.NoError(t, err)
-	for _, want := range []string{"SUCCEEDED", "UNRESOLVED", "No code changes made (saveFindings enabled).", "Pass arguments directly.", "Remove shell interpretation.", "No live service"} {
+	for _, want := range []string{"SUCCEEDED", "UNRESOLVED", "No code changes made", "saveFindings", "enabled).", "Pass arguments directly.", "Remove shell interpretation.", "No live service"} {
 		assert.Contains(t, string(summary), want)
 	}
 	// Later stages receive the actual unapplied evidence, then normal cleanup runs.

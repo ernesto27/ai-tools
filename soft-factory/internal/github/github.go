@@ -56,9 +56,19 @@ func RepositoryFromOrigin(ctx context.Context) (string, error) {
 	return parsed.Hostname() + "/" + path, nil
 }
 
-// AppendBody appends text to an existing PR description without creating files.
-// repository identifies the GitHub repository; pr is a number, URL or branch.
-func AppendBody(ctx context.Context, repository, pr, text string) error {
+// formatPRSummary preserves the monospace table in GitHub Markdown.
+func formatPRSummary(summary string) string {
+	fenceLength := 3
+	for _, run := range strings.FieldsFunc(summary, func(ch rune) bool { return ch != '`' }) {
+		fenceLength = max(fenceLength, len(run)+1)
+	}
+	fence := strings.Repeat("`", fenceLength)
+	return fence + "\n" + strings.TrimSuffix(summary, "\n") + "\n" + fence + "\n"
+}
+
+// AppendPRSummary appends a plain-text execution summary to an existing PR
+// description as a Markdown code block. The PR may be a number, URL, or branch.
+func AppendPRSummary(ctx context.Context, repository, pr, summary string) error {
 	output, err := command(ctx, nil,
 		"pr", "view", pr, "--repo", repository, "--json", "body")
 	if err != nil {
@@ -73,14 +83,14 @@ func AppendBody(ctx context.Context, repository, pr, text string) error {
 	if current.Body == nil {
 		return fmt.Errorf("GitHub CLI returned no PR description")
 	}
-	if text == "" {
+	if summary == "" {
 		return nil
 	}
 	body := *current.Body
 	if body != "" {
 		body += "\n\n"
 	}
-	body += text
+	body += formatPRSummary(summary)
 	if _, err := command(ctx, strings.NewReader(body),
 		"pr", "edit", pr, "--repo", repository, "--body-file", "-"); err != nil {
 		return fmt.Errorf("append PR description: %w", err)

@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	sandboxconfig "github.com/ernesto27/ai-tools/agent-sandbox/config"
 	"github.com/joho/godotenv"
 
 	"soft-factory/internal/config"
@@ -40,6 +41,7 @@ func main() {
 // workflowOptions holds the parsed command-line inputs for one workflow run.
 type workflowOptions struct {
 	IssueURL   string
+	TaskFile   string
 	Continue   bool
 	ResumePath string
 	StartStage config.Stage
@@ -54,6 +56,13 @@ func runWorkflow(opts workflowOptions) error {
 	cfg, err := config.Load(factoryConfigFile)
 	if err != nil {
 		return err
+	}
+	if opts.TaskFile != "" {
+		if cfg.AgentSandbox.Run == nil {
+			cfg.AgentSandbox.Run = &sandboxconfig.Section{}
+		}
+		paths := []string{opts.TaskFile}
+		cfg.AgentSandbox.Run.FilePrompt = &paths
 	}
 
 	shouldRun := func(stage config.Stage) bool {
@@ -96,6 +105,18 @@ func runWorkflow(opts workflowOptions) error {
 	}
 
 	branch, branchSet := workflowBranch(cfg, opts)
+	if opts.TaskFile != "" && !opts.Continue {
+		prefix := strings.TrimSpace(branch)
+		if prefix == "" {
+			prefix = "scheduled-task"
+		}
+		branch = fmt.Sprintf("%s-%s-%s",
+			prefix,
+			time.Now().UTC().Format("20060102-150405"),
+			strings.ToLower(rand.Text()),
+		)
+		branchSet = true
+	}
 	var runLog *executionlog.Run
 	command := executionlog.CommandRun
 	if opts.Continue {

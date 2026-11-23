@@ -43,8 +43,11 @@ The default workflow uses `run.branch`; continuation and recovery use
 `resume.branch`. Both fall back to the shared `branch`. Every stage in a run
 uses the same selected branch.
 
-The local task always comes from `run.filePrompt`, including continuation and
-recovery. To use a Jira issue instead, pass [`--jira`](jira.md).
+By default, the local task comes from `run.filePrompt`, including continuation
+and recovery. Pass [`--jira`](jira.md) to use a Jira issue. For a new workflow,
+`software-factory --file task.txt` uses that single file and creates a unique
+branch using the configured branch as its prefix. [Scheduled runs](reference.md#scheduled-tasks)
+use the same file and branch behavior.
 
 Set `run.filePrompt` to an array, even for one file: `["task.txt"]`.
 For multiple files, use `["task.txt", "constraints.md"]`. Contents are joined

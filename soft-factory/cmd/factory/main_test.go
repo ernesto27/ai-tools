@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +15,67 @@ import (
 	"soft-factory/internal/config"
 	"soft-factory/internal/sandbox"
 )
+
+func TestWorkflowTaskFileAndGeneratedBranch(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	output, err := exec.Command("git", "init", "-q").CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	output, err = exec.Command("git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+		"-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "initial").CombinedOutput()
+	require.NoError(t, err, "%s", output)
+
+	bin := t.TempDir()
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	const fakeSandbox = `#!/bin/sh
+set -e
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -f) cat "$2" > "$SOFT_FACTORY_TEST_CAPTURE/prompt"; shift ;;
+    --branch) printf '%s\n' "$2" > "$SOFT_FACTORY_TEST_CAPTURE/branch"; shift ;;
+  esac
+  shift
+done
+exit 23
+`
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "agent-sandbox"), []byte(fakeSandbox), 0700))
+	const taskFile = "cron task.txt"
+	const overrideText = "Scheduled task prompt"
+	const defaultText = "Default task prompt"
+	require.NoError(t, os.WriteFile(taskFile, []byte(overrideText), 0600))
+	require.NoError(t, os.WriteFile("default.txt", []byte(defaultText), 0600))
+
+	branches := make(map[string]string)
+	for _, tt := range []struct {
+		name, config, prefix string
+	}{
+		{"configured prompt", `{"agentSandbox":{"run":{"branch":"test-cron","filePrompt":["default.txt"]}}}`, "test-cron"},
+		{"missing run section", `{"agentSandbox":{"branch":"test-cron"}}`, "test-cron"},
+		{"no configured branch", `{"agentSandbox":{}}`, "scheduled-task"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			capture := t.TempDir()
+			t.Setenv("SOFT_FACTORY_TEST_CAPTURE", capture)
+			require.NoError(t, os.WriteFile(factoryConfigFile, []byte(tt.config), 0600))
+			err := runWorkflow(workflowOptions{TaskFile: taskFile})
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			require.Equal(t, 23, exitErr.ExitCode())
+
+			prompt, err := os.ReadFile(filepath.Join(capture, "prompt"))
+			require.NoError(t, err)
+			require.Contains(t, string(prompt), overrideText)
+			require.NotContains(t, string(prompt), defaultText)
+
+			branch, err := os.ReadFile(filepath.Join(capture, "branch"))
+			require.NoError(t, err)
+			name := strings.TrimSpace(string(branch))
+			require.Regexp(t, "^"+regexp.QuoteMeta(tt.prefix)+`-[0-9]{8}-[0-9]{6}-[a-z2-7]{26,}$`, name)
+			branches[tt.name] = name
+		})
+	}
+	require.NotEqual(t, branches["configured prompt"], branches["missing run section"])
+}
 
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {

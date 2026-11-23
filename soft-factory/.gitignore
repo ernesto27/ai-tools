@@ -22,3 +22,4 @@ task.txt
 software-factory.custom.example.json
 software-factory.simple.example.json
 task*.txt
+cron-task.txt

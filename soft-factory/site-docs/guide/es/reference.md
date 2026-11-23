@@ -9,10 +9,12 @@ Ejecuta los comandos del flujo de trabajo desde la carpeta del proyecto.
 | `software-factory resume <path>` | Recupera una ejecución registrada desde su estado guardado y añade registros a la misma carpeta; usa `resume.branch`. |
 | `software-factory doctor` | Busca `agent-sandbox`, `git` y `docker` en `PATH`; no requiere configuración. |
 | `software-factory update` | Instala la última versión mediante el instalador incluido. |
+| `software-factory scheduled-task` | Crea, edita o elimina [flujos programados](#scheduled-tasks) en tu crontab de usuario. |
 
 | Opción | Propósito |
 | --- | --- |
 | `--jira URL` | Usa una incidencia de Jira Cloud en lugar de la tarea local; disponible para los comandos del flujo de trabajo. |
+| `--file PATH` | Ejecuta el flujo predeterminado con un archivo de tarea local y una rama nueva. |
 | `-v`, `--version` | Muestra la etiqueta de la versión o `dev` para una compilación local. |
 | `-h`, `--help` | Muestra la ayuda del comando. |
 
@@ -23,3 +25,31 @@ admitidos se pasan mediante opciones. Usa la autenticación del host.
 
 Consulta la [configuración](configuration.md) para las propiedades JSON y los
 [informes](reports.md) para las ubicaciones de salida y los estados de revisión.
+
+## Programar un flujo de trabajo {#scheduled-tasks}
+
+En Linux o macOS, ejecuta estos comandos desde la carpeta del proyecto que
+contiene `software-factory.json`. El ejecutable instalado `software-factory`
+debe estar en tu `PATH` al crear o editar una tarea, y `agent-sandbox` debe
+estar en el `PATH` de cron cuando se ejecute.
+
+```sh
+software-factory scheduled-task create --name weekday-morning --file task.txt --cron '30 8 * * 1-5'
+software-factory scheduled-task edit --name weekday-morning --file task.txt --cron '0 9 * * 1-5'
+software-factory scheduled-task delete --name weekday-morning
+```
+
+El primer comando programa la tarea para las 8:30 de lunes a viernes. El
+segundo cambia la hora a las 9:00. Los nombres son únicos dentro del proyecto.
+Usa una ruta relativa o absoluta para `--file` y pon entre comillas la
+expresión de cinco campos de `--cron`. Para cambiar solo el archivo de tarea,
+omite `--cron` para conservar el horario.
+
+Cada ejecución comienza en la carpeta del proyecto, lee la configuración del
+flujo de `software-factory.json` y usa el archivo programado como tarea. Cada
+ejecución tiene una rama nueva que se usa en todas las etapas habilitadas.
+
+Usa `crontab -l` para ver las tareas instaladas. La salida de cron, incluidos
+los errores de inicio, se añade a
+`~/.config/software-factory/scheduled-tasks/cron-output.log`. Consulta los
+[informes](reports.md) para ver los registros y resúmenes de las etapas.

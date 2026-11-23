@@ -20,6 +20,8 @@ func TestRootCmdRouting(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "full workflow", args: nil, want: workflowOptions{}, wantRun: true},
+		{name: "full workflow with task file", args: []string{"--file", "cron task.txt"}, want: workflowOptions{TaskFile: "cron task.txt"}, wantRun: true},
+		{name: "full workflow with two task sources", args: []string{"--file", "task.txt", "--jira", issue}, wantErr: true},
 		{name: "continue", args: []string{"continue"}, want: workflowOptions{Continue: true}, wantRun: true},
 		{name: "continue with jira", args: []string{"continue", "--jira", issue}, want: workflowOptions{Continue: true, IssueURL: issue}, wantRun: true},
 		{name: "continue removed branch flag", args: []string{"continue", "--branch", " "}, wantErr: true},

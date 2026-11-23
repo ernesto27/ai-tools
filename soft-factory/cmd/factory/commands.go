@@ -10,6 +10,7 @@ import (
 // newRootCmd builds the CLI command tree. run executes the selected workflow;
 // tests pass a fake to check routing without starting agent-sandbox.
 func newRootCmd(run func(workflowOptions) error) *cobra.Command {
+	var taskFile string
 	root := &cobra.Command{
 		Use:           "software-factory",
 		Short:         "Implement a task, review it, classify risk, and explain the final changes.",
@@ -23,11 +24,21 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("file") {
+				if strings.TrimSpace(taskFile) == "" {
+					return fmt.Errorf("--file requires a non-empty file path")
+				}
+				if opts.IssueURL != "" {
+					return fmt.Errorf("--file and --jira are mutually exclusive")
+				}
+				opts.TaskFile = taskFile
+			}
 			return run(opts)
 		},
 	}
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
+	root.Flags().StringVar(&taskFile, "file", "", "Task prompt file to use instead of agentSandbox.run.filePrompt")
 	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.filePrompt")
 
 	root.AddCommand(newDoctorCmd())
@@ -36,6 +47,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root.AddCommand(newContinueCmd(run))
 	root.AddCommand(newResumeCmd(run))
 	root.AddCommand(newAuditCmd())
+	root.AddCommand(newScheduledTaskCmd())
 	return root
 }
 

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -47,11 +46,11 @@ exit 23
 
 	branches := make(map[string]string)
 	for _, tt := range []struct {
-		name, config, prefix string
+		name, config string
 	}{
-		{"configured prompt", `{"agentSandbox":{"run":{"branch":"test-cron","filePrompt":["default.txt"]}}}`, "test-cron"},
-		{"missing run section", `{"agentSandbox":{"branch":"test-cron"}}`, "test-cron"},
-		{"no configured branch", `{"agentSandbox":{}}`, "scheduled-task"},
+		{"configured prompt", `{"agentSandbox":{"run":{"branch":"test-cron","filePrompt":["default.txt"]}}}`},
+		{"missing run section", `{"agentSandbox":{"branch":"test-cron"}}`},
+		{"no configured branch", `{"agentSandbox":{}}`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			capture := t.TempDir()
@@ -70,7 +69,7 @@ exit 23
 			branch, err := os.ReadFile(filepath.Join(capture, "branch"))
 			require.NoError(t, err)
 			name := strings.TrimSpace(string(branch))
-			require.Regexp(t, "^"+regexp.QuoteMeta(tt.prefix)+`-[0-9]{8}-[0-9]{6}-[a-z2-7]{26,}$`, name)
+			require.Regexp(t, `^scheduled-task-[0-9]{8}-[0-9]{6}-[a-z2-7]{26,}$`, name)
 			branches[tt.name] = name
 		})
 	}

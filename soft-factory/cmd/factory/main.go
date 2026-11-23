@@ -106,12 +106,7 @@ func runWorkflow(opts workflowOptions) error {
 
 	branch, branchSet := workflowBranch(cfg, opts)
 	if opts.TaskFile != "" && !opts.Continue {
-		prefix := strings.TrimSpace(branch)
-		if prefix == "" {
-			prefix = "scheduled-task"
-		}
-		branch = fmt.Sprintf("%s-%s-%s",
-			prefix,
+		branch = fmt.Sprintf("scheduled-task-%s-%s",
 			time.Now().UTC().Format("20060102-150405"),
 			strings.ToLower(rand.Text()),
 		)

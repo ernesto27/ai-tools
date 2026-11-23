@@ -46,8 +46,9 @@ valor en la sección. Todas las etapas de una ejecución usan la misma rama.
 De forma predeterminada, la tarea local proviene de `run.filePrompt`, incluso
 en la continuación y recuperación. Pasa [`--jira`](jira.md) para usar una
 incidencia de Jira. Para un flujo nuevo, `software-factory --file task.txt`
-usa ese único archivo y crea una rama única con la rama configurada como
-prefijo. Las [ejecuciones programadas](reference.md#scheduled-tasks) usan el
+usa ese único archivo y crea una rama única con el nombre
+`scheduled-task-<fecha y hora UTC>-<sufijo aleatorio>`.
+Las [ejecuciones programadas](reference.md#scheduled-tasks) usan el
 mismo comportamiento para el archivo y la rama.
 
 Define `run.filePrompt` como un arreglo, incluso para un solo archivo:

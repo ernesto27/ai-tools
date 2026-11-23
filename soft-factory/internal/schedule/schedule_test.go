@@ -41,9 +41,22 @@ func TestNormalizeCron(t *testing.T) {
 
 func TestCronJobCapturesOutput(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("PATH", dir)
+	agentDir := filepath.Join(dir, "agent's bin")
+	toolsDir := filepath.Join(dir, "other tools")
+	for _, dir := range []string{agentDir, toolsDir} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", strings.Join([]string{dir, agentDir, toolsDir}, ":"))
+	if err := os.WriteFile(filepath.Join(agentDir, "agent-sandbox"), []byte("#!/bin/sh\necho startup-output\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(toolsDir, "gh"), []byte("#!/bin/sh\necho gh-output\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	executable := filepath.Join(dir, "software-factory")
-	const script = "#!/bin/sh\necho startup-output\necho startup-error >&2\nexit 23\n"
+	const script = "#!/bin/sh\ncommand -v sh >/dev/null || exit 1\nagent-sandbox || exit 1\ngh || exit 1\necho startup-error >&2\nexit 23\n"
 	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +66,7 @@ func TestCronJobCapturesOutput(t *testing.T) {
 	runJob := func(repo string) int {
 		t.Helper()
 		tasks := ScheduledTasks{repo: {{Name: "weekday", Cron: timing, FilePrompt: "task.txt"}}}
-		block, err := renderCronBlock(tasks, outputPath)
+		block, err := renderCronBlock(tasks, outputPath, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -62,7 +75,9 @@ func TestCronJobCapturesOutput(t *testing.T) {
 		if !ok {
 			t.Fatalf("unexpected cron entry %q", line)
 		}
-		output, err := exec.Command("/bin/sh", "-c", command).CombinedOutput()
+		cmd := exec.Command("/bin/sh", "-c", command)
+		cmd.Env = []string{"PATH=/usr/bin:/bin"}
+		output, err := cmd.CombinedOutput()
 		var exitErr *exec.ExitError
 		if len(output) != 0 || !errors.As(err, &exitErr) {
 			t.Fatalf("cron job returned output %q and error %v, want a quiet failure", output, err)
@@ -79,8 +94,23 @@ func TestCronJobCapturesOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output := string(data); !strings.HasPrefix(output, "startup-output\nstartup-error\n") || !strings.Contains(output, missing) {
+	if output := string(data); !strings.HasPrefix(output, "startup-output\ngh-output\nstartup-error\n") || !strings.Contains(output, missing) {
 		t.Fatalf("cron output log = %q, want startup output followed by the cd error", output)
+	}
+}
+
+func TestQuoteCronSearchPath(t *testing.T) {
+	got, err := quoteCronSearchPath(":/first:relative:.:/second:", false)
+	if want := "'/first':'/second'"; err != nil || got != want {
+		t.Fatalf("quoteCronSearchPath() = %q, %v; want %q", got, err, want)
+	}
+	for _, invalid := range []string{"/bin%name", "/bin\rname", "/bin\nname", "/bin\x00name"} {
+		if _, err := quoteCronSearchPath("/bin:"+invalid, false); err == nil {
+			t.Errorf("quoteCronSearchPath() accepted %q", invalid)
+		}
+	}
+	if _, err := quoteCronSearchPath(t.TempDir(), true); err == nil {
+		t.Fatal("quoteCronSearchPath() accepted a PATH without agent-sandbox")
 	}
 }
 
@@ -119,7 +149,7 @@ func TestScheduledTaskValidate(t *testing.T) {
 func TestScheduleChangesInstallCrontab(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", dir+":/usr/bin:/bin")
 	const fakeCrontab = `#!/bin/sh
 dir=${0%/*}
 case "$1" in
@@ -148,6 +178,9 @@ esac
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "agent-sandbox"), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 
 	repoPath, err := filepath.Abs("../..")
 	if err != nil {
@@ -168,7 +201,7 @@ esac
 
 	taskPath := filepath.Join(repoPath, task.FilePrompt)
 	outputPath := filepath.Join(filepath.Dir(schedule.filePath), "cron-output.log")
-	firstJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && '%s' --file '%s') >> '%s' 2>&1\n", repoPath, executable, taskPath, outputPath)
+	firstJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
 	tablePath := filepath.Join(dir, "table")
 	assertCrontab := func(want string) {
 		t.Helper()
@@ -193,7 +226,7 @@ esac
 	if err := schedule.Create(repoPath, secondTask); err != nil {
 		t.Fatal(err)
 	}
-	secondJob := fmt.Sprintf("0 18 * * 0 (cd '%s' && '%s' --file '%s') >> '%s' 2>&1\n", repoPath, executable, taskPath, outputPath)
+	secondJob := fmt.Sprintf("0 18 * * 0 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, taskPath, outputPath)
 	secondTable := cronBegin + "\n" + firstJob + secondJob + cronEnd + "\n" + unrelatedJob
 	assertCrontab(secondTable)
 
@@ -203,7 +236,7 @@ esac
 	if err := schedule.Edit(repoPath, editedTask); err != nil {
 		t.Fatal(err)
 	}
-	editedJob := fmt.Sprintf("0 9 * * 1-5 (cd '%s' && '%s' --file '%s') >> '%s' 2>&1\n", repoPath, executable, filepath.Join(repoPath, editedTask.FilePrompt), outputPath)
+	editedJob := fmt.Sprintf("0 9 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n", repoPath, dir, executable, filepath.Join(repoPath, editedTask.FilePrompt), outputPath)
 	editedTable := cronBegin + "\n" + editedJob + secondJob + cronEnd + "\n" + unrelatedJob
 	assertCrontab(editedTable)
 

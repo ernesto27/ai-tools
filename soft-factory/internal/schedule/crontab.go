@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
@@ -17,8 +18,8 @@ const (
 	cronEnd   = "# END SOFT FACTORY"
 )
 
-func prepareCrontab(tasks ScheduledTasks, outputPath string) (string, string, error) {
-	block, err := renderCronBlock(tasks, outputPath)
+func prepareCrontab(tasks ScheduledTasks, outputPath string, requireAgent bool) (string, string, error) {
+	block, err := renderCronBlock(tasks, outputPath, requireAgent)
 	if err != nil {
 		return "", "", err
 	}
@@ -51,7 +52,7 @@ func readCrontab() (string, error) {
 	return "", fmt.Errorf("read user crontab: %w: %s", err, message)
 }
 
-func renderCronBlock(tasks ScheduledTasks, outputPath string) (string, error) {
+func renderCronBlock(tasks ScheduledTasks, outputPath string, requireAgent bool) (string, error) {
 	repos := make([]string, 0, len(tasks))
 	for repo := range tasks {
 		repos = append(repos, repo)
@@ -59,7 +60,7 @@ func renderCronBlock(tasks ScheduledTasks, outputPath string) (string, error) {
 	slices.Sort(repos)
 
 	var jobs strings.Builder
-	var executableArg, outputArg string
+	var executableArg, outputArg, jobPath string
 	for _, repo := range repos {
 		for _, task := range tasks[repo] {
 			if task.Cron == "" {
@@ -71,6 +72,10 @@ func renderCronBlock(tasks ScheduledTasks, outputPath string) (string, error) {
 					return "", fmt.Errorf("find software-factory on PATH: %w", err)
 				}
 				executableArg, err = quoteCronPath(executable)
+				if err != nil {
+					return "", err
+				}
+				jobPath, err = quoteCronSearchPath(os.Getenv("PATH"), requireAgent)
 				if err != nil {
 					return "", err
 				}
@@ -99,13 +104,37 @@ func renderCronBlock(tasks ScheduledTasks, outputPath string) (string, error) {
 				}
 				command += " --file " + fileArg
 			}
-			fmt.Fprintf(&jobs, "%s (cd %s && %s) >> %s 2>&1\n", cron, repoArg, command, outputArg)
+			fmt.Fprintf(&jobs, "%s (cd %s && PATH=%s\"${PATH:+:$PATH}\" %s) >> %s 2>&1\n", cron, repoArg, jobPath, command, outputArg)
 		}
 	}
 	if jobs.Len() == 0 {
 		return "", nil
 	}
 	return cronBegin + "\n" + jobs.String() + cronEnd + "\n", nil
+}
+
+func quoteCronSearchPath(path string, requireAgent bool) (string, error) {
+	var pathArgs []string
+	var agentFound bool
+	for _, dir := range filepath.SplitList(path) {
+		if !filepath.IsAbs(dir) {
+			continue
+		}
+		arg, err := quoteCronPath(dir)
+		if err != nil {
+			return "", fmt.Errorf("schedule PATH: %w", err)
+		}
+		pathArgs = append(pathArgs, arg)
+		if requireAgent && !agentFound {
+			// An absolute argument checks this directory without searching the original PATH.
+			_, err := exec.LookPath(filepath.Join(dir, "agent-sandbox"))
+			agentFound = err == nil
+		}
+	}
+	if requireAgent && !agentFound {
+		return "", errors.New("agent-sandbox was not found on the absolute directories in PATH")
+	}
+	return strings.Join(pathArgs, ":"), nil
 }
 
 func quoteCronPath(path string) (string, error) {

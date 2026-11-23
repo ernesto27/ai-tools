@@ -81,7 +81,7 @@ func (s *Schedule) Create(repoPath string, task ScheduledTask) error {
 		}
 	}
 	tasks[repoPath] = append(tasks[repoPath], task)
-	return s.saveAndInstallCrontab(tasks, task.Name)
+	return s.saveAndInstallCrontab(tasks, task.Name, true)
 }
 
 func (s *Schedule) Edit(repoPath string, task ScheduledTask) error {
@@ -122,7 +122,7 @@ func (s *Schedule) Edit(repoPath string, task ScheduledTask) error {
 		if task.Cron == "" {
 			return s.save(tasks) // Older entries may have no cron expression.
 		}
-		return s.saveAndInstallCrontab(tasks, task.Name)
+		return s.saveAndInstallCrontab(tasks, task.Name, true)
 	}
 	return fmt.Errorf("task %q not found for %s", task.Name, repoPath)
 }
@@ -160,7 +160,7 @@ func (s *Schedule) Delete(repoPath, name string) error {
 		if task.Cron == "" {
 			return s.save(tasks)
 		}
-		return s.saveAndInstallCrontab(tasks, name)
+		return s.saveAndInstallCrontab(tasks, name, false)
 	}
 	return fmt.Errorf("task %q not found for %s", name, repoPath)
 }
@@ -181,9 +181,9 @@ func (s *Schedule) load() (ScheduledTasks, error) {
 	return tasks, nil
 }
 
-func (s *Schedule) saveAndInstallCrontab(tasks ScheduledTasks, name string) error {
+func (s *Schedule) saveAndInstallCrontab(tasks ScheduledTasks, name string, requireAgent bool) error {
 	outputPath := filepath.Join(filepath.Dir(s.filePath), "cron-output.log")
-	current, updated, err := prepareCrontab(tasks, outputPath)
+	current, updated, err := prepareCrontab(tasks, outputPath, requireAgent)
 	if err != nil {
 		return err
 	}

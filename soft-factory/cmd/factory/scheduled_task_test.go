@@ -29,7 +29,7 @@ func TestScheduledTaskCreateEditAndDelete(t *testing.T) {
 
 	t.Chdir(project)
 	t.Setenv("HOME", dir)
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", dir+":/usr/bin:/bin")
 	const fakeCrontab = `#!/bin/sh
 table=${0%/*}/table
 case "$1" in
@@ -47,6 +47,7 @@ esac
 	for name, contents := range map[string]string{
 		"crontab":          fakeCrontab,
 		"software-factory": "#!/bin/sh\nexit 0\n",
+		"agent-sandbox":    "#!/bin/sh\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o700); err != nil {
 			t.Fatal(err)
@@ -72,8 +73,8 @@ esac
 		t.Fatal(err)
 	}
 	scheduleDir := filepath.Join(dir, ".config", "software-factory", "scheduled-tasks")
-	wantJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && '%s' --file '%s') >> '%s' 2>&1\n",
-		project, filepath.Join(dir, "software-factory"), filepath.Join(project, prompt), filepath.Join(scheduleDir, "cron-output.log"))
+	wantJob := fmt.Sprintf("30 8 * * 1-5 (cd '%s' && PATH='%s':'/usr/bin':'/bin'\"${PATH:+:$PATH}\" '%s' --file '%s') >> '%s' 2>&1\n",
+		project, dir, filepath.Join(dir, "software-factory"), filepath.Join(project, prompt), filepath.Join(scheduleDir, "cron-output.log"))
 	wantTable := "15 2 * * * /usr/local/bin/backup\n# BEGIN SOFT FACTORY\n" + wantJob + "# END SOFT FACTORY\n"
 	if string(table) != wantTable {
 		t.Fatalf("installed crontab = %q, want %q", table, wantTable)

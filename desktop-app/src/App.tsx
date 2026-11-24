@@ -7,6 +7,7 @@ import { Sidebar, type SavedRepo } from "./components/Sidebar";
 import { BranchRuns } from "./screens/BranchRuns";
 import { RunDetail } from "./screens/RunDetail";
 import { Config } from "./screens/Config";
+import { Schedules } from "./screens/Schedules";
 import { NewRun } from "./screens/NewRun";
 import { Settings } from "./screens/Settings";
 import { AddRepo } from "./screens/AddRepo";
@@ -97,15 +98,13 @@ function MainApp({ theme, toggleTheme, updater }: {
   const deleteRepo = async (repo: SavedRepo) => {
     await invoke<void>("remove_repo", { path: repo.path });
     setSavedRepos((previous) => previous.filter((saved) => saved.path !== repo.path));
-    if ("repo" in lastBranchRoute.current && lastBranchRoute.current.repo === repo.name) {
-      lastBranchRoute.current = HOME;
-    }
-    setRoute((current) => {
-      const isRemoved = current.screen === "config"
+    const isRemoved = (current: Route) =>
+      current.screen === "config" || current.screen === "schedules"
         ? current.repoPath === repo.path
         : "repo" in current && current.repo === repo.name;
-      return isRemoved ? HOME : current;
-    });
+    if (isRemoved(lastBranchRoute.current)) lastBranchRoute.current = HOME;
+    if (isRemoved(settingsReturnRoute.current)) settingsReturnRoute.current = HOME;
+    setRoute((current) => isRemoved(current) ? HOME : current);
   };
 
   async function deleteWorktree(repo: SavedRepo, branch: string): Promise<void> {
@@ -274,10 +273,11 @@ function Screen({
     );
   }
   if (route.screen === "addRepo") return <AddRepo onDone={repoAdded} />;
-  if (route.screen === "config") {
+  if (route.screen === "config" || route.screen === "schedules") {
     const repo = repos.find((saved) => saved.path === route.repoPath);
     if (!repo) return <p>{t("repositoryFolderNotFound")}</p>;
-    return <Config key={repo.path} repo={repo.name} repoPath={repo.path} />;
+    const RepositoryScreen = route.screen === "config" ? Config : Schedules;
+    return <RepositoryScreen key={repo.path} repo={repo.name} repoPath={repo.path} />;
   }
 
   switch (route.screen) {

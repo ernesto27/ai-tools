@@ -252,6 +252,13 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
                     >
                       {t("newRun")}
                     </NavItem>
+                    <NavItem
+                      className="text-md"
+                      aria-current={route.screen === "schedules" && route.repoPath === saved.path ? "page" : undefined}
+                      onClick={() => navigate({ screen: "schedules", repoPath: saved.path })}
+                    >
+                      {t("schedules")}
+                    </NavItem>
                     {repo.branches.length === 0 && <span className="px-2 py-1 text-sm text-faint">{t("noBranchesYet")}</span>}
                     {visibleBranches.map((b) => {
                       const currentOpenBranch = searching ? searchOpenBranch : openBranch;

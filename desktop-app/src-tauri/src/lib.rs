@@ -10,7 +10,7 @@ use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
 use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_update};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
-use factory_run::FactoryRun;
+use factory_run::{FactoryRun, ScheduledTask};
 use std::fs;
 use std::path::Path;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -386,6 +386,13 @@ async fn scheduled_delete_factory_run(path: Option<String>, name: String) -> Res
     .map_err(|error| format!("Could not wait for schedule deletion: {error}"))?
 }
 
+#[tauri::command]
+async fn scheduled_list_factory_runs(path: String) -> Result<Vec<ScheduledTask>, String> {
+    tauri::async_runtime::spawn_blocking(move || FactoryRun::new(path).scheduled_task_list())
+        .await
+        .map_err(|error| format!("Could not wait for schedule listing: {error}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -421,6 +428,7 @@ pub fn run() {
             scheduled_create_factory_run,
             scheduled_edit_factory_run,
             scheduled_delete_factory_run,
+            scheduled_list_factory_runs,
             list_skills,
             agent_sandbox_check_bin,
             software_factory_check_bin,

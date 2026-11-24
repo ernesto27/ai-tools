@@ -5,7 +5,9 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createConnection, createServer } from "node:net";
@@ -17,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { Key, remote } from "webdriverio";
 import { prepareNavigationFixture } from "./navigationFixture.js";
 import { runNavigationChecks } from "./navigationChecks.js";
+import { runScheduleChecks } from "./scheduleChecks.js";
 import { runLanguageChecks } from "./languageChecks.js";
 import { runDependencySetupChecks } from "./dependencySetupChecks.js";
 import { runThemeChecks } from "./themeChecks.js";
@@ -78,6 +81,63 @@ function signalGroup(child, signal) {
   }
 }
 
+function startDriver(environment, logPath, port, nativePort) {
+  const log = openSync(logPath, "a");
+  let child;
+  let startupError;
+  try {
+    child = spawn("tauri-driver", ["--port", String(port), "--native-port", String(nativePort)], {
+      cwd: appDirectory,
+      env: environment,
+      detached: true,
+      stdio: ["ignore", log, log],
+    });
+    child.on("error", (error) => { startupError = error; });
+  } finally {
+    closeSync(log);
+  }
+
+  return {
+    child,
+    async connect() {
+      const deadline = Date.now() + 10_000;
+      while (!(await portIsOpen(port)) || !(await portIsOpen(nativePort))) {
+        if (startupError) throw startupError;
+        if (child.exitCode !== null || child.signalCode !== null) {
+          throw new Error(`tauri-driver exited before startup; inspect ${logPath}`);
+        }
+        if (Date.now() >= deadline) throw new Error(`tauri-driver startup timed out; inspect ${logPath}`);
+        await delay(100);
+      }
+      return remote({
+        hostname: "127.0.0.1",
+        port,
+        path: "/",
+        logLevel: "error",
+        connectionRetryCount: 0,
+        connectionRetryTimeout: 30_000,
+        capabilities: {
+          "tauri:options": {
+            application: join(appDirectory, "src-tauri", "target", "debug", "desktop-app"),
+          },
+        },
+      });
+    },
+  };
+}
+
+let desktopBuilt = false;
+
+function buildDesktop() {
+  if (desktopBuilt) return;
+  command("npm", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
+    timeout: 600_000,
+    stdio: "inherit",
+    env: { ...process.env, CARGO_TARGET_DIR: join(appDirectory, "src-tauri", "target") },
+  });
+  desktopBuilt = true;
+}
+
 test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
   let fixture;
   let projectLogs;
@@ -129,11 +189,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     await requireFreePort(4444);
     await requireFreePort(4445);
 
-    command("npm", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
-      timeout: 600_000,
-      stdio: "inherit",
-      env: { ...process.env, CARGO_TARGET_DIR: join(appDirectory, "src-tauri", "target") },
-    });
+    buildDesktop();
 
     fixture = mkdtempSync(join(tmpdir(), "soft-factory-desktop-e2e-"));
     t.diagnostic(`Temporary desktop test fixture: ${fixture}`);
@@ -145,44 +201,10 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
     mkdirSync(join(testDirectory, "artifacts"), { recursive: true });
     artifacts = mkdtempSync(join(testDirectory, "artifacts", "launch-"));
     t.diagnostic(`Desktop test artifacts: ${artifacts}`);
-    const log = openSync(join(artifacts, "driver.log"), "a");
-    let driverError;
-    try {
-      driver = spawn("tauri-driver", [], {
-        cwd: appDirectory,
-        env: environment,
-        detached: true,
-        stdio: ["ignore", log, log],
-      });
-      driver.on("error", (error) => { driverError = error; });
-      t.diagnostic(`Desktop test driver process group: ${driver.pid}`);
-    } finally {
-      closeSync(log);
-    }
-
-    const deadline = Date.now() + 10_000;
-    while (!(await portIsOpen(4444))) {
-      if (driverError) throw driverError;
-      if (driver.exitCode !== null || driver.signalCode !== null) {
-        throw new Error(`tauri-driver exited before startup; inspect ${artifacts}/driver.log`);
-      }
-      if (Date.now() >= deadline) throw new Error(`tauri-driver startup timed out; inspect ${artifacts}/driver.log`);
-      await delay(100);
-    }
-
-    browser = await remote({
-      hostname: "127.0.0.1",
-      port: 4444,
-      path: "/",
-      logLevel: "error",
-      connectionRetryCount: 0,
-      connectionRetryTimeout: 30_000,
-      capabilities: {
-        "tauri:options": {
-          application: join(appDirectory, "src-tauri", "target", "debug", "desktop-app"),
-        },
-      },
-    });
+    const navigationDriver = startDriver(environment, join(artifacts, "driver.log"), 4444, 4445);
+    driver = navigationDriver.child;
+    t.diagnostic(`Desktop test driver process group: ${driver.pid}`);
+    browser = await navigationDriver.connect();
     await browser.execute(() => localStorage.removeItem("soft-factory.language"));
     await browser.refresh();
     await runDependencySetupChecks(browser);
@@ -303,6 +325,75 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
         if (result.status === "rejected") t.diagnostic(`Could not capture diagnostic: ${result.reason}`);
       }
     }
+    throw error;
+  }
+});
+
+test("repository schedules list and forms", { timeout: 900_000 }, async (t) => {
+  assert.ok(process.env.DISPLAY, "An X11 DISPLAY is required. Try: xvfb-run -a npm run test:desktop");
+  command("software-factory", ["scheduled-task", "list", "--help"]);
+  command("xdotool", ["--version"]);
+  await requireFreePort(4444);
+  await requireFreePort(4445);
+  buildDesktop();
+
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "soft-factory-schedules-e2e-")));
+  let driver;
+  let browser;
+  t.after(async () => {
+    try {
+      await browser?.deleteSession();
+    } finally {
+      try {
+        signalGroup(driver, "SIGTERM");
+        if (driver?.pid) {
+          await delay(500);
+          signalGroup(driver, "SIGKILL");
+        }
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    }
+  });
+
+  const repoName = "schedule-repository";
+  const repo = join(home, repoName);
+  const data = join(home, "data");
+  const binaries = join(home, "bin");
+  command("git", ["init", "--initial-branch=main", repo]);
+  writeFileSync(join(repo, "task.txt"), "Prepared schedule prompt.\n");
+  writeFileSync(join(repo, "context notes.md"), "Prepared legacy prompt.\n");
+  mkdirSync(join(data, "com.ernesto.desktop-app"), { recursive: true });
+  mkdirSync(binaries);
+  // Run the real CLI with no crontab on PATH, even if a form regression submits.
+  for (const executable of ["tauri-driver", "WebKitWebDriver", "software-factory", "agent-sandbox", "git"]) {
+    const binary = command("sh", ["-c", 'command -v "$1"', "find-test-binary", executable]).trim();
+    symlinkSync(resolve(binary), join(binaries, executable));
+  }
+  const environment = {
+    ...process.env,
+    PATH: binaries,
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, "config"),
+    XDG_DATA_HOME: data,
+    XDG_CACHE_HOME: join(home, "cache"),
+    GDK_BACKEND: "x11",
+    GTK_USE_PORTAL: "0",
+  };
+
+  mkdirSync(join(testDirectory, "artifacts"), { recursive: true });
+  const artifacts = mkdtempSync(join(testDirectory, "artifacts", "schedules-"));
+  t.diagnostic(`Schedules test artifacts: ${artifacts}`);
+  const schedulesDriver = startDriver(environment, join(artifacts, "driver.log"), 4444, 4445);
+  driver = schedulesDriver.child;
+  browser = await schedulesDriver.connect();
+  try {
+    await runScheduleChecks(browser, { repo, repoName, environment }, command, artifacts);
+  } catch (error) {
+    await Promise.allSettled([
+      browser.saveScreenshot(join(artifacts, "failure.png")),
+      browser.getPageSource().then((source) => writeFileSync(join(artifacts, "failure.html"), source)),
+    ]);
     throw error;
   }
 });

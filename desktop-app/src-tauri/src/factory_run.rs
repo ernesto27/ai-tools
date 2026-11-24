@@ -7,6 +7,15 @@ pub struct FactoryRun {
     repository: PathBuf,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScheduledTask {
+    name: String,
+    file_prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cron: Option<String>,
+}
+
 impl FactoryRun {
     pub fn new(repository: impl Into<PathBuf>) -> Self {
         Self {
@@ -119,6 +128,17 @@ impl FactoryRun {
         self.run_scheduled_task("delete", name, None, None)
     }
 
+    pub fn scheduled_task_list(&self) -> Result<Vec<ScheduledTask>, String> {
+        let mut command = Self::bin_command();
+        command
+            .args(["scheduled-task", "list", "--path"])
+            .arg(&self.repository);
+        let stdout = Self::scheduled_task_output(&mut command, "list schedules")?;
+
+        serde_json::from_slice(&stdout)
+            .map_err(|error| format!("Could not parse scheduled tasks: {error}"))
+    }
+
     fn run_scheduled_task(
         &self,
         action: &str,
@@ -126,18 +146,22 @@ impl FactoryRun {
         file: Option<&str>,
         cron: Option<&str>,
     ) -> Result<(), String> {
-        let output = self
-            .scheduled_task_command(action, name, file, cron)
+        let mut command = self.scheduled_task_command(action, name, file, cron);
+        Self::scheduled_task_output(&mut command, &format!("{action} schedule")).map(|_| ())
+    }
+
+    fn scheduled_task_output(command: &mut Command, operation: &str) -> Result<Vec<u8>, String> {
+        let output = command
             .output()
             .map_err(|error| format!("Could not start software-factory: {error}"))?;
 
         if output.status.success() {
-            return Ok(());
+            return Ok(output.stdout);
         }
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!(
-            "Could not {action} schedule ({}): {}",
+            "Could not {operation} ({}): {}",
             output.status,
             stderr.trim()
         ))
@@ -151,7 +175,11 @@ impl FactoryRun {
         cron: Option<&str>,
     ) -> Command {
         let mut command = self.command();
-        command.args(["scheduled-task", action, "--name", name]);
+        // Go uses PWD when it resolves to the working directory. Keep the saved
+        // repository path as the registry key even when it contains a symlink.
+        command
+            .env("PWD", &self.repository)
+            .args(["scheduled-task", action, "--name", name]);
         if let Some(file) = file {
             command.args(["--file", file]);
         }
@@ -262,6 +290,34 @@ mod tests {
             let actual = command.get_args().collect::<Vec<_>>();
             assert_eq!(actual.as_slice(), expected, "{action}");
         }
+    }
+
+    #[test]
+    fn scheduled_tasks_preserve_cli_json_fields() {
+        let json = serde_json::json!([
+            {"name": "weekday", "filePrompt": "task.txt", "cron": "30 8 * * 1-5"},
+            {"name": "legacy", "filePrompt": "old.txt"}
+        ]);
+        let tasks: Vec<ScheduledTask> = serde_json::from_value(json.clone()).unwrap();
+
+        assert_eq!(tasks[0].cron.as_deref(), Some("30 8 * * 1-5"));
+        assert_eq!(tasks[1].cron, None);
+        assert_eq!(serde_json::to_value(tasks).unwrap(), json);
+    }
+
+    #[test]
+    fn scheduled_task_writes_use_the_saved_repository_path() {
+        let repository = tempfile::tempdir().unwrap();
+        let command = FactoryRun::new(repository.path())
+            .scheduled_task_command("delete", "weekday", None, None);
+
+        assert_eq!(command.get_current_dir(), Some(repository.path()));
+        assert_eq!(
+            command
+                .get_envs()
+                .find(|(key, _)| *key == OsStr::new("PWD")),
+            Some((OsStr::new("PWD"), Some(repository.path().as_os_str())))
+        );
     }
 
     #[test]

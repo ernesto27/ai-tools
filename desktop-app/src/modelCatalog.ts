@@ -1,7 +1,9 @@
-// Verified 2026-11-23. Selection still depends on CLI version and account access.
+// Verified 2026-11-24. Selection still depends on CLI version and account access.
 export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
-  // CLI catalog: https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/models-manager/models.json
+  // CLI catalog: https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/models-manager/models.json
   // Selection/access: https://learn.chatgpt.com/docs/models?surface=cli
+  // Daybreak access: https://learn.chatgpt.com/docs/cyber-safety
+  // GPT-6.2 requires CLI 0.166.0+; Enterprise/Edu admins must enable access.
   codex: [
     "gpt-6.2-astra",
     "gpt-6.2-sol",
@@ -14,24 +16,33 @@ export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
     "gpt-5.6-terra",
     "gpt-5.6-luna",
     "gpt-5.5", // API-key sessions only; retired for ChatGPT sign-in.
+    "gpt-daybreak-blue-latest", // Hidden in CLI picker; requires Trusted Access approval.
+    "gpt-daybreak-red-latest", // Hidden in CLI picker; requires separate Red approval.
   ],
   // Full model IDs: https://code.claude.com/docs/en/model-config
   // CLI releases: https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md
   // Status/retirements: https://platform.claude.com/docs/en/about-claude/model-deprecations
+  // Mythos/CLI access: https://www.anthropic.com/claude-fable-and-mythos-5-2
+  // Verification: https://support.claude.com/en/articles/14604842-cyber-verification-program
+  // Fable usage credits and organization/provider restrictions may apply.
   claude: [
     "claude-fable-5-2", // Requires Claude Code 2.1.321+; usage credits may apply.
-    "claude-fable-5-1",
+    "claude-fable-5-1", // Requires Claude Code 2.1.257+.
     "claude-fable-5",
-    "claude-opus-5-5",
+    "claude-mythos-5-2", // Requires verification-program approval and provisioning.
+    "claude-mythos-5-1", // Requires verification-program approval and provisioning.
+    "claude-mythos-5", // Requires verification-program approval and provisioning.
+    "claude-opus-5-5", // Requires Claude Code 2.1.280+.
     "claude-opus-5",
     "claude-opus-4-8",
     "claude-opus-4-7",
     "claude-opus-4-6",
     "claude-opus-4-5", // Deprecated; selectable until 2027-01-22.
-    "claude-sonnet-5-5",
+    "claude-sonnet-5-5", // Requires Claude Code 2.1.284+.
     "claude-sonnet-5",
     "claude-sonnet-4-6",
-    "claude-haiku-5-5",
+    "claude-sonnet-4-5", // Deprecated; selectable until 2026-11-30 on the Claude API.
+    "claude-haiku-5-5", // Requires Claude Code 2.1.293+.
     "claude-haiku-4-5",
   ],
 };

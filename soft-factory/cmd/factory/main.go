@@ -42,6 +42,7 @@ func main() {
 type workflowOptions struct {
 	IssueURL   string
 	TaskFile   string
+	ConfigPath string
 	Continue   bool
 	ResumePath string
 	StartStage config.Stage
@@ -53,7 +54,11 @@ func runWorkflow(opts workflowOptions) error {
 		return err
 	}
 
-	cfg, err := config.Load(factoryConfigFile)
+	configPath := opts.ConfigPath
+	if configPath == "" {
+		configPath = factoryConfigFile
+	}
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		return err
 	}

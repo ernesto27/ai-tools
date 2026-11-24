@@ -92,6 +92,23 @@ func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 	}
 }
 
+func TestWorkflowLoadsCustomConfig(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("PATH", t.TempDir())
+	require.NoError(t, os.WriteFile(factoryConfigFile, []byte(`{`), 0644))
+	require.NoError(t, os.Mkdir("configs", 0755))
+	custom := filepath.Join("configs", "staging.json")
+	data := `{"agentSandbox":{},"stages":{"codeReview":{"customSkill":"missing"}}}`
+	require.NoError(t, os.WriteFile(custom, []byte(data), 0644))
+
+	err := runWorkflow(workflowOptions{ConfigPath: custom})
+	require.ErrorContains(t, err, `stages.codeReview.customSkill: project skill "missing" not found`)
+
+	err = runWorkflow(workflowOptions{ConfigPath: "absent.json"})
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorContains(t, err, "absent.json")
+}
+
 func TestWorkflowDoesNotFallBackToLegacyConfig(t *testing.T) {
 	for _, invalid := range []bool{false, true} {
 		name := "missing"

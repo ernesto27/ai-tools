@@ -15,7 +15,14 @@ func newAuditCmd() *cobra.Command {
 		Short: "Create audit html for log file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := config.Load(factoryConfigFile)
+			configPath, err := configPathFrom(cmd)
+			if err != nil {
+				return err
+			}
+			if configPath == "" {
+				configPath = factoryConfigFile
+			}
+			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}
@@ -29,6 +36,8 @@ func newAuditCmd() *cobra.Command {
 		"",
 		"Absolute path to the execution log",
 	)
+
+	addConfigFlag(cmd)
 
 	if err := cmd.MarkFlagRequired("log"); err != nil {
 		panic(err)

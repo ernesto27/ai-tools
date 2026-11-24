@@ -7,7 +7,7 @@ import (
 )
 
 func newContinueCmd(run func(workflowOptions) error) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   executionlog.CommandContinue,
 		Short: "Continue work in the agentSandbox.resume.branch in software-factory.json",
 		Args:  cobra.NoArgs,
@@ -20,4 +20,6 @@ func newContinueCmd(run func(workflowOptions) error) *cobra.Command {
 			return run(opts)
 		},
 	}
+	addConfigFlag(cmd)
+	return cmd
 }

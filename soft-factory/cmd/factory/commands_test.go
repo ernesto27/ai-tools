@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -25,12 +26,13 @@ func TestRootCmdRouting(t *testing.T) {
 		{name: "continue", args: []string{"continue"}, want: workflowOptions{Continue: true}, wantRun: true},
 		{name: "continue with jira", args: []string{"continue", "--jira", issue}, want: workflowOptions{Continue: true, IssueURL: issue}, wantRun: true},
 		{name: "continue removed branch flag", args: []string{"continue", "--branch", " "}, wantErr: true},
-		{name: "long config", args: []string{"--config", "x.json"}, wantErr: true},
-		{name: "short config", args: []string{"-c", "x.json"}, wantErr: true},
+		{name: "long config", args: []string{"--config", "x.json"}, want: workflowOptions{ConfigPath: "x.json"}, wantRun: true},
+		{name: "short config", args: []string{"-c", "x.json"}, want: workflowOptions{ConfigPath: "x.json"}, wantRun: true},
+		{name: "continue with config", args: []string{"continue", "-c", "x.json"}, want: workflowOptions{Continue: true, ConfigPath: "x.json"}, wantRun: true},
+		{name: "empty config", args: []string{"--config", " "}, wantErr: true},
 		{name: "empty jira", args: []string{"--jira", ""}, wantErr: true},
 		{name: "unknown command", args: []string{"extra"}, wantErr: true},
 		{name: "removed review command", args: []string{"review"}, wantErr: true},
-		{name: "single-dash long flag", args: []string{"-config", "x.json"}, wantErr: true},
 		{name: "help", args: []string{"--help"}},
 	}
 	for _, tt := range tests {
@@ -60,8 +62,8 @@ func TestRootCmdRouting(t *testing.T) {
 	}
 }
 
-func TestHelpOmitsConfigFlags(t *testing.T) {
-	for _, args := range [][]string{{"--help"}} {
+func TestHelpShowsConfigFlags(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"continue", "--help"}, {"resume", "--help"}, {"audit", "--help"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var output bytes.Buffer
 			cmd := newRootCmd(func(workflowOptions) error {
@@ -72,10 +74,25 @@ func TestHelpOmitsConfigFlags(t *testing.T) {
 			cmd.SetOut(&output)
 			cmd.SetErr(io.Discard)
 			require.NoError(t, cmd.Execute())
-			require.NotContains(t, output.String(), "--config")
-			require.NotContains(t, output.String(), "-c,")
+			require.Contains(t, output.String(), "-c, --config")
+			require.Contains(t, output.String(), factoryConfigFile)
 		})
 	}
+}
+
+func TestAuditLoadsCustomConfig(t *testing.T) {
+	t.Chdir(t.TempDir())
+	cmd := newRootCmd(func(workflowOptions) error {
+		require.FailNow(t, "audit invoked the workflow")
+		return nil
+	})
+	cmd.SetArgs([]string{"audit", "--log", "run.log", "--config", "absent.json"})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err := cmd.Execute()
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorContains(t, err, "absent.json")
 }
 
 func TestVersionFlags(t *testing.T) {

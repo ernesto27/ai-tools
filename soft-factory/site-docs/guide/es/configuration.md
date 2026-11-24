@@ -1,7 +1,8 @@
 # Configuración
 
 Crea `software-factory.json` en la carpeta del proyecto y ejecuta Soft Factory
-allí. Empieza con esta configuración:
+allí. Para mantener varias configuraciones, pasa una con `--config PATH`;
+consulta la [referencia de comandos](reference.md). Empieza con esta configuración:
 
 ```json
 {
@@ -209,7 +210,8 @@ Consulta los [informes](reports.md).
 }
 ```
 
-Las rutas locales son relativas a `software-factory.json`. Omite las secciones
+Las rutas locales son relativas a la carpeta del proyecto, incluso cuando
+`--config` apunta a un archivo en otra ubicación. Omite las secciones
 que no necesites. Para Drive, indica carpetas, URL de documentos o ambos. Los
 nombres de carpeta deben identificar una única carpeta accesible; solo se
 cargan los Google Docs directamente dentro de ella.
@@ -228,8 +230,7 @@ tienen prioridad sobre los valores configurados.
 Factory ignora `apiKey` en ambas secciones. Usa la autenticación del host.
 
 ::: tip Migrar una configuración anterior
-Renombra `config.json` a `software-factory.json`; `--config` y `-c` ya no están
-disponibles. Mueve los valores de `customSkills` del nivel superior a
+Renombra `config.json` a `software-factory.json`, o pásalo con `--config`. Mueve los valores de `customSkills` del nivel superior a
 `stages.<stage>.customSkill` y las entradas de `disabledStages` a
 `stages.<stage>.disabled: true`. Conserva las asignaciones de etapa existentes.
 :::

@@ -13,9 +13,12 @@ It is the single user-maintained workflow configuration source.
 
 ### `software-factory.json`: workflow and sandbox settings
 
-The CLI always reads `software-factory.json` from the current working directory.
-Rename an existing `config.json` to `software-factory.json`; there is no fallback
-to the old filename, and `--config` / `-c` are no longer supported.
+By default, the CLI reads `software-factory.json` from the current working
+directory. Pass `--config PATH` (or `-c PATH`) to the default workflow,
+`continue`, `resume`, or `audit` to read another file, for example
+`software-factory --config configs/staging.json`. Relative paths inside it stay
+relative to the current working directory. Scheduled tasks always use
+`software-factory.json`. There is no automatic fallback to an old `config.json`.
 
 All property names use lower camelCase, including nested properties. These are all the options currently supported:
 

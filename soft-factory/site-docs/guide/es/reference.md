@@ -15,12 +15,21 @@ Ejecuta los comandos del flujo de trabajo desde la carpeta del proyecto.
 | --- | --- |
 | `--jira URL` | Usa una incidencia de Jira Cloud en lugar de la tarea local; disponible para los comandos del flujo de trabajo. |
 | `--file PATH` | Ejecuta el flujo predeterminado con un archivo de tarea local y una rama nueva. |
+| `-c`, `--config PATH` | Lee este archivo de configuración en lugar de `software-factory.json`; disponible para el flujo predeterminado, `continue`, `resume` y `audit`. |
 | `-v`, `--version` | Muestra la etiqueta de la versión o `dev` para una compilación local. |
 | `-h`, `--help` | Muestra la ayuda del comando. |
 
-`--config` y `-c` no están disponibles. Soft Factory siempre lee
-`software-factory.json` desde la raíz del proyecto, incluidos los ajustes
-`agentSandbox`. No genera un archivo de configuración del sandbox; los ajustes
+De forma predeterminada, Soft Factory lee `software-factory.json` desde la raíz
+del proyecto, incluidos los ajustes `agentSandbox`. Pasa `--config` para usar
+otro archivo:
+
+```bash
+software-factory --config configs/staging.json
+```
+
+Las rutas relativas de ese archivo siguen siendo relativas a la raíz del
+proyecto, no a la carpeta del archivo. Las tareas programadas siempre usan
+`software-factory.json`. No genera un archivo de configuración del sandbox; los ajustes
 admitidos se pasan mediante opciones. Usa la autenticación del host.
 
 Consulta la [configuración](configuration.md) para las propiedades JSON y los

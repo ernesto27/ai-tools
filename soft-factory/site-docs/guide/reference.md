@@ -15,12 +15,19 @@ Run workflow commands from your project directory.
 | --- | --- |
 | `--jira URL` | Use a Jira Cloud issue instead of the local task; available for workflow commands. |
 | `--file PATH` | Run the default workflow with one local prompt file and a new branch. |
+| `-c`, `--config PATH` | Read this configuration file instead of `software-factory.json`; available for the default workflow, `continue`, `resume`, and `audit`. |
 | `-v`, `--version` | Print the release tag, or `dev` for a local build. |
 | `-h`, `--help` | Show command help. |
 
-`--config` and `-c` are not supported. Soft Factory always reads
-`software-factory.json` from the project root, including embedded `agentSandbox`
-settings. No sandbox configuration file is generated; supported settings
+By default, Soft Factory reads `software-factory.json` from the project root,
+including embedded `agentSandbox` settings. Pass `--config` to use another file:
+
+```bash
+software-factory --config configs/staging.json
+```
+
+Relative paths inside that file stay relative to the project root, not to the
+file's folder. Scheduled tasks always use `software-factory.json`. No sandbox configuration file is generated; supported settings
 travel through flags. Use host authentication.
 
 See [configuration](configuration.md) for JSON properties and

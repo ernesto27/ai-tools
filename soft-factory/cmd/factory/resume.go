@@ -11,10 +11,10 @@ import (
 )
 
 func newResumeCmd(run func(workflowOptions) error) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "resume <path>",
 		Short: "Resume an interrupted workflow from its run log folder",
-		Long:  "Resume an interrupted workflow using current software-factory.json agentSandbox.resume settings.\nThe local task comes from agentSandbox.run.filePrompt. Settings travel through CLI flags;\nno sandbox configuration JSON is generated. Resume preserves existing pull request reviewers. Use host authentication.",
+		Long:  "Resume an interrupted workflow using current software-factory.json (or --config) agentSandbox.resume settings.\nThe local task comes from agentSandbox.run.filePrompt. Settings travel through CLI flags;\nno sandbox configuration JSON is generated. Resume preserves existing pull request reviewers. Use host authentication.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := executionlog.RunPath(args[0])
@@ -51,4 +51,6 @@ func newResumeCmd(run func(workflowOptions) error) *cobra.Command {
 			return run(opts)
 		},
 	}
+	addConfigFlag(cmd)
+	return cmd
 }

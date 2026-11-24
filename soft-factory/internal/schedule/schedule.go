@@ -165,6 +165,24 @@ func (s *Schedule) Delete(repoPath, name string) error {
 	return fmt.Errorf("task %q not found for %s", name, repoPath)
 }
 
+func (s *Schedule) List(repoPath string) ([]ScheduledTask, error) {
+	repoPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve repository path: %w", err)
+	}
+
+	// The constructor initializes the registry under lock and save replaces it atomically.
+	tasks, err := s.load()
+	if err != nil {
+		return nil, err
+	}
+	repoTasks := tasks[repoPath]
+	if repoTasks == nil {
+		return []ScheduledTask{}, nil
+	}
+	return repoTasks, nil
+}
+
 func (s *Schedule) load() (ScheduledTasks, error) {
 	data, err := os.ReadFile(s.filePath)
 	if err != nil {

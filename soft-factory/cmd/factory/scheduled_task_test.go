@@ -161,3 +161,71 @@ func TestScheduledTaskCreateRequiresFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestScheduledTaskList(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", dir)
+	t.Setenv("PATH", dir)
+	t.Chdir(dir)
+
+	registryDir := filepath.Join(dir, ".config", "software-factory", "scheduled-tasks")
+	if err := os.MkdirAll(registryDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(dir, "project with spaces")
+	tasks := schedule.ScheduledTasks{
+		repo: {
+			{Name: "pending", FilePrompt: "task.txt", Cron: "30 8 * * 1-5"},
+			{Name: "legacy", FilePrompt: "old.txt"},
+		},
+		filepath.Join(dir, "other"): {{Name: "other", FilePrompt: "other.txt", Cron: "0 9 * * *"}},
+	}
+	data, err := json.Marshal(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(registryDir, "cron.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const wantSchedules = `[{"name":"pending","filePrompt":"task.txt","cron":"30 8 * * 1-5"},{"name":"legacy","filePrompt":"old.txt"}]`
+
+	for _, test := range []struct {
+		name       string
+		args       []string
+		wantOutput string
+		wantErr    string
+	}{
+		{name: "absolute", args: []string{"--path", repo}, wantOutput: wantSchedules},
+		{name: "relative", args: []string{"--path", "project with spaces/"}, wantOutput: wantSchedules},
+		{name: "no schedules", args: []string{"--path", "unknown"}, wantOutput: "[]"},
+		{name: "missing path", wantErr: `required flag(s) "path" not set`},
+		{name: "blank path", args: []string{"--path", " "}, wantErr: "--path requires a non-empty repository path"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			cmd := newRootCmd(func(workflowOptions) error {
+				t.Fatal("list invoked the workflow")
+				return nil
+			})
+			cmd.SetOut(&output)
+			cmd.SetErr(&output)
+			cmd.SetArgs(append([]string{"scheduled-task", "list"}, test.args...))
+			err := cmd.Execute()
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("Execute() = %v, want a message containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := output.String(); got != test.wantOutput+"\n" {
+				t.Fatalf("list output = %q, want %q", got, test.wantOutput+"\n")
+			}
+		})
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -34,8 +35,39 @@ func newScheduledTaskCmd() *cobra.Command {
 			panic(err)
 		}
 	}
-	parent.AddCommand(create, newScheduledTaskEditCmd(), newScheduledTaskDeleteCmd())
+	parent.AddCommand(create, newScheduledTaskEditCmd(), newScheduledTaskDeleteCmd(), newScheduledTaskListCmd())
 	return parent
+}
+
+func newScheduledTaskListCmd() *cobra.Command {
+	var path string
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List saved schedules for a repository as JSON",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(path) == "" {
+				return errors.New("--path requires a non-empty repository path")
+			}
+			schedules, err := schedule.NewSchedule()
+			if err != nil {
+				return err
+			}
+			tasks, err := schedules.List(path)
+			if err != nil {
+				return err
+			}
+			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(tasks); err != nil {
+				return fmt.Errorf("write scheduled tasks: %w", err)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&path, "path", "", "Repository directory, relative to the current directory or absolute")
+	if err := cmd.MarkFlagRequired("path"); err != nil {
+		panic(err)
+	}
+	return cmd
 }
 
 func newScheduledTaskEditCmd() *cobra.Command {

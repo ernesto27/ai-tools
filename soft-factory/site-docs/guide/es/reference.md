@@ -9,7 +9,7 @@ Ejecuta los comandos del flujo de trabajo desde la carpeta del proyecto.
 | `software-factory resume <path>` | Recupera una ejecución registrada desde su estado guardado y añade registros a la misma carpeta; usa `resume.branch`. |
 | `software-factory doctor` | Busca `agent-sandbox`, `git` y `docker` en `PATH`; no requiere configuración. |
 | `software-factory update` | Instala la última versión mediante el instalador incluido. |
-| `software-factory scheduled-task` | Crea, edita o elimina [flujos programados](#scheduled-tasks) en tu crontab de usuario. |
+| `software-factory scheduled-task` | Crea, edita, elimina o lista [flujos programados](#scheduled-tasks). |
 
 | Opción | Propósito |
 | --- | --- |
@@ -44,6 +44,17 @@ segundo cambia la hora a las 9:00. Los nombres son únicos dentro del proyecto.
 Usa una ruta relativa o absoluta para `--file` y pon entre comillas la
 expresión de cinco campos de `--cron`. Para cambiar solo el archivo de tarea,
 omite `--cron` para conservar el horario.
+
+Desde cualquier carpeta, usa `list` con la ruta del repositorio. Las rutas
+relativas se resuelven desde la carpeta actual.
+
+```sh
+software-factory scheduled-task list --path /ruta/al/repositorio
+```
+
+El comando imprime un arreglo JSON con las tareas guardadas, incluidas las
+pendientes de instalación en crontab. Si el repositorio no tiene tareas
+guardadas, devuelve `[]`.
 
 Cada ejecución comienza en la carpeta del proyecto, lee la configuración del
 flujo de `software-factory.json` y usa el archivo programado como tarea. Cada

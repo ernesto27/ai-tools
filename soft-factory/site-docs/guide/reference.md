@@ -9,7 +9,7 @@ Run workflow commands from your project directory.
 | `software-factory resume <path>` | Recover a logged run from its saved stage status, appending to the same log folder; uses `resume.branch`. |
 | `software-factory doctor` | Check `agent-sandbox`, `git`, and `docker` on `PATH`; no configuration required. |
 | `software-factory update` | Install the latest release using the bundled installer. |
-| `software-factory scheduled-task` | Create, edit, or delete [scheduled workflows](#scheduled-tasks) in your user crontab. |
+| `software-factory scheduled-task` | Create, edit, delete, or list [scheduled workflows](#scheduled-tasks). |
 
 | Flag | Purpose |
 | --- | --- |
@@ -43,6 +43,16 @@ The first command schedules 8:30 a.m. on weekdays. The second changes it to
 9:00 a.m. Names are unique within the project. Use a relative or absolute
 `--file` path and quote the five-field `--cron` expression. To edit only the
 prompt file, omit `--cron` to keep the existing time.
+
+From any directory, use `list` with the repository path. Relative paths resolve
+from your current directory.
+
+```sh
+software-factory scheduled-task list --path /path/to/repo
+```
+
+The command prints a JSON array of saved schedules, including entries pending
+crontab installation. A repository with no saved schedules returns `[]`.
 
 Each job starts in the project directory, reads its workflow settings from
 `software-factory.json`, and uses the scheduled file as the task prompt. Each

@@ -22,16 +22,17 @@ export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
   // Full model IDs: https://code.claude.com/docs/en/model-config
   // CLI releases: https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md
   // Status/retirements: https://platform.claude.com/docs/en/about-claude/model-deprecations
-  // Mythos/CLI access: https://www.anthropic.com/claude-fable-and-mythos-5-2
+  // Mythos 5.2 fast mode (Verification Program orgs): https://www.anthropic.com/claude-fable-and-mythos-5-2
   // Verification: https://support.claude.com/en/articles/14604842-cyber-verification-program
+  // Mythos IDs are API-active per the deprecations page; none are listed in Claude Code docs.
   // Fable usage credits and organization/provider restrictions may apply.
   claude: [
     "claude-fable-5-2", // Requires Claude Code 2.1.321+; usage credits may apply.
     "claude-fable-5-1", // Requires Claude Code 2.1.257+.
     "claude-fable-5",
-    "claude-mythos-5-2", // Requires verification-program approval and provisioning.
-    "claude-mythos-5-1", // Requires verification-program approval and provisioning.
-    "claude-mythos-5", // Requires verification-program approval and provisioning.
+    "claude-mythos-5-2", // UNVERIFIED CLI ID; only fast mode for Verification Program orgs documented.
+    "claude-mythos-5-1", // UNVERIFIED for Claude Code; API-active, requires verification approval.
+    "claude-mythos-5", // UNVERIFIED for Claude Code; API-active, requires verification approval.
     "claude-opus-5-5", // Requires Claude Code 2.1.280+.
     "claude-opus-5",
     "claude-opus-4-8",

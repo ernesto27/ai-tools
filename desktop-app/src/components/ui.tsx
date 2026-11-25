@@ -141,9 +141,9 @@ export function Tabs<T extends string>({ label, items, value, onChange, size = "
 }
 
 /** Small text switcher, underlined when selected (task source, settings source). */
-export function TextTabs<T extends string>({ label, items, value, onChange, size = "md" }: TabsProps<T>) {
+export function TextTabs<T extends string>({ label, items, value, onChange, size = "md", wrap = false }: TabsProps<T> & { wrap?: boolean }) {
   return (
-    <div role="tablist" aria-label={label} className={cx("flex", size === "sm" ? "gap-3 text-sm" : "gap-4 text-md")}>
+    <div role="tablist" aria-label={label} className={cx("flex", wrap && "flex-wrap", size === "sm" ? "gap-3 text-sm" : "gap-4 text-md")}>
       {items.map(([key, text]) => (
         <button
           key={key}

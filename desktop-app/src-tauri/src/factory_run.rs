@@ -3,6 +3,13 @@ use std::process::{Command, Stdio};
 
 use crate::factory_process::{RunOutcome, RunProcesses};
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FactoryRunMode {
+    Run,
+    Continue,
+}
+
 pub struct FactoryRun {
     repository: PathBuf,
 }
@@ -23,29 +30,32 @@ impl FactoryRun {
         }
     }
 
-    pub fn run_tracked(
+    pub fn start_tracked(
         &self,
         processes: &RunProcesses,
         run_id: String,
+        mode: FactoryRunMode,
         jira_url: Option<&str>,
+        image_paths: &[String],
     ) -> Result<RunOutcome, String> {
-        let mut command = self.command();
-        Self::add_jira(&mut command, jira_url);
-
-        processes.run(run_id, command)
+        processes.run(run_id, self.tracked_command(mode, jira_url, image_paths))
     }
 
-    pub fn continue_tracked(
+    fn tracked_command(
         &self,
-        processes: &RunProcesses,
-        run_id: String,
+        mode: FactoryRunMode,
         jira_url: Option<&str>,
-    ) -> Result<RunOutcome, String> {
+        image_paths: &[String],
+    ) -> Command {
         let mut command = self.command();
-        command.arg("continue");
+        if matches!(mode, FactoryRunMode::Continue) {
+            command.arg("continue");
+        }
         Self::add_jira(&mut command, jira_url);
-
-        processes.run(run_id, command)
+        for path in image_paths {
+            command.arg("--image").arg(path);
+        }
+        command
     }
 
     pub fn resume(
@@ -240,6 +250,52 @@ mod tests {
         assert_eq!(command.get_program(), OsStr::new("software-factory"));
         assert_eq!(command.get_current_dir(), Some(repository.path()));
         assert_eq!(command.get_args().count(), 0);
+    }
+
+    #[test]
+    fn builds_run_and_continue_args_with_optional_images() {
+        let repository = tempfile::tempdir().unwrap();
+        let factory = FactoryRun::new(repository.path());
+        let images = [
+            String::from("/tmp/design review.png"),
+            String::from("/tmp/a,b.jpg"),
+        ];
+        let jira_url = "https://jira.example/ABC-1";
+
+        let run = factory.tracked_command(FactoryRunMode::Run, None, &images);
+        assert_eq!(run.get_current_dir(), Some(repository.path()));
+        assert_eq!(
+            run.get_args().collect::<Vec<_>>(),
+            [
+                "--image",
+                "/tmp/design review.png",
+                "--image",
+                "/tmp/a,b.jpg"
+            ]
+        );
+
+        let continuing = factory.tracked_command(FactoryRunMode::Continue, Some(jira_url), &images);
+        assert_eq!(
+            continuing.get_args().collect::<Vec<_>>(),
+            [
+                "continue",
+                "--jira",
+                jira_url,
+                "--image",
+                "/tmp/design review.png",
+                "--image",
+                "/tmp/a,b.jpg"
+            ]
+        );
+
+        let run_without_images = factory.tracked_command(FactoryRunMode::Run, None, &[]);
+        assert_eq!(run_without_images.get_args().count(), 0);
+
+        let continue_without_images = factory.tracked_command(FactoryRunMode::Continue, None, &[]);
+        assert_eq!(
+            continue_without_images.get_args().collect::<Vec<_>>(),
+            ["continue"]
+        );
     }
 
     #[test]

@@ -212,7 +212,7 @@ test("desktop screens navigation", { timeout: 1_200_000 }, async (t) => {
       await runDesktopUpdateChecks(browser);
     });
     await runThemeChecks(browser, artifacts);
-    await runNavigationChecks(t, browser, navigationFixture, artifacts);
+    await runNavigationChecks(t, browser, navigationFixture, artifacts, command);
     await runRecoveryChecks(t, browser, navigationFixture, artifacts, command);
     await runLanguageChecks(browser, navigationFixture, artifacts);
     await t.test("Sidebar repository and branch search", { timeout: 120_000 }, async (searchContext) => {

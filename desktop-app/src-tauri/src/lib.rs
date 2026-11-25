@@ -10,7 +10,7 @@ use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
 use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_update};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
-use factory_run::{FactoryRun, ScheduledTask};
+use factory_run::{FactoryRun, FactoryRunMode, ScheduledTask};
 use std::fs;
 use std::path::Path;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -30,13 +30,6 @@ struct FolderInfo {
 struct SavedRepo {
     name: String,
     path: String,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum FactoryRunMode {
-    Run,
-    Continue,
 }
 
 #[tauri::command]
@@ -194,17 +187,19 @@ async fn start_tracked_factory_run(
     path: String,
     jira_url: Option<String>,
     mode: FactoryRunMode,
+    image_paths: Option<Vec<String>>,
 ) -> Result<RunOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let processes = app.state::<RunProcesses>();
         let workflow = FactoryRun::new(path);
 
-        match mode {
-            FactoryRunMode::Run => workflow.run_tracked(&processes, run_id, jira_url.as_deref()),
-            FactoryRunMode::Continue => {
-                workflow.continue_tracked(&processes, run_id, jira_url.as_deref())
-            }
-        }
+        workflow.start_tracked(
+            &processes,
+            run_id,
+            mode,
+            jira_url.as_deref(),
+            image_paths.as_deref().unwrap_or_default(),
+        )
     })
     .await
     .map_err(|error| format!("Could not wait for software-factory: {error}"))?

@@ -8,10 +8,16 @@ import { runStageTimingChecks } from "./stageTimingChecks.js";
 import { runPullRequestChecks } from "./pullRequestChecks.js";
 import { runWalkthroughChecks } from "./walkthroughChecks.js";
 
-export async function runNavigationChecks(t, browser, fixture, artifacts) {
+export async function runNavigationChecks(t, browser, fixture, artifacts, command) {
   const { repoName, branch, runId, logText } = fixture;
   const navButton = (text) =>
     `//nav[@data-testid="main-nav"]//button[normalize-space(.)="${text}"]`;
+
+  const taskTab = (name) =>
+    `//main//*[@role="tablist" and @aria-label="Task source"]//button[normalize-space(.)="${name}"]`;
+  const imagesPanel = 'main [role="region"][aria-label="Images"]';
+  const imageRows = () => browser.$$(`${imagesPanel} input[placeholder="Path to your image"]`);
+  const imageValues = async () => Promise.all([...(await imageRows())].map((row) => row.getValue()));
 
   async function visible(selector) {
     const element = await browser.$(selector);
@@ -197,6 +203,56 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
 
     await checkTaskFiles();
 
+    const configPath = join(fixture.repo, "software-factory.json");
+    const configBefore = readFileSync(configPath, "utf8");
+    const previewBefore = await (await visible("main pre code")).getText();
+    const taskTabs = await browser.$$('main [role="tablist"][aria-label="Task source"] [role="tab"]');
+    assert.deepEqual(await Promise.all([...taskTabs].map((tab) => tab.getText())),
+      ["Task", "File", "Folder", "Images", "Jira URL"]);
+
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQCm8CAAGyAQRUxrVQAAAAAElFTkSuQmCC",
+      "base64",
+    );
+    const imagePaths = ["design review.png", "second,reference.png"]
+      .map((name) => join(fixture.repo, "..", name));
+    for (const path of imagePaths) writeFileSync(path, png);
+
+    await click(taskTab("Images"));
+    await visible(`${imagesPanel} input[placeholder="Path to your image"]`);
+    assert.deepEqual(await imageValues(), [""]);
+    for (const [index, path] of imagePaths.entries()) {
+      if (index > 0) {
+        await click('//main//*[@role="region" and @aria-label="Images"]//button[normalize-space(.)="Add image"]');
+        assert.equal(await browser.execute((input) => document.activeElement === input, (await imageRows())[index]), true);
+      }
+      await click(`${imagesPanel} button[aria-label="Browse for Image ${index + 1}"]`);
+      const chooser = command("xdotool", ["search", "--sync", "--onlyvisible", "--name", "^Select images$"],
+        { timeout: 10_000 }).trim();
+      assert.match(chooser, /^\d+$/);
+      command("xdotool", ["windowfocus", "--sync", chooser, "key", "--clearmodifiers", "ctrl+l", "ctrl+a"]);
+      command("xdotool", ["type", "--clearmodifiers", path + " "]);
+      // Allow GTK to resolve the typed path before activating Open.
+      command("xdotool", ["sleep", "0.5", "key", "--clearmodifiers", "Return"]);
+      await browser.waitUntil(async () => (await imageValues())[index] === path,
+        { timeout: 15_000, timeoutMsg: "Expected the chosen path in the image row" });
+    }
+
+    await click(taskTab("File"));
+    await visible('main button[aria-label="Browse for Task file 1"]');
+    await click(taskTab("Images"));
+    assert.deepEqual(await imageValues(), imagePaths);
+    await click(`${imagesPanel} button[aria-label="Remove image 1"]`);
+    assert.deepEqual(await imageValues(), [imagePaths[1]]);
+    assert.equal(await (await visible("main pre code")).getText(), previewBefore);
+    assert.equal(readFileSync(configPath, "utf8"), configBefore);
+
+    await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Continue"]');
+    await visible(`${imagesPanel} input[placeholder="Path to your image"]`);
+    assert.deepEqual(await imageValues(), [imagePaths[1]]);
+    await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Run"]');
+    await click(taskTab("File"));
+
     const reviewersInput = await visible('main input[placeholder="alice, bob"]');
     const preview = await visible('main pre code');
     const previewReviewers = async () => JSON.parse(await preview.getText()).agentSandbox.run?.reviewers;
@@ -228,7 +284,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     };
 
     await click(sourceTab("File"));
-    assert.deepEqual(await Promise.all((await rows()).map((row) => row.getValue())), ["task.txt", "context notes.md"]);
+    assert.deepEqual(await Promise.all([...(await rows())].map((row) => row.getValue())), ["task.txt", "context notes.md"]);
     await add();
     assert.equal((await rows()).length, 3);
     await expectFocus(2);
@@ -241,7 +297,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     assert.deepEqual(await files(), ["task.txt"]);
     await click(sourceTab("Task"));
     await click(sourceTab("File"));
-    assert.deepEqual(await Promise.all((await rows()).map((row) => row.getValue())), ["task.txt", "  "]);
+    assert.deepEqual(await Promise.all([...(await rows())].map((row) => row.getValue())), ["task.txt", "  "]);
     await remove(1);
     await remove(1);
     assert.equal((await rows()).length, 1);
@@ -262,9 +318,13 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
   }
 
   await screen("New run Continue", async () => {
-    await openBranch();
+    await openRuns();
     await click(navButton("Continue"));
     await mode("Continue", "Rerun implementation and later stages on the existing resume.branch worktree.");
+    await click(taskTab("Images"));
+    await visible(imagesPanel);
+    assert.deepEqual(await imageValues(), [""]);
+    await click(taskTab("Task"));
     await checkTaskFiles();
     await click('//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="Continue"]');
   });
@@ -304,6 +364,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts) {
     await openBranch();
     await click(navButton("Resume"));
     await mode("Resume", "Pick up an interrupted run from its log folder.");
+    assert.equal(await (await browser.$(taskTab("Images"))).isExisting(), false);
     await text("#rs-h", "Failed or interrupted runs");
     await text(`//main//label//span[text()="${runId}"]`, runId);
   });

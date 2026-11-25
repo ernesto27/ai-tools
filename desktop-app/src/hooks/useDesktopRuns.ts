@@ -25,6 +25,7 @@ export interface StartDesktopRun {
   config: FactoryConfig;
   createConfig: boolean;
   jiraUrl: string | null;
+  imagePaths: string[];
 }
 
 export interface ResumeDesktopRun {
@@ -186,6 +187,7 @@ export function useDesktopRuns(
             path: input.repoPath,
             jiraUrl: input.jiraUrl,
             mode: input.mode,
+            imagePaths: input.imagePaths,
           },
         );
         const outcome = await completion;

@@ -26,6 +26,8 @@ Select a stage to read its output. During a desktop-started run, the detail view
 
 To continue, open the branch's **Continue** action and provide the next instructions. To resume, select **Resume** and choose a failed or interrupted run from the list. Review the configuration preview before launching either mode.
 
+In **Run** or **Continue**, choose **Images** next to **Folder** and use **Browse** on the image row. You can select several local images at once or use **Add image** to add another row. The selection goes to the implementation agent for that run alongside your task and any project-configured images. Image attachments require Software Factory CLI v0.0.33 or a newer build with the `--image` flag, plus an Agent Sandbox agent that supports image input.
+
 ## Stop a running workflow
 
 For an active run started in the current desktop session, choose **Stop** and confirm. The app waits for process cleanup and reports any stop error. Once stopped, you can use **Resume** to continue from the recorded logs.

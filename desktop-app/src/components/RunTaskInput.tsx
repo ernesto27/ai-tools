@@ -20,20 +20,25 @@ function TaskTextInput({ value, onChange }: TaskInputProps) {
   );
 }
 
-function TaskPathInput({ value, onChange, directory, label, placeholder, children, inputRef }: TaskInputProps & {
+function TaskPathInput({ value, onChange, directory, label, placeholder, children, inputRef, onSelectImages }: TaskInputProps & {
   directory: boolean;
   label: string;
   placeholder: string;
   children?: ReactNode;
   inputRef?: (node: HTMLInputElement | null) => void;
+  onSelectImages?: (paths: string[]) => void;
 }) {
   const { t } = useTranslation();
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<UiMessage | null>(null);
   const latestChange = useRef(onChange);
+  const latestImageSelection = useRef(onSelectImages);
   const mounted = useRef(false);
 
-  useEffect(() => { latestChange.current = onChange; }, [onChange]);
+  useEffect(() => {
+    latestChange.current = onChange;
+    latestImageSelection.current = onSelectImages;
+  }, [onChange, onSelectImages]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; };
@@ -44,6 +49,16 @@ function TaskPathInput({ value, onChange, directory, label, placeholder, childre
     setError(null);
     setOpening(true);
     try {
+      if (onSelectImages) {
+        const paths = await open({
+          title: t("selectRunImages"),
+          directory: false,
+          multiple: true,
+          filters: [{ name: t("runImages"), extensions: ["png", "jpg", "jpeg", "webp"] }],
+        });
+        if (paths && mounted.current) latestImageSelection.current?.(paths);
+        return;
+      }
       const path = await open({ directory, multiple: false });
       if (path && mounted.current) latestChange.current(path);
     } catch (error) {
@@ -59,6 +74,7 @@ function TaskPathInput({ value, onChange, directory, label, placeholder, childre
         <div className="min-w-0 grow">
           <Field label={label}>
             <Input ref={inputRef} mono large className="w-full min-w-0" value={value} placeholder={placeholder}
+              readOnly={onSelectImages !== undefined}
               onChange={(event) => onChange(event.target.value)} />
           </Field>
         </div>
@@ -88,11 +104,13 @@ export interface TaskValues {
   jira: string;
 }
 
-function TaskFileInput({ value, onChange }: {
+function TaskFileInput({ value, onChange, kind = "task" }: {
   value: TaskFile[];
   onChange: (value: TaskFile[]) => void;
+  kind?: "task" | "image";
 }) {
   const { t } = useTranslation();
+  const isImage = kind === "image";
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const focusId = useRef<string | null>(null);
 
@@ -117,26 +135,46 @@ function TaskFileInput({ value, onChange }: {
     onChange(next);
   }
 
+  function setImageFiles(id: string, paths: string[]) {
+    const index = value.findIndex((file) => file.id === id);
+    if (index === -1) return;
+
+    const existingPaths = new Set(value.filter((file) => file.id !== id).map((file) => file.path));
+    const uniquePaths = [...new Set(paths)].filter((path) => !existingPaths.has(path));
+    if (!uniquePaths.length) return;
+
+    const [firstPath, ...additionalPaths] = uniquePaths;
+    onChange([
+      ...value.slice(0, index),
+      { id, path: firstPath },
+      ...additionalPaths.map((path) => ({ id: crypto.randomUUID(), path })),
+      ...value.slice(index + 1),
+    ]);
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {value.map((file, index) => (
         <TaskPathInput key={file.id} value={file.path}
           onChange={(path) => onChange(value.map((entry) => entry.id === file.id ? { ...entry, path } : entry))}
-          directory={false} label={t("taskFileNumber", { number: index + 1 })}
-          placeholder={t("pathToYourTaskFile")}
+          directory={false}
+          label={t(isImage ? "runImageNumber" : "taskFileNumber", { number: index + 1 })}
+          placeholder={t(isImage ? "pathToYourRunImage" : "pathToYourTaskFile")}
+          onSelectImages={isImage ? (paths) => setImageFiles(file.id, paths) : undefined}
           inputRef={(node) => {
             if (node) inputs.current.set(file.id, node);
             else inputs.current.delete(file.id);
           }}>
           <OutlineButton className="flex shrink-0 items-center justify-center px-2.5"
-            onClick={() => removeFile(file.id)} aria-label={t("removeTaskFile", { number: index + 1 })}
-            title={t("removeTaskFile", { number: index + 1 })}>
+            onClick={() => removeFile(file.id)}
+            aria-label={t(isImage ? "removeRunImage" : "removeTaskFile", { number: index + 1 })}
+            title={t(isImage ? "removeRunImage" : "removeTaskFile", { number: index + 1 })}>
             <Icon name="remove" />
           </OutlineButton>
         </TaskPathInput>
       ))}
       <OutlineButton className="flex items-center gap-2 self-start" onClick={addFile}>
-        <Icon name="plus" />{t("addTaskFile")}
+        <Icon name="plus" />{t(isImage ? "addRunImage" : "addTaskFile")}
       </OutlineButton>
     </div>
   );
@@ -159,15 +197,17 @@ function JiraUrlInput({ value, onChange }: TaskInputProps) {
 
 export type TaskSource = keyof TaskValues;
 type TextSource = Exclude<TaskSource, "file">;
+type TaskView = TaskSource | "images";
 
-const SOURCE_LABELS: Record<TaskSource, string> = {
+const VIEW_LABELS: Record<TaskView, string> = {
   task: "task",
   file: "file",
   folder: "folder",
+  images: "runImages",
   jira: "jiraUrl",
 };
 
-const sourceKeys = Object.keys(SOURCE_LABELS) as TaskSource[];
+const viewKeys = Object.keys(VIEW_LABELS) as TaskView[];
 
 const TEXT_INPUTS = {
   task: TaskTextInput,
@@ -180,24 +220,42 @@ function TextSourceInput({ source, ...props }: TaskInputProps & { source: TextSo
   return <ActiveInput {...props} />;
 }
 
-export function RunTaskInput({ source, onSourceChange, values, onChange }: {
+export function RunTaskInput({
+  source, onSourceChange, values, onChange, imageFiles, onImageFilesChange,
+}: {
   source: TaskSource;
   onSourceChange: (source: TaskSource) => void;
   values: TaskValues;
   onChange: <Source extends TaskSource>(source: Source, value: TaskValues[Source]) => void;
+  imageFiles: TaskFile[];
+  onImageFilesChange: (files: TaskFile[]) => void;
 }) {
   const { t } = useTranslation();
-  const sourceTabs = sourceKeys.map((key) => [key, t(SOURCE_LABELS[key])] as const);
+  const [showImages, setShowImages] = useState(false);
+  const viewTabs = viewKeys.map((key) => [key, t(VIEW_LABELS[key])] as const);
+
+  function selectView(view: TaskView) {
+    setShowImages(view === "images");
+    if (view !== "images") onSourceChange(view);
+  }
 
   return (
     <section aria-labelledby="task-h" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SectionHeading id="task-h" plain>{t("task")}</SectionHeading>
-        <TextTabs label={t("taskSource")} items={sourceTabs} value={source} onChange={onSourceChange} />
+        <TextTabs label={t("taskSource")} items={viewTabs} value={showImages ? "images" : source}
+          onChange={selectView} wrap />
       </div>
-      {source === "file"
-        ? <TaskFileInput value={values.file} onChange={(value) => onChange("file", value)} />
-        : <TextSourceInput key={source} source={source} value={values[source]} onChange={(value) => onChange(source, value)} />}
+      {showImages ? (
+        <div role="region" aria-label={t("runImages")} className="flex min-w-0 flex-col gap-2">
+          <p className="text-sm text-muted">{t("runImagesHint")}</p>
+          <TaskFileInput key="images" kind="image" value={imageFiles} onChange={onImageFilesChange} />
+        </div>
+      ) : source === "file" ? (
+        <TaskFileInput value={values.file} onChange={(value) => onChange("file", value)} />
+      ) : (
+        <TextSourceInput key={source} source={source} value={values[source]} onChange={(value) => onChange(source, value)} />
+      )}
     </section>
   );
 }

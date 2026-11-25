@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { applyTaskInputs, invalidReviewerNames, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
 import { useBranchRuns } from "../hooks/useBranchRuns";
 import { stageLabel, statusClass, statusLabel } from "../runStatus";
-import { RunTaskInput, createTaskFiles, type TaskSource, type TaskValues } from "../components/RunTaskInput";
+import { RunTaskInput, createTaskFiles, type TaskFile, type TaskSource, type TaskValues } from "../components/RunTaskInput";
 import type { DesktopRuns } from "../hooks/useDesktopRuns";
 import { RUN_MODE, type Navigate, type NewRunMode } from "../router";
 import {
@@ -44,6 +44,7 @@ interface Props {
 export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: Props) {
   const { t } = useTranslation();
   const [source, setSource] = useState<TaskSource>("task");
+  const [imageFiles, setImageFiles] = useState<TaskFile[]>(() => createTaskFiles([]));
   const [runBranch, setRunBranch] = useState("");
   const [reviewers, setReviewers] = useState("");
   const [taskValues, setTaskValues] = useState<TaskValues>(() => ({
@@ -123,6 +124,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
         repo, repoPath, branch: targetBranch, config: taskConfig,
         createConfig: loadedConfig === null,
         jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
+        imagePaths: imageFiles.map((file) => file.path).filter((path) => path.trim()),
       });
       navigate({ screen: "run", repo, branch: targetBranch, runId: id });
     } catch (error) {
@@ -196,6 +198,8 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
                   source={source}
                   onSourceChange={setSource}
                   values={taskValues}
+                  imageFiles={imageFiles}
+                  onImageFilesChange={setImageFiles}
                   onChange={(source, value) => {
                     setTaskValues((current) => ({ ...current, [source]: value }));
                     setSaveError(null);

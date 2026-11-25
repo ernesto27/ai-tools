@@ -15,9 +15,21 @@ Run workflow commands from your project directory.
 | --- | --- |
 | `--jira URL` | Use a Jira Cloud issue instead of the local task; available for workflow commands. |
 | `--file PATH` | Run the default workflow with one local prompt file and a new branch. |
+| `--image PATH` | Append an image for implementation only; repeat for the default workflow or `continue`. |
 | `-c`, `--config PATH` | Read this configuration file instead of `software-factory.json`; available for the default workflow, `continue`, `resume`, and `audit`. |
 | `-v`, `--version` | Print the release tag, or `dev` for a local build. |
 | `-h`, `--help` | Show command help. |
+
+Pass `--image` once per image. Flag images follow `agentSandbox.run.image`
+in the default workflow or `agentSandbox.resume.image` in `continue`, in the
+order given. They apply only to the current invocation and are not sent to later
+stages. Relative paths resolve from the project root, even with `--config`.
+Quote filenames with spaces. Commas are part of the filename, not separators.
+Empty or whitespace-only paths are rejected. You can combine `--image` with `--jira`.
+
+```bash
+software-factory continue --image 'screenshots/before, desktop.png' --image screenshots/after.png
+```
 
 By default, Soft Factory reads `software-factory.json` from the project root,
 including embedded `agentSandbox` settings. Pass `--config` to use another file:

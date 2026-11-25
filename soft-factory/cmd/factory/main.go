@@ -42,6 +42,7 @@ func main() {
 type workflowOptions struct {
 	IssueURL   string
 	TaskFile   string
+	Images     []string
 	ConfigPath string
 	Continue   bool
 	ResumePath string
@@ -167,6 +168,12 @@ func runWorkflow(opts workflowOptions) error {
 
 		if shouldRun(config.StageImplementation) {
 			if err := runStage(input, cfg, config.StageImplementation, "Starting implementation...", func() error {
+				if len(opts.Images) != 0 {
+					// Keep invocation images out of the config reused by later stages.
+					implementation := input
+					implementation.Config = withImplementationImages(cfg, opts.Continue, opts.Images)
+					return sandbox.Run(implementation)
+				}
 				return sandbox.Run(input)
 			}); err != nil {
 				return err
@@ -266,6 +273,25 @@ func runWorkflow(opts workflowOptions) error {
 			"Warning: append PR execution summary: %v\n", err)
 	}
 	return nil
+}
+
+func withImplementationImages(cfg config.Config, continuing bool, paths []string) config.Config {
+	section := &cfg.AgentSandbox.Run
+	if continuing {
+		section = &cfg.AgentSandbox.Resume
+	}
+	var copySection sandboxconfig.Section
+	var configured []string
+	if *section != nil {
+		copySection = **section
+		if copySection.Image != nil {
+			configured = *copySection.Image
+		}
+	}
+	images := slices.Concat(configured, paths)
+	copySection.Image = &images
+	*section = &copySection
+	return cfg
 }
 
 // workflowBranch selects one branch for every stage and report in this run.

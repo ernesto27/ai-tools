@@ -76,6 +76,73 @@ exit 23
 	require.NotEqual(t, branches["configured prompt"], branches["missing run section"])
 }
 
+func TestWorkflowImplementationImages(t *testing.T) {
+	for _, tt := range []struct {
+		mode, sandboxMode, configuredImage string
+	}{
+		{"default", "run", "configured run.png"},
+		{"continue", "resume", "configured resume.png"},
+	} {
+		t.Run(tt.mode, func(t *testing.T) {
+			project := t.TempDir()
+			t.Chdir(project)
+			t.Setenv("HOME", t.TempDir())
+			output, err := exec.Command("git", "init", "-q", "-b", "factory-test").CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			output, err = exec.Command("git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+				"-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "initial").CombinedOutput()
+			require.NoError(t, err, "%s", output)
+
+			bin := t.TempDir()
+			capture := filepath.Join(t.TempDir(), "invocations")
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("SOFT_FACTORY_TEST_CAPTURE", capture)
+			const fakeSandbox = `#!/bin/sh
+set -e
+if [ -f "$SOFT_FACTORY_TEST_CAPTURE" ]; then status=23; else status=0; fi
+{
+  printf 'mode=%s\n' "$1"
+  printf 'cwd=%s\n' "$(pwd -P)"
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = --image ]; then
+      printf 'image=%s\n' "$2"
+      shift
+    fi
+    shift
+  done
+} >> "$SOFT_FACTORY_TEST_CAPTURE"
+exit "$status"
+`
+			require.NoError(t, os.WriteFile(filepath.Join(bin, "agent-sandbox"), []byte(fakeSandbox), 0700))
+			require.NoError(t, os.Mkdir("configs", 0700))
+			const configPath = "configs/workflow.json"
+			const settings = `{"agentSandbox":{"branch":"factory-test","run":{"filePrompt":["task.txt"],"image":["configured run.png"]},"resume":{"image":["configured resume.png"]}}}`
+			require.NoError(t, os.WriteFile(configPath, []byte(settings), 0600))
+			require.NoError(t, os.WriteFile("task.txt", []byte("Implement the task"), 0600))
+
+			cmd := newRootCmd(runWorkflow)
+			args := []string{"--config", configPath, "--image", "first,second.png", "--image", " third image.png "}
+			if tt.mode == "continue" {
+				args = append([]string{"continue"}, args...)
+			}
+			cmd.SetArgs(args)
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, cmd.Execute(), &exitErr)
+			require.Equal(t, 23, exitErr.ExitCode())
+
+			root, err := filepath.EvalSymlinks(project)
+			require.NoError(t, err)
+			got, err := os.ReadFile(capture)
+			require.NoError(t, err)
+			require.Equal(t, "mode="+tt.sandboxMode+"\ncwd="+root+"\nimage="+tt.configuredImage+
+				"\nimage=first,second.png\nimage= third image.png \nmode=resume\ncwd="+root+"\nimage=configured resume.png\n", string(got))
+			stored, err := os.ReadFile(configPath)
+			require.NoError(t, err)
+			require.Equal(t, settings, string(stored))
+		})
+	}
+}
+
 func TestMissingSkillStopsBeforeImplementation(t *testing.T) {
 	for _, stage := range []string{"codeReview", "securityReview", "riskClassification", "reviewChanges"} {
 		t.Run(stage, func(t *testing.T) {

@@ -15,9 +15,22 @@ Ejecuta los comandos del flujo de trabajo desde la carpeta del proyecto.
 | --- | --- |
 | `--jira URL` | Usa una incidencia de Jira Cloud en lugar de la tarea local; disponible para los comandos del flujo de trabajo. |
 | `--file PATH` | Ejecuta el flujo predeterminado con un archivo de tarea local y una rama nueva. |
+| `--image PATH` | Añade una imagen solo para la implementación; se puede repetir en el flujo predeterminado o en `continue`. |
 | `-c`, `--config PATH` | Lee este archivo de configuración en lugar de `software-factory.json`; disponible para el flujo predeterminado, `continue`, `resume` y `audit`. |
 | `-v`, `--version` | Muestra la etiqueta de la versión o `dev` para una compilación local. |
 | `-h`, `--help` | Muestra la ayuda del comando. |
+
+Pasa `--image` una vez por imagen. Las imágenes se añaden, en el orden indicado,
+después de `agentSandbox.run.image` en el flujo predeterminado o de
+`agentSandbox.resume.image` en `continue`. Solo se usan en la ejecución actual y
+no se envían a las etapas posteriores. Las rutas relativas se resuelven desde la
+raíz del proyecto, incluso con `--config`. Pon entre comillas los nombres con
+espacios. Las comas son parte del nombre, no separadores. No se admiten rutas
+vacías o que solo contengan espacios en blanco. Puedes combinar `--image` con `--jira`.
+
+```bash
+software-factory continue --image 'screenshots/before, desktop.png' --image screenshots/after.png
+```
 
 De forma predeterminada, Soft Factory lee `software-factory.json` desde la raíz
 del proyecto, incluidos los ajustes `agentSandbox`. Pasa `--config` para usar

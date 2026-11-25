@@ -10,6 +10,7 @@ import (
 // newRootCmd builds the CLI command tree. run executes the selected workflow;
 // tests pass a fake to check routing without starting agent-sandbox.
 func newRootCmd(run func(workflowOptions) error) *cobra.Command {
+	var images []string
 	var taskFile string
 	root := &cobra.Command{
 		Use:           "software-factory",
@@ -24,6 +25,9 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := validateImagePaths(images); err != nil {
+				return err
+			}
 			if cmd.Flags().Changed("file") {
 				if strings.TrimSpace(taskFile) == "" {
 					return fmt.Errorf("--file requires a non-empty file path")
@@ -33,6 +37,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 				}
 				opts.TaskFile = taskFile
 			}
+			opts.Images = images
 			return run(opts)
 		},
 	}
@@ -41,6 +46,7 @@ func newRootCmd(run func(workflowOptions) error) *cobra.Command {
 	root.Flags().StringVar(&taskFile, "file", "", "Task prompt file to use instead of agentSandbox.run.filePrompt")
 	root.PersistentFlags().String("jira", "", "Jira Cloud issue URL to use instead of agentSandbox.run.filePrompt")
 	addConfigFlag(root)
+	addImageFlag(root, &images)
 
 	root.AddCommand(newDoctorCmd())
 	root.AddCommand(newUpdateCmd())
@@ -71,6 +77,19 @@ func configPathFrom(cmd *cobra.Command) (string, error) {
 		return "", fmt.Errorf("--config requires a non-empty file path")
 	}
 	return path, nil
+}
+
+func addImageFlag(cmd *cobra.Command, paths *[]string) {
+	cmd.Flags().StringArrayVar(paths, "image", nil, "Append a project-relative or absolute image path for implementation only (repeatable)")
+}
+
+func validateImagePaths(paths []string) error {
+	for _, path := range paths {
+		if strings.TrimSpace(path) == "" {
+			return fmt.Errorf("--image requires a non-empty file path")
+		}
+	}
+	return nil
 }
 
 func optionsFrom(cmd *cobra.Command) (workflowOptions, error) {

@@ -19,7 +19,7 @@ Run screen.
 
 config screen
 [x] - i want model input to be autocomplete with options
-[] - show select option for skills in project
+[x] - show select option for skills in project
 [x] - remove input , file for task
 
 run detail

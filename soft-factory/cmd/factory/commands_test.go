@@ -62,6 +62,54 @@ func TestRootCmdRouting(t *testing.T) {
 	}
 }
 
+func TestImageFlagRouting(t *testing.T) {
+	const issue = "https://a.atlassian.net/browse/X-1"
+	for _, mode := range []string{"default", "continue"} {
+		t.Run(mode, func(t *testing.T) {
+			for _, tt := range []struct {
+				name    string
+				images  []string
+				wantErr bool
+			}{
+				{"jira and repeated images", []string{"--image", "a,b.png", "--image", " c d.png "}, false},
+				{"empty image", []string{"--image="}, true},
+				{"blank image after valid image", []string{"--image", "a.png", "--image", " \t"}, true},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					args := []string{"--jira", issue}
+					if mode == "continue" {
+						args = append(args, mode)
+					}
+					called := false
+					cmd := newRootCmd(func(opts workflowOptions) error {
+						called = true
+						require.Equal(t, issue, opts.IssueURL)
+						require.Equal(t, mode == "continue", opts.Continue)
+						return nil
+					})
+					var output bytes.Buffer
+					cmd.SetOut(&output)
+					cmd.SetErr(&output)
+					cmd.SetArgs(append(args, tt.images...))
+					if tt.wantErr {
+						require.EqualError(t, cmd.Execute(), "--image requires a non-empty file path")
+					} else {
+						require.NoError(t, cmd.Execute())
+					}
+					require.Equal(t, !tt.wantErr, called)
+					require.Empty(t, output.String())
+				})
+			}
+		})
+	}
+	cmd := newRootCmd(func(workflowOptions) error {
+		t.Fatal("recovery must not accept --image")
+		return nil
+	})
+	cmd.SetArgs([]string{"resume", "saved-run", "--image", "a.png"})
+	require.EqualError(t, cmd.Execute(), "unknown flag: --image")
+}
+
 func TestHelpShowsConfigFlags(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"continue", "--help"}, {"resume", "--help"}, {"audit", "--help"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {

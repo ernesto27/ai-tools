@@ -57,8 +57,8 @@ Short flags (`-i`, `-c`, `-f`) and names such as `hn` and `pr` are unchanged.
 
 | Location | Fields |
 | --- | --- |
-| Shared root | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn`, `file` |
-| `run` and `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `file`, `apiKey` |
+| Shared root | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn`, `file`, `cpus`, `memory`, `timeout` |
+| `run` and `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `file`, `apiKey`, `cpus`, `memory`, `timeout` |
 | `run` only | `reviewers` |
 
 Use strings for text fields, booleans for `push`, `pr`, and `hn`, and arrays
@@ -86,6 +86,38 @@ On `resume` and `resume-tui`, reviewer flag syntax is validated, then valid
 values are ignored. Existing reviewers are preserved. This does not change the
 JSON schema: root-level `apiKey` and `reviewers`, and `resume.reviewers`, remain
 invalid.
+
+## Resource limits
+
+Set CPU, memory, or maximum execution time independently on any execution command.
+
+```bash
+agent-sandbox run -b limited-task -a codex --cpus 1.5 --memory 2GiB --timeout 30m -q "inspect this repository"
+```
+
+The matching settings in `agent-sandbox.json` use a number for CPU cores and
+strings for memory size and duration.
+
+```json
+{
+  "cpus": 1.5,
+  "memory": "2GiB",
+  "timeout": "30m",
+  "resume": { "timeout": "0" }
+}
+```
+
+CPU limits start at `0.01` cores and memory limits start at `6MiB`.
+Memory accepts whole sizes in `B`, `KiB`, `MiB`, `GiB`, and `TiB`.
+Durations accept Go units such as `s`, `m`, and `h`.
+The CLI overrides the command section, then the shared root. To clear an
+inherited limit, pass `0` to its flag or set the JSON value to `0` for CPU
+and `"0"` for memory or timeout. Limits are optional.
+
+The timer starts after Docker starts the agent container, following image
+preparation and setup. At the deadline agent-sandbox requests an immediate stop,
+waits for cleanup, and exits with status `124`. Your changes stay in the
+worktree for inspection or resume, and the host skips push and PR publication.
 
 ## Share reference files
 

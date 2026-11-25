@@ -1,6 +1,8 @@
 // Package config defines the JSON configuration types used by agent-sandbox.
 package config
 
+import "encoding/json"
+
 // Config represents agent-sandbox.json, with root values shared by run and resume.
 type Config struct {
 	Run         *Section `json:"run"`
@@ -14,6 +16,10 @@ type Config struct {
 	Push        bool     `json:"push"`
 	PR          bool     `json:"pr"`
 	HostNetwork bool     `json:"hn"`
+
+	CPUs    json.Number `json:"cpus,omitempty"`
+	Memory  string      `json:"memory,omitempty"`
+	Timeout string      `json:"timeout,omitempty"`
 }
 
 // Section contains command-specific values that override shared root defaults.
@@ -35,4 +41,8 @@ type Section struct {
 	File          *[]string `json:"file"`
 	Image         *[]string `json:"image"`
 	Reviewers     []string  `json:"reviewers"`
+
+	CPUs    *json.Number `json:"cpus,omitempty"`
+	Memory  *string      `json:"memory,omitempty"`
+	Timeout *string      `json:"timeout,omitempty"`
 }

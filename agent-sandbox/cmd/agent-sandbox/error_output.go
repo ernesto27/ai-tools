@@ -21,6 +21,7 @@ import (
 // testable without launching Docker or terminating the test process.
 func reportError(cmd *cobra.Command, out io.Writer, err error, width int, color bool) int {
 	legacy := cmd.Name() == "run-tui" || cmd.Name() == "resume-tui"
+	timedOut := sandbox.IsTimeout(err)
 	var usage sandbox.UsageError
 	if errors.As(err, &usage) {
 		if usage.Error() != "" {
@@ -33,7 +34,7 @@ func reportError(cmd *cobra.Command, out io.Writer, err error, width int, color 
 		fmt.Fprint(out, cmd.UsageString())
 		return sandbox.ExitUsage
 	}
-	if errors.Is(err, context.Canceled) {
+	if errors.Is(err, context.Canceled) && !timedOut {
 		if legacy {
 			fmt.Fprintln(out, "interrupted; the container was stopped")
 		} else {
@@ -41,10 +42,13 @@ func reportError(cmd *cobra.Command, out io.Writer, err error, width int, color 
 		}
 		return sandbox.ExitInterrupted
 	}
-	if legacy {
+	if legacy && !timedOut {
 		fmt.Fprintf(out, "error: %s\n", err)
 	} else {
 		renderError(out, err, clierror.General, width, color)
+	}
+	if timedOut {
+		return sandbox.ExitTimeout
 	}
 	var status sandbox.StatusError
 	if errors.As(err, &status) {

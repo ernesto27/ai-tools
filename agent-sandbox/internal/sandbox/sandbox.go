@@ -290,6 +290,9 @@ func containerOptions(opts Options, worktreeDir string) (docker.RunOptions, erro
 	)
 
 	runOpts.HostNetwork = opts.HostNetwork
+	runOpts.NanoCPUs = opts.NanoCPUs
+	runOpts.MemoryBytes = opts.MemoryBytes
+	runOpts.Timeout = opts.Timeout
 	if opts.BaseImage != "" {
 		// An arbitrary Alpine base may leave a numeric host UID trying to create
 		// /.cache. XDG_CACHE_HOME gives every tool that follows the standard a

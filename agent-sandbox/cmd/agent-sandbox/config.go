@@ -157,7 +157,7 @@ func applyLocalConfig(cmd *cobra.Command, name string, flags *runFlags) error {
 	if cmd.Flags().Changed(flagFilePrompt) && !cmd.Flags().Changed(flagQuery) {
 		flags.Prompt = ""
 	}
-	return nil
+	return applyResourceLimits(cmd, flags, config, section)
 }
 
 // readLocalConfig validates both supported sections even though only one is
@@ -196,7 +196,7 @@ func readLocalConfig() (cfgResult config.Config, resultErr error) {
 	}
 
 	for name, value := range root {
-		if name == flagFile {
+		if name == flagFile || name == flagCPUs || name == flagMemory || name == flagTimeout {
 			if err := validateConfigField("", name, value); err != nil {
 				return config.Config{}, err
 			}
@@ -259,6 +259,10 @@ func validateConfigField(section, key string, value json.RawMessage) error {
 		fieldName = section + "." + key
 	}
 	switch key {
+	case flagCPUs, flagMemory, flagTimeout:
+		if err := validateResourceLimit(key, value); err != nil {
+			return fmt.Errorf("%s: %s %w", localConfigFile, fieldName, err)
+		}
 	case flagReviewers:
 		if section != "run" {
 			return fmt.Errorf("%s: unknown field %s", localConfigFile, fieldName)

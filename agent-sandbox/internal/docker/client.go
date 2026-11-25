@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/client"
@@ -40,6 +41,9 @@ type RunOptions struct {
 	Mounts      []Mount
 	Tmpfs       []Tmpfs
 	HostNetwork bool
+	NanoCPUs    int64
+	MemoryBytes int64
+	Timeout     time.Duration
 	// FormatStdout wraps agent output for presentation. Close flushes pending
 	// bytes after the attachment is drained without closing the host stream.
 	FormatStdout func(io.Writer) io.WriteCloser

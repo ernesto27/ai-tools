@@ -23,6 +23,9 @@ const stopGrace = 10 * time.Second
 // kill that follows the grace period still has time to be reported.
 const stopOverhead = 5 * time.Second
 
+// ErrRunTimeout reports a deadline set by the sandbox for the agent container.
+var ErrRunTimeout = errors.New("container execution timed out")
+
 // attachStdin reports whether the container reads from our stdin. A TTY always
 // implies it.
 func (o RunOptions) attachStdin() bool {
@@ -71,7 +74,7 @@ func (c *Client) Output(ctx context.Context, entrypoint string, args ...string) 
 
 // Run runs the agent in the sandbox, wiring the process streams to it, and
 // returns the agent's own exit code.
-func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
+func (c *Client) Run(ctx context.Context, opts RunOptions) (_ int, runErr error) {
 	env, err := c.runtimeEnv(ctx, opts.Env)
 	if err != nil {
 		return 0, err
@@ -98,7 +101,22 @@ func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
 	// Register removal before attaching, so an attach failure cannot leave a
 	// never-started container behind. On an unexpected wait failure this also
 	// prevents a live agent from continuing to hold its worktree open.
-	defer c.remove(context.WithoutCancel(ctx), created.ID)
+	defer func() {
+		cleanupCtx := context.WithoutCancel(ctx)
+		if !errors.Is(runErr, ErrRunTimeout) {
+			c.remove(cleanupCtx, created.ID)
+			return
+		}
+		if err := c.removeTimedOutContainer(cleanupCtx, created.ID); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("removing timed-out container: %w", err))
+		}
+	}()
+
+	if opts.NanoCPUs != 0 || opts.MemoryBytes != 0 {
+		if err := c.checkResourceLimits(ctx, created.ID, opts); err != nil {
+			return 0, err
+		}
+	}
 
 	attach, err := c.api.ContainerAttach(ctx, created.ID, container.AttachOptions{
 		Stream: true,
@@ -130,14 +148,22 @@ func (c *Client) Run(ctx context.Context, opts RunOptions) (int, error) {
 	if err := c.api.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
 		return 0, fmt.Errorf("starting container: %w", err)
 	}
-	runCtx, cancelRun := context.WithCancel(ctx)
+	var runCtx context.Context
+	var cancelRun context.CancelFunc
+	if opts.Timeout > 0 {
+		// The agent gets the full duration after start, and its deadline
+		// never cancels the caller's setup or publication context.
+		runCtx, cancelRun = context.WithTimeoutCause(ctx, opts.Timeout, ErrRunTimeout)
+	} else {
+		runCtx, cancelRun = context.WithCancel(ctx)
+	}
 	defer cancelRun()
 	outputDone := c.pump(attach, opts)
 	if opts.TTY {
 		c.watchResize(runCtx, created.ID)
 	}
 
-	status, err := c.awaitExit(ctx, created.ID, waitCh, waitErrCh)
+	status, err := c.awaitExit(runCtx, created.ID, waitCh, waitErrCh)
 	if err != nil {
 		attach.Close()
 		<-outputDone
@@ -217,6 +243,8 @@ func containerConfig(image string, opts RunOptions) *container.Config {
 // container is always disposable: it is removed as soon as the agent exits.
 func hostConfig(opts RunOptions) *container.HostConfig {
 	config := &container.HostConfig{AutoRemove: true}
+	config.Resources.NanoCPUs = opts.NanoCPUs
+	config.Resources.Memory = opts.MemoryBytes
 
 	for _, bind := range opts.Mounts {
 		config.Mounts = append(config.Mounts, mount.Mount{
@@ -240,6 +268,25 @@ func hostConfig(opts RunOptions) *container.HostConfig {
 	return config
 }
 
+func (c *Client) checkResourceLimits(ctx context.Context, id string, opts RunOptions) error {
+	info, err := c.api.ContainerInspect(ctx, id)
+	if err != nil {
+		return fmt.Errorf("verifying container resource limits: %w", err)
+	}
+	// The daemon can accept a create request but discard a memory limit if
+	// the host cannot enforce it. Do not start an unlimited agent in that case.
+	if info.ContainerJSONBase == nil || info.HostConfig == nil {
+		return errors.New("Docker did not report the requested resource limits")
+	}
+	if opts.NanoCPUs != 0 && info.HostConfig.NanoCPUs != opts.NanoCPUs {
+		return errors.New("Docker did not apply the requested CPU limit")
+	}
+	if opts.MemoryBytes != 0 && info.HostConfig.Memory != opts.MemoryBytes {
+		return errors.New("Docker did not apply the requested memory limit")
+	}
+	return nil
+}
+
 // wait blocks until the container stops and returns its exit status.
 func (c *Client) wait(ctx context.Context, id string) (int, error) {
 	waitCtx, cancelWait := context.WithCancel(context.WithoutCancel(ctx))
@@ -256,13 +303,25 @@ func (c *Client) awaitExit(ctx context.Context, id string, waitCh <-chan contain
 	case err := <-errCh:
 		return 0, fmt.Errorf("waiting for container: %w", err)
 	case result := <-waitCh:
-		if result.Error != nil {
-			return 0, errors.New(result.Error.Message)
-		}
-		return int(result.StatusCode), nil
+		return waitStatus(result)
 	case <-ctx.Done():
+		if errors.Is(context.Cause(ctx), ErrRunTimeout) {
+			// Prefer an exit the daemon already reported by the deadline.
+			select {
+			case result := <-waitCh:
+				return waitStatus(result)
+			default:
+			}
+		}
 		return 0, c.stop(ctx, id, waitCh, errCh)
 	}
+}
+
+func waitStatus(result container.WaitResponse) (int, error) {
+	if result.Error != nil {
+		return 0, errors.New(result.Error.Message)
+	}
+	return int(result.StatusCode), nil
 }
 
 // stop shuts down a container whose run was cancelled and waits for the exit,
@@ -270,25 +329,40 @@ func (c *Client) awaitExit(ctx context.Context, id string, waitCh <-chan contain
 // cancellation that caused it, so the caller still reports why the run ended.
 func (c *Client) stop(ctx context.Context, id string, waitCh <-chan container.WaitResponse, errCh <-chan error) error {
 	cause := ctx.Err()
+	grace := stopGrace
+	timedOut := errors.Is(context.Cause(ctx), ErrRunTimeout)
+	if timedOut {
+		cause = ErrRunTimeout
+		grace = 0
+	}
 
 	// The stop cannot run on the cancelled context: that would abort the very
 	// request meant to clean it up. It gets a deadline of its own, longer than
 	// the grace period so a SIGKILL still has time to land and be reported.
-	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), stopGrace+stopOverhead)
+	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), grace+stopOverhead)
 	defer cancel()
 
-	grace := int(stopGrace.Seconds())
-	err := c.api.ContainerStop(stopCtx, id, container.StopOptions{Timeout: &grace})
+	graceSeconds := int(grace.Seconds())
+	err := c.api.ContainerStop(stopCtx, id, container.StopOptions{Timeout: &graceSeconds})
 	if err != nil && !cerrdefs.IsNotFound(err) {
-		return fmt.Errorf("stopping container after %v: %w", cause, err)
+		stopErr := fmt.Errorf("stopping container after %v: %w", cause, err)
+		if timedOut {
+			return errors.Join(cause, stopErr)
+		}
+		return stopErr
 	}
 
 	// The wait registered before the start is still live, and the stop is what
 	// makes it fire.
 	select {
-	case <-waitCh:
-	case <-errCh:
+	case result := <-waitCh:
+		_, err = waitStatus(result)
+	case err = <-errCh:
 	case <-stopCtx.Done():
+		err = stopCtx.Err()
+	}
+	if timedOut && err != nil {
+		return errors.Join(cause, fmt.Errorf("waiting for timed-out container: %w", err))
 	}
 
 	return cause
@@ -298,6 +372,28 @@ func (c *Client) stop(ctx context.Context, id string, waitCh <-chan container.Wa
 // Failures are not worth reporting over whatever brought us here.
 func (c *Client) remove(ctx context.Context, id string) {
 	_ = c.api.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
+}
+
+func (c *Client) removeTimedOutContainer(ctx context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(ctx, stopOverhead)
+	defer cancel()
+	err := c.api.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
+	if cerrdefs.IsConflict(err) {
+		// AutoRemove can already be in progress after the next-exit wait.
+		// Wait for removal so the command reports the completed cleanup.
+		waitCh, errCh := c.api.ContainerWait(ctx, id, container.WaitConditionRemoved)
+		select {
+		case result := <-waitCh:
+			_, err = waitStatus(result)
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+	}
+	if cerrdefs.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 // logs returns the container's buffered stdout and stderr.

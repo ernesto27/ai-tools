@@ -58,8 +58,8 @@ Las opciones cortas (`-i`, `-c`, `-f`) y los nombres `hn` y `pr` no cambian.
 
 | Ubicación | Campos |
 | --- | --- |
-| Raíz compartida | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn`, `file` |
-| `run` y `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `file`, `apiKey` |
+| Raíz compartida | `branch`, `agent`, `model`, `effort`, `baseImage`, `push`, `pr`, `hn`, `file`, `cpus`, `memory`, `timeout` |
+| `run` y `resume` | `branch`, `agent`, `model`, `effort`, `baseImage`, `query`, `filePrompt`, `push`, `pr`, `hn`, `commitMessage`, `image`, `file`, `apiKey`, `cpus`, `memory`, `timeout` |
 | Solo `run` | `reviewers` |
 
 Usa cadenas para los campos de texto, booleanos para `push`, `pr` y `hn`, y
@@ -88,6 +88,40 @@ En `resume` y `resume-tui` se valida la sintaxis de los revisores y luego se
 ignoran los valores válidos. Se conservan los revisores existentes. El esquema
 JSON no cambia: `apiKey` y `reviewers` en la raíz y `resume.reviewers` siguen
 siendo inválidos.
+
+## Límites de recursos {#resource-limits}
+
+Puedes fijar límites independientes de CPU, memoria y tiempo de ejecución en
+cualquiera de los cuatro comandos de ejecución.
+
+```bash
+agent-sandbox run -b limited-task -a codex --cpus 1.5 --memory 2GiB --timeout 30m -q "inspecciona este repositorio"
+```
+
+En `agent-sandbox.json`, usa un número para los núcleos de CPU y cadenas para
+el tamaño de memoria y la duración.
+
+```json
+{
+  "cpus": 1.5,
+  "memory": "2GiB",
+  "timeout": "30m",
+  "resume": { "timeout": "0" }
+}
+```
+
+El límite mínimo de CPU es `0.01` núcleos y el de memoria es `6MiB`. La memoria acepta tamaños enteros
+en `B`, `KiB`, `MiB`, `GiB` y `TiB`. La duración acepta unidades de Go
+como `s`, `m` y `h`. Para cada valor, la CLI tiene prioridad sobre la sección
+del comando y la raíz compartida. Para quitar un límite heredado, pasa `0` en
+su opción o usa `0` para CPU y `"0"` para memoria o duración en el JSON.
+Todos los límites son opcionales.
+
+El temporizador comienza cuando Docker inicia el contenedor del agente, después
+de preparar la imagen y completar la configuración. Al vencer el plazo,
+agent-sandbox solicita la detención inmediata, espera la limpieza del contenedor
+y termina con el código `124`. Los cambios permanecen en el worktree para
+revisarlos o reanudar la sesión. El equipo omite el push y la publicación del PR.
 
 ## Compartir archivos de referencia {#share-reference-files}
 

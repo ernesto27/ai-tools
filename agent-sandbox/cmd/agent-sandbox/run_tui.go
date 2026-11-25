@@ -137,6 +137,8 @@ func printLiveResult(out, errOut io.Writer, status int, err error) {
 		switch {
 		case errors.As(err, &usageErr):
 			status = sandbox.ExitUsage
+		case sandbox.IsTimeout(err):
+			status = sandbox.ExitTimeout
 		case errors.Is(err, context.Canceled):
 			status = sandbox.ExitInterrupted
 		case errors.As(err, &statusErr):
@@ -146,7 +148,9 @@ func printLiveResult(out, errOut io.Writer, status int, err error) {
 	if err != nil || status != 0 {
 		result = "failed"
 		out = errOut
-		if errors.Is(err, context.Canceled) {
+		if sandbox.IsTimeout(err) {
+			result = "timed out"
+		} else if errors.Is(err, context.Canceled) {
 			result = "cancelled"
 		}
 	}

@@ -34,6 +34,9 @@ const (
 	flagImage         = "image"
 	flagFile          = "file"
 	flagFolder        = "folder"
+	flagCPUs          = "cpus"
+	flagMemory        = "memory"
+	flagTimeout       = "timeout"
 )
 
 func newRootCmd() (*cobra.Command, *commandState) {
@@ -130,6 +133,7 @@ func newRunCmd(state *commandState) *cobra.Command {
 // creates it when necessary, while resume finds it in the sandbox state file.
 type runFlags struct {
 	sandbox.Options
+	cpus, memory, timeout string
 }
 
 // bind gives both commands the same agent execution flags and completions, so
@@ -151,6 +155,9 @@ func (f *runFlags) bind(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVar(&f.Files, flagFile, nil, "file to mount read-only for the agent (repeatable)")
 	cmd.Flags().StringArrayVar(&f.Folders, flagFolder, nil, "folders to mount read-only for the agent")
 	cmd.Flags().BoolVar(&f.HostNetwork, flagHostNetwork, false, "access to host services from container")
+	cmd.Flags().StringVar(&f.cpus, flagCPUs, "0", "CPU limit in `cores` (for example 1.5, 0 clears)")
+	cmd.Flags().StringVar(&f.memory, flagMemory, "0", "memory limit `size` (minimum 6MiB, 0 clears)")
+	cmd.Flags().StringVar(&f.timeout, flagTimeout, "0", "container execution `duration` (for example 30m, 0 clears)")
 
 	completeFlag(cmd, flagAgent, func(string) ([]string, error) {
 		return sandbox.AgentNames(), nil

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/ernesto27/ai-tools/agent-sandbox/internal/clierror"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/docker"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/git"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/github"
@@ -104,6 +105,16 @@ func (r Runtime) execute(ctx context.Context, opts Options, record worktreeRecor
 	}
 	r.emit(Event{Phase: "Running agent"})
 	status, err := client.Run(ctx, runOpts)
+	if IsTimeout(err) {
+		r.emit(Event{Phase: "Timed out"})
+		return 0, StatusError{Status: ExitTimeout, err: &clierror.Error{
+			Category: clierror.General,
+			Summary:  fmt.Sprintf("Agent execution timed out after %s.", opts.Timeout),
+			Details:  []clierror.Detail{{Label: "Worktree", Value: record.Path}},
+			Hints:    []string{fmt.Sprintf("Resume with agent-sandbox resume -b %s and your agent and prompt options.", record.Branch)},
+			Cause:    err,
+		}}
+	}
 	if err != nil {
 		return 0, err
 	}

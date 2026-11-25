@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/agent"
 	"github.com/ernesto27/ai-tools/agent-sandbox/internal/utils"
@@ -35,6 +36,9 @@ type Options struct {
 	Files         []string
 	Folders       []string
 	HostNetwork   bool
+	NanoCPUs      int64
+	MemoryBytes   int64
+	Timeout       time.Duration
 
 	// prBase is a fetched remote snapshot supplied by execution, not a CLI option.
 	prBase   string

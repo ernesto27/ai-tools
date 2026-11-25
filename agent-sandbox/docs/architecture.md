@@ -210,6 +210,19 @@ using a context derived with `context.WithoutCancel`. Deferred removal also
 covers attach/start failures and unexpected wait failures. Preserve these
 orderings so an agent cannot outlive the command and hold its worktree open.
 
+The four execution commands resolve optional `cpus`, `memory`, and `timeout`
+independently through flag, command section, and root values. Zero clears an
+inherited limit. The shared sandbox executor sends CPU nanocores and memory
+bytes to Docker's host configuration and checks that the daemon retained them
+before starting the agent. Image builds and probe containers use their usual
+configuration.
+
+The elapsed-time deadline is local to `docker.Run` and begins after
+`ContainerStart` succeeds. Expiry uses the existing stop-and-wait path with
+zero shutdown grace and a separate cleanup context. The sandbox reports exit
+`124` before publication and preserves the registered worktree. Manual
+interruption still uses its shutdown grace and reports exit `130`.
+
 ## Automatic verification evidence
 
 [verification.go](../internal/sandbox/verification.go) contains instructions

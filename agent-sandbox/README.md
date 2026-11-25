@@ -113,6 +113,9 @@ agent-sandbox resume -b <branch> -a <codex|claude|opencode|pi> [options] (-q <qu
 | `--effort` | Optional. Agent effort; defaults to `high`. Passed through without checking supported levels. |
 | `-i`, `--baseImage` | Optional. Derives an image from a compatible base to make its toolchain available inside the sandbox. |
 | `--hn` | Optional. Shares the host network with the container, without port restrictions. Disabled by default; see the risks under "Host networking". |
+| `--cpus <cores>` | Optional. CPU limit in cores, for example `1.5`. Minimum `0.01`; `0` clears the limit. |
+| `--memory <size>` | Optional. Container memory limit, for example `2GiB`. Minimum `6MiB`. `0` clears the limit. |
+| `--timeout <duration>` | Optional. Agent execution limit, for example `30m`. `0` clears the limit. |
 | `-p`, `--push` | The agent creates the commit inside the container. If it finishes successfully and leaves the worktree clean, the host runs `git push --set-upstream origin <branch>` without creating a PR. |
 | `--pr` | Commit and publish a PR. `run` creates or reuses one; `resume` appends to an existing open PR. Includes `--push`; see "GitHub pull requests". |
 | `-q`, `--query` | Instructions for the agent. |
@@ -134,9 +137,9 @@ or `--pr`, the agent must commit its changes before ending the session.
 
 `run` and `resume` read `./agent-sandbox.json` if it exists in the directory
 where they are invoked. The JSON root accepts `branch`, `agent`, `model`, `effort`, `baseImage`,
-`push`, `pr`, `hn`, and `file` as values shared by both commands.
+`push`, `pr`, `hn`, `file`, `cpus`, `memory`, and `timeout` as values shared by both commands.
 Each section accepts the long option names `branch`, `agent`, `model`, `effort`,
-`baseImage`, `query`, `push`, `pr`, `hn`, and `commitMessage`, plus
+`baseImage`, `query`, `push`, `pr`, `hn`, `commitMessage`, `cpus`, `memory`, and `timeout`, plus
 `filePrompt`, `image`, and `file` (arrays of paths), and the `apiKey` field. Only `run`
 accepts a JSON `reviewers` array. For `file`, CLI values replace the section
 array, which replaces the root array; arrays are not combined, and a section's
@@ -386,6 +389,38 @@ The value is passed to Codex's `model_reasoning_effort`, Claude's `--effort`,
 opencode's `--variant`, or pi's `--thinking`. Supported levels depend on the
 agent and model; the agent reports unsupported values and its exit status is
 propagated. The sandbox does not validate levels or modify host agent settings.
+
+### Resource limits
+
+Set any combination of limits on `run`, `resume`, `run-tui`, or `resume-tui`.
+
+```bash
+agent-sandbox run -b limited-task -a codex --cpus 1.5 --memory 2GiB --timeout 30m -q "inspect this repository"
+```
+
+In `agent-sandbox.json`, use a number for CPU and strings for memory and duration.
+Memory accepts whole sizes in `B`, `KiB`, `MiB`, `GiB`, or `TiB`.
+Durations accept Go units such as `s`, `m`, and `h`.
+
+```json
+{
+  "cpus": 1.5,
+  "memory": "2GiB",
+  "timeout": "30m",
+  "resume": { "timeout": "0" }
+}
+```
+
+Each CLI flag overrides the command section and then the root value. Use
+`--cpus 0`, `--memory 0`, or `--timeout 0` to clear an inherited limit for one
+invocation. Use `0` for CPU or `"0"` for memory and timeout in JSON. A setting
+with no value at any level is unlimited by agent-sandbox.
+
+The limits apply to the agent container. The timer starts after Docker starts
+the container, so setup and image builds are outside the execution window.
+At the deadline, agent-sandbox requests an immediate stop, waits for cleanup,
+and exits with status `124`. The worktree remains available to inspect or
+resume, and the host skips push and PR publication.
 
 ## Examples
 

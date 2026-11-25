@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Input } from "./ui";
+import { AutocompleteInput } from "./AutocompleteInput";
 import { SuggestionList } from "./SuggestionList";
 import { useListboxNavigation } from "../hooks/useListboxNavigation";
 
@@ -31,12 +31,11 @@ export function SkillAutocomplete({ id, value, names, disabled = false, onChange
 
   return (
     <div className="relative min-w-0 w-full">
-      <Input
+      <AutocompleteInput
         id={id}
         mono
-        className="min-w-0 w-full"
         role="combobox"
-        aria-label={t("customSkill")}
+        fieldLabel={t("customSkill")}
         aria-autocomplete="list"
         aria-expanded={listbox.expanded}
         aria-controls={listbox.expanded ? listbox.listId : undefined}
@@ -46,6 +45,10 @@ export function SkillAutocomplete({ id, value, names, disabled = false, onChange
         value={listbox.expanded ? query : value}
         placeholder={value || t("noneSkill")}
         disabled={disabled}
+        onClear={value ? () => {
+          onChange("");
+          listbox.close();
+        } : undefined}
         onFocus={(event) => { listbox.show(event.currentTarget); listbox.resetHighlight(); }}
         onClick={(event) => listbox.show(event.currentTarget)}
         onBlur={listbox.close}

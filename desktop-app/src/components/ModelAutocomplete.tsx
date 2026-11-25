@@ -1,8 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { MODEL_CATALOG } from "../modelCatalog";
-import { Input } from "./ui";
-import { SuggestionList } from "./SuggestionList";
-import { useListboxNavigation } from "../hooks/useListboxNavigation";
+import { TextAutocomplete } from "./TextAutocomplete";
 
 interface Props {
   id: string;
@@ -18,52 +16,18 @@ export function ModelAutocomplete({ id, agent, value, onChange, placeholder, dis
   const models = Object.prototype.hasOwnProperty.call(MODEL_CATALOG, agent)
     ? MODEL_CATALOG[agent]
     : [];
-  const query = value.trim().toLowerCase();
-  const matches = models.filter((model) => model.toLowerCase().includes(query));
-  const listbox = useListboxNavigation({
-    id,
-    optionCount: matches.length,
-    disabled: disabled || models.length === 0,
-    onSelect: (index) => onChange(matches[index]),
-  });
-
   return (
-    <div className="relative min-w-0 w-full">
-      <Input
-        id={id}
-        className="min-w-0 w-full"
-        role="combobox"
-        aria-label={t("model")}
-        autoComplete="off"
-        aria-autocomplete="list"
-        aria-expanded={listbox.expanded}
-        aria-controls={listbox.expanded ? listbox.listId : undefined}
-        aria-activedescendant={listbox.activeId}
-        value={value}
-        placeholder={placeholder}
-        disabled={disabled}
-        onFocus={(event) => { listbox.show(event.currentTarget); listbox.resetHighlight(); }}
-        onClick={(event) => listbox.show(event.currentTarget)}
-        onBlur={listbox.close}
-        onChange={(event) => {
-          onChange(event.target.value);
-          listbox.show(event.currentTarget);
-          listbox.resetHighlight();
-        }}
-        onKeyDown={listbox.onKeyDown}
-      />
-      {listbox.expanded && (
-        <SuggestionList
-          id={listbox.listId}
-          label={t("modelSuggestions")}
-          options={matches.map((model) => ({ value: model, label: model }))}
-          activeIndex={listbox.activeIndex}
-          selectedIndex={listbox.activeIndex}
-          openAbove={listbox.openAbove}
-          message={matches.length === 0 ? t("noMatchingModels") : undefined}
-          onSelect={listbox.select}
-        />
-      )}
-    </div>
+    <TextAutocomplete
+      id={id}
+      label={t("model")}
+      suggestionsLabel={t("modelSuggestions")}
+      emptyMessage={t("noMatchingModels")}
+      options={models}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      suggestionsEnabled={models.length > 0}
+      onChange={onChange}
+    />
   );
 }

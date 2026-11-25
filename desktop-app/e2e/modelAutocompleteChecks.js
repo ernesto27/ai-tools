@@ -80,7 +80,8 @@ export async function runModelAutocompleteChecks(browser, fixture, artifacts) {
     for (const key of ["implementation", "codeReview", "securityReview", "riskClassification", "reviewChanges"]) {
       const input = await browser.$(`#${key}-model`);
       await input.click();
-      assert.equal(await input.getAttribute("aria-label"), "Model");
+      const label = await browser.execute((id) => document.getElementById(id)?.labels[0]?.textContent, `${key}-model`);
+      assert.equal(label, "Model");
       assert.equal(await input.getAttribute("aria-controls"), `${key}-model-suggestions`);
       assert.equal(await (await browser.$(`#${key}-model-suggestions [role=option]:first-child`)).getProperty("innerText"), "gpt-6-astra");
       await browser.keys("ArrowUp");

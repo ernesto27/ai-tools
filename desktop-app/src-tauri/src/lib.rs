@@ -1,6 +1,7 @@
 use tauri::Manager;
 mod agent_sandbox_run;
 mod desktop_updates;
+mod docker;
 mod factory_config;
 mod factory_process;
 mod factory_run;
@@ -8,6 +9,7 @@ mod stage_log;
 
 use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
 use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_update};
+use docker::{Docker, Image};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
 use factory_run::{FactoryRun, FactoryRunMode, ScheduledTask};
@@ -388,6 +390,13 @@ async fn scheduled_list_factory_runs(path: String) -> Result<Vec<ScheduledTask>,
         .map_err(|error| format!("Could not wait for schedule listing: {error}"))?
 }
 
+#[tauri::command]
+async fn list_docker_images() -> Result<Vec<Image>, String> {
+    tauri::async_runtime::spawn_blocking(Docker::get_images)
+        .await
+        .map_err(|err| format!("Could not complete Docker image lookup: {err}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -431,6 +440,7 @@ pub fn run() {
             software_factory_check_and_update,
             software_factory_install_bin,
             agent_sandbox_install_bin,
+            list_docker_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

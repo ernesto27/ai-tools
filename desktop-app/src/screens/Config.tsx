@@ -2,12 +2,13 @@ import { toUiMessage, messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { AGENTS, CONFIG_STAGES } from "../data";
-import { Checkbox, Crumb, Field, Input, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
+import { Checkbox, Crumb, Field, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusMessage } from "../components/StatusMessage";
 import { ModelAutocomplete } from "../components/ModelAutocomplete";
 import { SkillAutocomplete } from "../components/SkillAutocomplete";
+import { TextAutocomplete } from "../components/TextAutocomplete";
 import { useSkills } from "../hooks/useSkills";
 import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from "../config";
 import type { FactoryConfig, StageSettings } from "../config";
@@ -29,6 +30,11 @@ interface Props {
   repoPath: string;
 }
 
+interface BaseImageSuggestions {
+  names: string[];
+  emptyMessage: "loadingBaseImages" | "noMatchingBaseImages" | "couldNotLoadBaseImages";
+}
+
 export function Config({ repo, repoPath }: Props) {
   const { t } = useTranslation();
   const skills = useSkills(repoPath);
@@ -36,6 +42,9 @@ export function Config({ repo, repoPath }: Props) {
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("medium");
   const [baseImage, setBaseImage] = useState("");
+  const [baseImages, setBaseImages] = useState<BaseImageSuggestions>({
+    names: [], emptyMessage: "loadingBaseImages",
+  });
   const [stageSettings, setStageSettings] = useState<Record<string, StageSettings>>(() =>
     Object.fromEntries(CONFIG_STAGES.map((s) => [s.key, { agent: s.agent, model: "", effort: "medium", customSkill: s.skill }])),
   );
@@ -53,6 +62,18 @@ export function Config({ repo, repoPath }: Props) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [loadedConfig, setLoadedConfig] = useState<FactoryConfig | null>(null);
   const [initialConfig, setInitialConfig] = useState<FactoryConfig | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    invoke<{ name: string }[]>("list_docker_images")
+      .then((images) => {
+        if (active) setBaseImages({ names: [...new Set(images.map(({ name }) => name))].sort(), emptyMessage: "noMatchingBaseImages" });
+      })
+      .catch(() => {
+        if (active) setBaseImages({ names: [], emptyMessage: "couldNotLoadBaseImages" });
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +210,7 @@ export function Config({ repo, repoPath }: Props) {
                 ))}
               </Select>
             </Field>
-            <Field label={t("model")}>
+            <Field label={t("model")} htmlFor="default-model">
               <ModelAutocomplete
                 key={agent}
                 id="default-model"
@@ -208,8 +229,19 @@ export function Config({ repo, repoPath }: Props) {
                 ))}
               </Select>
             </Field>
-            <Field label={t("baseImage")}>
-              <Input mono value={baseImage} placeholder={t("optional")} onChange={(e) => edit(setBaseImage)(e.target.value)} />
+            <Field label={t("baseImage")} htmlFor="base-image">
+              <TextAutocomplete
+                id="base-image"
+                label={t("baseImage")}
+                suggestionsLabel={t("baseImageSuggestions")}
+                emptyMessage={t(baseImages.emptyMessage)}
+                options={baseImages.names}
+                value={baseImage}
+                placeholder={t("optional")}
+                disabled={saving || loading || !!loadError}
+                mono
+                onChange={edit(setBaseImage)}
+              />
             </Field>
           </div>
 
@@ -255,7 +287,7 @@ export function Config({ repo, repoPath }: Props) {
                       {AGENTS.map((a) => <option key={a} value={a}>{a}</option>)}
                     </Select>
                   </Field>
-                  <Field label={t("model")}>
+                  <Field label={t("model")} htmlFor={`${s.key}-model`}>
                     <ModelAutocomplete
                       key={stageSettings[s.key].agent || agent}
                       id={`${s.key}-model`}
@@ -274,7 +306,7 @@ export function Config({ repo, repoPath }: Props) {
                     </Select>
                   </Field>
                   {s.key !== "implementation" && (
-                    <Field label={t("customSkill")}>
+                    <Field label={t("customSkill")} htmlFor={`${s.key}-skill`}>
                       <SkillAutocomplete
                         key={`${repoPath}-${s.key}`}
                         id={`${s.key}-skill`}

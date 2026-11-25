@@ -66,10 +66,10 @@ export async function runLanguageChecks(browser, fixture, artifacts) {
     await expectText("main h1", "Config");
     await expectText('//main//h2[normalize-space(.)="Valores predeterminados del agente"]',
       "Valores predeterminados del agente");
-    assert.equal(await (await visible('#default-model')).getAttribute("aria-label"), "Modelo");
+    assert.equal(await browser.execute(() => document.getElementById("default-model")?.labels[0]?.textContent), "Modelo");
     const skill = await visible("#codeReview-skill");
     await browser.waitUntil(async () => await skill.isEnabled(), { timeout: 15_000 });
-    assert.equal(await skill.getAttribute("aria-label"), "Skill personalizada");
+    assert.equal(await browser.execute(() => document.getElementById("codeReview-skill")?.labels[0]?.textContent), "Skill personalizada");
     assert.equal(await skill.getAttribute("placeholder"), "Ninguna");
     await skill.click();
     await expectText("#codeReview-skill-suggestions-0", "Ninguna");

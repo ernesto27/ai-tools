@@ -167,6 +167,108 @@ export async function runNavigationChecks(t, browser, fixture, artifacts, comman
     );
   });
 
+  await screen("Base image autocomplete", async () => {
+    await openRepo();
+    await click(navButton("Config"));
+    await text('main header [role="status"]', "Saved");
+    const configPath = join(fixture.repo, "software-factory.json");
+    const original = readFileSync(configPath, "utf8");
+    const input = await visible("#base-image");
+    const popupStatus = "#base-image-suggestions + [role=status]";
+    let images;
+    try {
+      const output = command("docker", ["images", "--format", "{{.Repository}}:{{.Tag}}"], { env: fixture.environment });
+      images = [...new Set(output.split("\n").map((line) => line.trim())
+        .filter((line) => line && !line.includes("<none>")))].sort();
+    } catch {
+      images = null;
+    }
+
+    async function saveBaseImage(expected) {
+      await click('//main//header//button[normalize-space(.)="Save"]');
+      await text('main header [role="status"]', "Saved");
+      assert.equal(JSON.parse(readFileSync(configPath, "utf8")).agentSandbox.baseImage, expected);
+    }
+
+    try {
+      await input.clearValue();
+      await input.click();
+      if (images?.length) {
+        const expected = images[0];
+        await input.setValue(expected.toUpperCase());
+        await text("#base-image-suggestions-0", expected);
+        await browser.keys(["ArrowDown", "Enter"]);
+        assert.equal(await input.getValue(), expected);
+        assert.equal(await input.getAttribute("aria-expanded"), "false");
+        await saveBaseImage(expected);
+      } else {
+        await text(popupStatus, images
+          ? "No matching local Docker images"
+          : "Could not list local Docker images. Enter an image reference manually.");
+      }
+
+      const custom = "example.invalid/desktop-e2e/base-image:custom";
+      await input.setValue(custom);
+      await browser.keys("Tab");
+      await saveBaseImage(custom);
+    } finally {
+      writeFileSync(configPath, original);
+    }
+    await click(navButton("New run"));
+    await click(navButton("Config"));
+    await text('main header [role="status"]', "Saved");
+  });
+
+  await screen("Clear autocomplete selections", async () => {
+    const configPath = join(fixture.repo, "software-factory.json");
+    const original = readFileSync(configPath, "utf8");
+    const config = JSON.parse(original);
+    config.agentSandbox.model = "saved-agent-model";
+    config.agentSandbox.baseImage = "example.invalid/saved-image:latest";
+    config.stages = { implementation: { model: "saved-stage-model" }, codeReview: { customSkill: "saved-skill" } };
+
+    async function reloadConfig() {
+      await click(navButton("New run"));
+      await click(navButton("Config"));
+      await text('main header [role="status"]', "Saved");
+    }
+
+    try {
+      writeFileSync(configPath, JSON.stringify(config));
+      await openRepo();
+      await click(navButton("Config"));
+      await reloadConfig();
+      for (const id of ["default-model", "base-image", "implementation-model", "codeReview-skill"]) {
+        const input = await visible(`#${id}`);
+        const clear = await visible(`#${id}-clear`);
+        await clear.waitForClickable({ timeout: 15_000 });
+        await click(`label[for="${id}"]`);
+        assert.equal(await browser.execute(() => document.activeElement.id), id);
+        if (id === "default-model") {
+          await browser.keys("Tab");
+          assert.equal(await browser.execute(() => document.activeElement.id), `${id}-clear`);
+          await browser.keys("Enter");
+        } else {
+          await clear.click();
+        }
+        assert.equal(await input.getValue(), "");
+        assert.equal(await input.getAttribute("aria-expanded"), "false");
+        assert.equal(await browser.execute(() => document.activeElement.id), id);
+        assert.equal(await (await browser.$(`#${id}-clear`)).isExisting(), false);
+      }
+      await click('//main//header//button[normalize-space(.)="Save"]');
+      await text('main header [role="status"]', "Saved");
+      const saved = JSON.parse(readFileSync(configPath, "utf8"));
+      assert.equal(saved.agentSandbox.model, undefined);
+      assert.equal(saved.agentSandbox.baseImage, undefined);
+      assert.equal(saved.stages.implementation.model, undefined);
+      assert.equal(saved.stages.codeReview.customSkill, undefined);
+    } finally {
+      writeFileSync(configPath, original);
+    }
+    await reloadConfig();
+  });
+
   await screen("Config", async () => {
     await openRepo();
     await click(navButton("Config"));

@@ -70,13 +70,14 @@ export function LinkButton({ muted, className, ...props }: ComponentProps<"butto
 
 const FIELD = "rounded-md border border-field-line bg-field text-ink placeholder:text-faint focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-info";
 
-export function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, children, htmlFor }: { label: ReactNode; hint?: ReactNode; children: ReactNode; htmlFor?: string }) {
+  const Wrapper = htmlFor ? "div" : "label";
   return (
-    <label className="flex flex-col gap-1.5 text-sm text-muted">
-      {label}
+    <Wrapper className="flex flex-col gap-1.5 text-sm text-muted">
+      {htmlFor ? <label htmlFor={htmlFor}>{label}</label> : label}
       {children}
       {hint && <span className="text-xs">{hint}</span>}
-    </label>
+    </Wrapper>
   );
 }
 

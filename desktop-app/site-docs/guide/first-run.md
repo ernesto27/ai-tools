@@ -30,6 +30,6 @@ The task source determines what is passed to Software Factory. File and folder i
 
 ## Follow the result
 
-The run detail screen displays stage progress and output. Open **Log**, **Summary**, or **Walkthrough** to inspect available files. Review the changes and any reported failures before deciding what to do next.
+The run detail screen displays stage progress and output. Open **Log**, **Summary**, or **Walkthrough** to inspect available files. After the run finishes, open **Changes** and choose **Load latest commit changes** to inspect the branch tip.
 
 Use [Runs and logs](./runs) to learn when to choose **Continue** or **Resume**.

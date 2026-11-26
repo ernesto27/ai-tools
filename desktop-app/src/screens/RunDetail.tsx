@@ -12,15 +12,17 @@ import { RUN_MODE, type Navigate } from "../router";
 import { StageSummary } from "../components/StageSummary";
 import { AuditDuration } from "../components/AuditDuration";
 import { AuditReportLink } from "../components/AuditReportLink";
+import { RunChanges } from "../components/RunChanges";
 import { WalkthroughMarkdown, WalkthroughReader } from "../components/Walkthrough";
 import { Crumb, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
-type Tab = "log" | "summary" | "walk";
+type Tab = "log" | "summary" | "walk" | "changes";
 
 const TABS = [
   ["log", "log"],
   ["summary", "summary"],
   ["walk", "walkthrough"],
+  ["changes", "changes"],
 ] as const;
 
 interface Props {
@@ -84,7 +86,8 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     || run?.stages.some((entry) => entry.stage === stage.id),
   );
   const currentStage = stages.find((stage) => stage.id === selectedStage) ?? stages[0];
-  const filename = tab === "summary" ? "summary.log"
+  const filename = tab === "changes" ? undefined
+    : tab === "summary" ? "summary.log"
     : tab === "walk" ? "05-reviewChanges.md" : currentStage?.filename;
   const output = logs.find((log) => log.filename === filename);
 
@@ -265,60 +268,70 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           />
 
           {logs.length === 0 && <p role="status" className="text-muted">{t("noLogFilesRecordedForThisRunYet")}</p>}
-
-            <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
-                <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
-                {live && (
-                  <TextButton aria-pressed={following} onClick={() => {
-                    setFollowing(true);
-                    setTab("log");
-                    if (progress.followStage) setSelectedStage(progress.followStage);
-                    if (outputPanel.current) {
-                      outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
-                    }
-                  }}>
-                    {following ? t("followingLive") : t("followLive")}
-                  </TextButton>
-                )}
-                <div className="flex min-w-0 flex-wrap items-center gap-3">
-                  <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
-                  {tab === "walk" && output?.content && <WalkthroughReader content={output.content} />}
-                </div>
-              </div>
-
-              <div
-                ref={outputPanel}
-                key={filename ?? "no-file"}
-                role="region"
-                aria-label={filename ? t("contentsOfFilename", { filename }) : t("fileContents")}
-                tabIndex={0}
-                className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-panel"
-              >
-                {!output ? (
-                  <p role="status" className="rounded-md bg-panel p-4 text-muted">
-                    {tab === "summary" ? t("noSummaryRecordedForThisRunYet")
-                      : tab === "walk" ? t("noWalkthroughRecordedForThisRunYet")
-                      : t("noLogRecordedForThisStageYet")}
-                  </p>
-                ) : output.content.length === 0 ? (
-                  <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("thisFileIsEmpty")}</p>
-                ) : tab === "walk" ? (
-                  <WalkthroughMarkdown content={output.content} className="p-5" />
-                ) : (
-                  <div className="py-4 font-mono text-sm leading-[1.8]">
-                    {output.content.replace(/\r\n/g, "\n").split("\n").map((line, index) => (
-                      <div key={index} className="flex gap-4 px-4 whitespace-pre">
-                        <span className="w-8 shrink-0 text-right text-faint select-none" aria-hidden="true">{index + 1}</span>
-                        <span>{line}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
         </>
       )}
+
+      <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
+          <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
+          {live && (
+            <TextButton aria-pressed={following} onClick={() => {
+              setFollowing(true);
+              setTab("log");
+              if (progress.followStage) setSelectedStage(progress.followStage);
+              if (outputPanel.current) {
+                outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
+              }
+            }}>
+              {following ? t("followingLive") : t("followLive")}
+            </TextButton>
+          )}
+          {tab !== "changes" && (
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <span className="font-mono text-xs break-all text-muted">{filename ?? t("noStageSelected")}</span>
+              {tab === "walk" && output?.content && <WalkthroughReader content={output.content} />}
+            </div>
+          )}
+        </div>
+
+        <RunChanges
+          repoPath={repoPath}
+          branch={branch}
+          active={tab === "changes"}
+          live={live}
+        />
+        {!loading && tab !== "changes" && (
+          <div
+            ref={outputPanel}
+            key={filename ?? "no-file"}
+            role="region"
+            aria-label={filename ? t("contentsOfFilename", { filename }) : t("fileContents")}
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-panel"
+          >
+            {!output ? (
+              <p role="status" className="rounded-md bg-panel p-4 text-muted">
+                {tab === "summary" ? t("noSummaryRecordedForThisRunYet")
+                  : tab === "walk" ? t("noWalkthroughRecordedForThisRunYet")
+                  : t("noLogRecordedForThisStageYet")}
+              </p>
+            ) : output.content.length === 0 ? (
+              <p role="status" className="rounded-md bg-panel p-4 text-muted">{t("thisFileIsEmpty")}</p>
+            ) : tab === "walk" ? (
+              <WalkthroughMarkdown content={output.content} className="p-5" />
+            ) : (
+              <div className="py-4 font-mono text-sm leading-[1.8]">
+                {output.content.replace(/\r\n/g, "\n").split("\n").map((line, index) => (
+                  <div key={index} className="flex gap-4 px-4 whitespace-pre">
+                    <span className="w-8 shrink-0 text-right text-faint select-none" aria-hidden="true">{index + 1}</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

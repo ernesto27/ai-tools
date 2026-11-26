@@ -11,8 +11,11 @@ The detail screen combines stage status with the available output files:
 | Log | Output for the selected stage |
 | Summary | `summary.log`, when present |
 | Walkthrough | Rendered `05-reviewChanges.md`, when present |
+| Changes | Files changed in the latest commit on the branch |
 
 Select a stage to read its output. During a desktop-started run, the detail view can follow the active stage. Use **Show folder** to reveal the run's log directory in your file manager.
+
+Open **Changes** after the run finishes and choose **Load latest commit changes**. Select a file to see its diff. The button compares the branch tip with its parent at the time you press it.
 
 ![Completed run showing successful workflow stages, durations, and review changes output](/screenshots/completed-run-dark.png)
 

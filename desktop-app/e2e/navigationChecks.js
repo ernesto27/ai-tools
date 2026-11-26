@@ -1,12 +1,96 @@
 import { toggleThemeInSettings } from "./themeChecks.js";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runModelAutocompleteChecks } from "./modelAutocompleteChecks.js";
 import { runSkillAutocompleteChecks } from "./skillAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
 import { runPullRequestChecks } from "./pullRequestChecks.js";
 import { runWalkthroughChecks } from "./walkthroughChecks.js";
+
+async function checkRunChanges(browser, fixture, artifacts, command, { openRuns, click, text }) {
+  const tab = '//main//button[@role="tab" and normalize-space(.)="Changes"]';
+  await openRuns();
+  await click(`main button[aria-label="Open run ${fixture.runId}"]`);
+  await click(tab);
+  const load = '//main//button[normalize-space(.)="Load latest commit changes"]';
+  const tabs = await browser.execute(() => Array.from(
+    document.querySelectorAll('main section[aria-label="Output"] [role="tab"]'),
+    (tab) => tab.textContent.trim(),
+  ));
+  assert.deepEqual(tabs.slice(-2), ["Walkthrough", "Changes"]);
+
+  const git = (...args) => command("git", ["-C", fixture.worktree, ...args]);
+  const commit = (message, ...extra) => git(
+    "-c", "user.name=Desktop UI Test",
+    "-c", "user.email=desktop-ui-test@example.invalid",
+    "-c", "commit.gpgsign=false",
+    "-c", "core.hooksPath=/dev/null",
+    "commit", ...extra, "-m", message,
+  );
+  const paths = ["changes/a.txt", "changes/nested/b.txt", "changes/oversized.txt"];
+  mkdirSync(dirname(join(fixture.worktree, paths[1])), { recursive: true });
+  const original = Array.from({ length: 16 }, (_, index) => "Original line " + (index + 1));
+  writeFileSync(join(fixture.worktree, paths[0]), original.join("\n") + "\n");
+  git("add", "--", paths[0]);
+  commit("Baseline for numbered diff");
+  writeFileSync(join(fixture.worktree, paths[0]), [
+    original[0], "First selected file", "Extra line", ...original.slice(2, -1), "Last selected line",
+  ].join("\n") + "\n");
+  writeFileSync(join(fixture.worktree, paths[1]), "Second selected file\n");
+  writeFileSync(join(fixture.worktree, paths[2]), "generated\n".repeat(5_001));
+  git("add", "--", ...paths);
+  commit("Changes fixture");
+  await click(load);
+  const item = (path) => `main nav[aria-label="Changed files"] button[title="${path}"]`;
+  const patch = (path) => `main section[aria-label="Changes in ${path}"] pre code`;
+  await text(`${item(paths[0])} span`, "a.txt");
+  await text(`${item(paths[1])} span`, "b.txt");
+  assert.equal(await (await browser.$(item(paths[0]))).getAttribute("aria-current"), "true");
+  const addedLine = (path) => patch(path) + ' :nth-child(1 of [data-diff-line="addition"]) > span:last-child';
+  await text(addedLine(paths[0]), "First selected file");
+  const rows = await browser.execute((selector) => Array.from(
+    document.querySelectorAll(selector + ' [data-diff-line]'),
+    (row) => ({
+      kind: row.dataset.diffLine,
+      cells: Array.from(row.children, (cell) => cell.textContent),
+    }),
+  ), patch(paths[0]));
+  assert.equal(rows.filter((row) => row.kind === "hunk").length, 2);
+  assert.deepEqual(rows.filter((row) => row.kind === "addition" || row.kind === "deletion").map((row) => row.cells), [
+    ["2", "", "−", "Original line 2"],
+    ["", "2", "+", "First selected file"],
+    ["", "3", "+", "Extra line"],
+    ["16", "", "−", "Original line 16"],
+    ["", "17", "+", "Last selected line"],
+  ]);
+  assert.ok(rows.some((row) => row.kind === "context" && row.cells.join("|") === "3|4||Original line 3"));
+  const totals = 'main section[aria-label="Changes in changes/a.txt"] [aria-label="Added lines: 3. Removed lines: 2."]';
+  assert.equal(await (await browser.$(totals)).isDisplayed(), true);
+  await browser.saveScreenshot(join(artifacts, "run-changes.png"));
+  const folder = 'main nav[aria-label="Changed files"] button[title="nested"]';
+  await click(folder);
+  assert.equal(await (await browser.$(folder)).getAttribute("aria-expanded"), "false");
+  assert.equal(await (await browser.$(item(paths[1]))).isDisplayed(), false);
+  await click(folder);
+  await text(`${item(paths[1])} span`, "b.txt");
+  await click(item(paths[1]));
+  assert.equal(await (await browser.$(item(paths[1]))).getAttribute("aria-current"), "true");
+  await text(addedLine(paths[1]), "Second selected file");
+  assert.equal(await browser.$(patch(paths[0])).isExisting(), false);
+  await browser.execute((selector) => document.querySelector(selector).focus(), item(paths[0]));
+  await browser.keys("Enter");
+  assert.equal(await (await browser.$(item(paths[0]))).getAttribute("aria-current"), "true");
+  await click(item(paths[2]));
+  await text(`main section[aria-label="Changes in ${paths[2]}"] [role="status"]`, "Diff too large to display.");
+  assert.equal(await browser.$(patch(paths[2])).isExisting(), false);
+  await click(item(paths[0]));
+  await text(addedLine(paths[0]), "First selected file");
+
+  commit("Empty changes fixture", "--allow-empty");
+  await click(load);
+  await text('main section[aria-label="Output"] [role="status"]', "No changes found.");
+}
 
 export async function runNavigationChecks(t, browser, fixture, artifacts, command) {
   const { repoName, branch, runId, logText } = fixture;
@@ -506,4 +590,7 @@ export async function runNavigationChecks(t, browser, fixture, artifacts, comman
     await runPullRequestChecks(browser, fixture, artifacts, { text, openRuns, click });
     await runWalkthroughChecks(browser, fixture, artifacts, { text, click });
   }, 120_000);
+  await screen("Run changes", async () => {
+    await checkRunChanges(browser, fixture, artifacts, command, { openRuns, click, text });
+  });
 }

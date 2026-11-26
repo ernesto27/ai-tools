@@ -5,6 +5,7 @@ mod docker;
 mod factory_config;
 mod factory_process;
 mod factory_run;
+mod git;
 mod stage_log;
 
 use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
@@ -266,6 +267,13 @@ async fn load_run_detail(
 }
 
 #[tauri::command]
+async fn load_git_diff(path: String, branch: String) -> Result<Vec<git::ChangedFile>, String> {
+    tauri::async_runtime::spawn_blocking(move || git::diff(Path::new(&path), &branch))
+        .await
+        .map_err(|error| format!("Could not load Git changes: {error}"))?
+}
+
+#[tauri::command]
 async fn resume_factory_run(
     app: tauri::AppHandle,
     path: String,
@@ -421,6 +429,7 @@ pub fn run() {
             delete_worktree,
             list_branch_runs,
             load_run_detail,
+            load_git_diff,
             create_factory_config,
             load_factory_config,
             update_factory_config,

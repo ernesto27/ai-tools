@@ -3,7 +3,7 @@
 [x] - add githuaction to run tests
 [x] - create release for linux and mac
 [x] - show version app
-[] - add autocomplete option of docker base image
+[x] - add autocomplete option of docker base image
 
 sidebar
 [x] - order by new in list of branchs

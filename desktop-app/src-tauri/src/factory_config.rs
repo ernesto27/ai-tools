@@ -11,9 +11,11 @@ pub struct FactoryConfigFile {
 
 impl FactoryConfigFile {
     pub fn new(repo_path: impl AsRef<Path>) -> Self {
-        Self {
-            path: repo_path.as_ref().join("software-factory.json"),
-        }
+        Self::at(repo_path.as_ref().join("software-factory.json"))
+    }
+
+    pub(crate) fn at(path: PathBuf) -> Self {
+        Self { path }
     }
 
     pub fn load(&self) -> Result<Option<Value>, String> {
@@ -65,7 +67,7 @@ impl FactoryConfigFile {
             .map_err(|error| format!("Could not update {}: {error}", self.path.display()))
     }
 
-    fn validate(config: &Value) -> Result<(), String> {
+    pub(crate) fn validate(config: &Value) -> Result<(), String> {
         if !config.is_object() {
             return Err("Factory configuration must be a JSON object.".into());
         }

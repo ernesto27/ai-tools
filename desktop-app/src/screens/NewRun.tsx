@@ -1,8 +1,9 @@
 import { toUiMessage, messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { applyTaskInputs, invalidReviewerNames, parseFactoryConfig, withResumeBranch, type FactoryConfig } from "../config";
+import { applyTaskInputs, invalidReviewerNames, withResumeBranch, type FactoryConfig } from "../config";
+import { loadFactoryConfiguration, useFactoryProfiles } from "../factoryProfiles";
+import { FactoryProfileSelect } from "../components/FactoryProfileSelect";
 import { useBranchRuns } from "../hooks/useBranchRuns";
 import { stageLabel, statusClass, statusLabel } from "../runStatus";
 import { RunTaskInput, createTaskFiles, type TaskFile, type TaskSource, type TaskValues } from "../components/RunTaskInput";
@@ -12,6 +13,7 @@ import {
   Crumb,
   Field,
   Input,
+  OutlineButton,
   PrimaryButton,
   SectionHeading,
   Tabs,
@@ -61,6 +63,9 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [configError, setConfigError] = useState<UiMessage | null>(null);
   const [saveError, setSaveError] = useState<UiMessage | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [profileId, setProfileId] = useState("");
+  const profileList = useFactoryProfiles(repoPath);
 
   useEffect(() => {
     let active = true;
@@ -70,11 +75,10 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     setLoadedConfig(null);
     setSaveError(null);
 
-    invoke<unknown>("load_factory_config", { path: repoPath })
-      .then((value) => {
+    loadFactoryConfiguration(repoPath, profileId)
+      .then((config) => {
         if (!active) return;
 
-        const config = value === null ? null : parseFactoryConfig(value);
         setLoadedConfig(config);
         setRunBranch(config?.agentSandbox?.branch ?? "");
         setReviewers(config?.agentSandbox?.run?.reviewers?.join(", ") ?? "");
@@ -95,7 +99,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     return () => {
       active = false;
     };
-  }, [repoPath]);
+  }, [repoPath, profileId, loadAttempt]);
 
   const targetBranch = mode === RUN_MODE.RUN ? runBranch.trim() : branch;
   const missingRunBranch = mode === RUN_MODE.RUN && !targetBranch;
@@ -122,7 +126,8 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
       const id = desktopRuns.start({
         mode,
         repo, repoPath, branch: targetBranch, config: taskConfig,
-        createConfig: loadedConfig === null,
+        createConfig: loadedConfig === null && !profileId,
+        profileId: profileId || null,
         jiraUrl: source === "jira" ? taskValues.jira.trim() : null,
         imagePaths: imageFiles.map((file) => file.path).filter((path) => path.trim()),
       });
@@ -140,6 +145,7 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
     try {
       const id = desktopRuns.resume({
         repo, repoPath, branch, config: resumeConfig, run: selectedRun,
+        profileId: profileId || null,
       });
       navigate({ screen: "run", repo, branch, runId: id });
     } catch (error) {
@@ -168,6 +174,28 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
           </fieldset>
           <p className="-mt-3 text-base text-muted">{t(MODE_DESC[mode])}</p>
 
+          {(profileId || profileList.profiles.length > 0 || profileList.error) && (
+            <div className="flex min-w-0 flex-col gap-2">
+              {(profileId || profileList.profiles.length > 0) && (
+                <FactoryProfileSelect profiles={profileList.profiles} value={profileId} disabled={loadingConfig}
+                  onChange={(id) => {
+                    if (id === profileId) return;
+                    setLoadingConfig(true);
+                    setSource("task");
+                    setImageFiles(createTaskFiles([]));
+                    setProfileId(id);
+                  }} />
+              )}
+              {profileId && <p className="text-sm text-muted">{t("factoryProfileSavesOnLaunch")}</p>}
+              {profileList.error && (
+                <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
+                  <span>{t("couldNotListFactoryProfiles")} {messageText(profileList.error, t)}</span>
+                  <OutlineButton onClick={profileList.reload}>{t("retry")}</OutlineButton>
+                </div>
+              )}
+            </div>
+          )}
+
           {(loadingConfig || (!configError && !loadedConfig)) && (
             <p role="status" className="text-sm text-muted">
               {loadingConfig
@@ -179,7 +207,13 @@ export function NewRun({ repo, repoPath, branch, mode, navigate, desktopRuns }: 
           )}
 
           {configError && (
-            <p role="alert" className="text-sm text-bad">{messageText(configError, t)}</p>
+            <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
+              <span>{messageText(configError, t)}</span>
+              {profileId && <OutlineButton disabled={loadingConfig} onClick={() => {
+                setLoadingConfig(true);
+                setLoadAttempt((attempt) => attempt + 1);
+              }}>{t("retry")}</OutlineButton>}
+            </div>
           )}
 
           {mode !== RUN_MODE.RESUME && (

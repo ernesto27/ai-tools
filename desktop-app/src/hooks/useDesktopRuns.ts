@@ -24,6 +24,7 @@ export interface StartDesktopRun {
   branch: string;
   config: FactoryConfig;
   createConfig: boolean;
+  profileId: string | null;
   jiraUrl: string | null;
   imagePaths: string[];
 }
@@ -34,6 +35,7 @@ export interface ResumeDesktopRun {
   branch: string;
   config: FactoryConfig;
   run: RunEntry;
+  profileId: string | null;
 }
 
 export function useDesktopRuns(
@@ -171,9 +173,11 @@ export function useDesktopRuns(
     void (async () => {
       let dispatched = false;
       try {
-        await invoke(input.createConfig ? "create_factory_config" : "update_factory_config", {
-          path: input.repoPath, config: input.config,
-        });
+        if (input.profileId === null) {
+          await invoke(input.createConfig ? "create_factory_config" : "update_factory_config", {
+            path: input.repoPath, config: input.config,
+          });
+        }
         const previous = await invoke<RunEntry[]>("list_branch_runs", {
           path: input.repoPath, branch: input.branch,
         });
@@ -188,6 +192,7 @@ export function useDesktopRuns(
             jiraUrl: input.jiraUrl,
             mode: input.mode,
             imagePaths: input.imagePaths,
+            profile: input.profileId === null ? null : { id: input.profileId, config: input.config },
           },
         );
         const outcome = await completion;
@@ -215,15 +220,18 @@ export function useDesktopRuns(
     void (async () => {
       let dispatched = false;
       try {
-        await invoke("update_factory_config", {
-          path: input.repoPath, config: input.config,
-        });
+        if (input.profileId === null) {
+          await invoke("update_factory_config", {
+            path: input.repoPath, config: input.config,
+          });
+        }
         if (!lifecycle.current.active || lifecycle.current.leaving) return;
         update(id, { state: RUN_STATE.RUNNING });
         dispatched = true;
         const outcome = await invoke<RunOutcome>("resume_factory_run", {
           path: input.repoPath, branch: input.branch, runId: input.run.name,
           executionId: id,
+          profile: input.profileId === null ? null : { id: input.profileId, config: input.config },
         });
         update(id, { state: outcome, stopError: null });
       } catch (error) {

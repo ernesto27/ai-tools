@@ -4,6 +4,7 @@ mod desktop_updates;
 mod docker;
 mod factory_config;
 mod factory_process;
+mod factory_profiles;
 mod factory_run;
 mod git;
 mod stage_log;
@@ -13,6 +14,7 @@ use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_upda
 use docker::{Docker, Image};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
+use factory_profiles::{ProfileLaunch, ProfileStore, ProfileSummary};
 use factory_run::{FactoryRun, FactoryRunMode, ScheduledTask};
 use std::fs;
 use std::path::Path;
@@ -149,6 +151,101 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
         .map_err(|error| format!("Could not save configuration: {error}"))?
 }
 
+fn repo_profiles(app: &tauri::AppHandle, path: &str) -> Result<ProfileStore, String> {
+    let repos = read_repos(&repos_file(app)?)?;
+    if !Path::new(path).is_absolute() || !repos.iter().any(|repo| repo.path == path) {
+        return Err("Repository is not registered.".into());
+    }
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    Ok(ProfileStore::new(&app_data, path))
+}
+
+#[derive(serde::Deserialize)]
+struct FactoryLaunchProfile {
+    id: String,
+    config: serde_json::Value,
+}
+
+fn prepare_factory_profile(
+    app: &tauri::AppHandle,
+    path: &str,
+    profile: Option<FactoryLaunchProfile>,
+) -> Result<Option<ProfileLaunch>, String> {
+    profile
+        .map(|profile| repo_profiles(app, path)?.prepare_launch(&profile.id, &profile.config))
+        .transpose()
+}
+
+#[tauri::command]
+async fn list_factory_profiles(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Vec<ProfileSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.list())
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.load(&id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn create_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    name: String,
+) -> Result<ProfileSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.create(&name))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.update(&id, &config))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn rename_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+    name: String,
+) -> Result<ProfileSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.rename(&id, &name))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn delete_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.delete(&id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 async fn agent_sandbox_check_bin() -> bool {
     AgentSandboxRun::check_bin()
@@ -191,9 +288,11 @@ async fn start_tracked_factory_run(
     jira_url: Option<String>,
     mode: FactoryRunMode,
     image_paths: Option<Vec<String>>,
+    profile: Option<FactoryLaunchProfile>,
 ) -> Result<RunOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let processes = app.state::<RunProcesses>();
+        let profile = prepare_factory_profile(&app, &path, profile)?;
         let workflow = FactoryRun::new(path);
 
         workflow.start_tracked(
@@ -202,6 +301,7 @@ async fn start_tracked_factory_run(
             mode,
             jira_url.as_deref(),
             image_paths.as_deref().unwrap_or_default(),
+            profile.as_ref().map(ProfileLaunch::path),
         )
     })
     .await
@@ -280,6 +380,7 @@ async fn resume_factory_run(
     branch: String,
     run_id: String,
     execution_id: String,
+    profile: Option<FactoryLaunchProfile>,
 ) -> Result<RunOutcome, String> {
     let home = app
         .path()
@@ -291,7 +392,13 @@ async fn resume_factory_run(
         let directory = logs.run_directory(&branch, &run_id)?;
         let processes = app.state::<RunProcesses>();
 
-        FactoryRun::new(path).resume(&processes, execution_id, &directory)
+        let profile = prepare_factory_profile(&app, &path, profile)?;
+        FactoryRun::new(path).resume(
+            &processes,
+            execution_id,
+            &directory,
+            profile.as_ref().map(ProfileLaunch::path),
+        )
     })
     .await
     .map_err(|error| format!("Could not wait for resume: {error}"))?
@@ -433,6 +540,12 @@ pub fn run() {
             create_factory_config,
             load_factory_config,
             update_factory_config,
+            list_factory_profiles,
+            load_factory_profile,
+            create_factory_profile,
+            update_factory_profile,
+            rename_factory_profile,
+            delete_factory_profile,
             start_tracked_factory_run,
             supports_factory_stop,
             resume_factory_run,

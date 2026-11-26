@@ -363,6 +363,77 @@ export async function runNavigationChecks(t, browser, fixture, artifacts, comman
     await runSkillAutocompleteChecks(browser, fixture, artifacts);
   }, 180_000);
 
+  await screen("Repository config profiles", async () => {
+    await openRepo();
+    await click(navButton("Config"));
+    const rootFile = join(fixture.repo, "software-factory.json");
+    const original = readFileSync(rootFile, "utf8");
+    const picker = "#factory-profile-select";
+    const button = (label) => `//main//button[normalize-space(.)="${label}"]`;
+    const selectProfile = async (label) => {
+      const element = await visible(picker);
+      await browser.waitUntil(async () => await element.isEnabled() && (await element.getHTML()).includes(label), { timeout: 15_000 });
+      await element.selectByVisibleText(label);
+    };
+    const nameDialog = async (title, name) => {
+      const dialog = await visible("main dialog[open]");
+      assert.equal(await dialog.$("h2").getText(), title);
+      const input = await dialog.$("input");
+      assert.equal(await browser.execute((element) => document.activeElement === element, input), true);
+      await input.setValue(name);
+      await dialog.$('button[type="submit"]').click();
+      await dialog.waitForDisplayed({ reverse: true });
+    };
+
+    await text('main header [role="status"]', "Saved");
+    assert.equal(await (await visible(picker)).getValue(), "");
+    await click(button("+ New profile"));
+    await nameDialog("New profile", " Quick review ");
+    await mainHasText("Editing Quick review · Saved in desktop app data");
+    await text('main header [role="status"]', "Saved");
+    const effort = await visible('(//main//label[normalize-space(text())="Effort"]/select)[1]');
+    const effortValue = await effort.getValue() === "high" ? "low" : "high";
+    await effort.selectByAttribute("value", effortValue);
+    await text('main header [role="status"]', "Unsaved changes");
+    await click(button("Rename profile"));
+    await nameDialog("Rename profile", "Profile for tests");
+    await mainHasText("Editing Profile for tests · Saved in desktop app data");
+    await text('main header [role="status"]', "Unsaved changes");
+    assert.equal(await effort.getValue(), effortValue);
+    await click(button("Save"));
+    await mainHasText("Profile saved.");
+
+    await openBranch();
+    await click(navButton("New run"));
+    assert.equal(await (await visible(picker)).getValue(), "");
+    await selectProfile("Profile for tests");
+    await mainHasText("Launching saves these changes to the selected profile.");
+    await browser.waitUntil(async () => {
+      const preview = await browser.$("main pre code");
+      return await preview.isExisting()
+        && JSON.parse(await preview.getProperty("textContent")).agentSandbox.effort === effortValue;
+    });
+    for (const name of ["Continue", "Resume", "Run"]) {
+      await click(`//main//*[@role="tablist" and @aria-label="Mode"]//button[normalize-space(.)="${name}"]`);
+      assert.equal(await (await visible(picker)).getValue(), "Profile for tests");
+    }
+
+    await click(navButton("Config"));
+    await selectProfile("Profile for tests");
+    await mainHasText("Editing Profile for tests · Saved in desktop app data");
+    await click(button("Delete profile"));
+    await click('//main//dialog[@open]//button[normalize-space(.)="Delete profile"]');
+    await browser.waitUntil(async () => {
+      const element = await browser.$(picker);
+      return await element.getValue() === "" && !(await element.getHTML()).includes("Profile for tests");
+    });
+    assert.equal(readFileSync(rootFile, "utf8"), original);
+    await openBranch();
+    await click(navButton("New run"));
+    await mode("Run", "Full workflow: implement, review, classify risk, explain.");
+    assert.equal(await browser.$(picker).isExisting(), false);
+  });
+
   await screen("Branch runs", async () => {
     await openRuns();
     await text("main article h3", runId);

@@ -4,6 +4,7 @@ mod desktop_updates;
 mod docker;
 mod factory_config;
 mod factory_process;
+mod factory_profiles;
 mod factory_run;
 mod git;
 mod stage_log;
@@ -13,6 +14,7 @@ use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_upda
 use docker::{Docker, Image};
 use factory_config::FactoryConfigFile;
 use factory_process::{RunOutcome, RunProcesses};
+use factory_profiles::{ProfileLaunch, ProfileStore, ProfileSummary};
 use factory_run::{FactoryRun, FactoryRunMode, ScheduledTask};
 use std::fs;
 use std::path::Path;
@@ -149,6 +151,127 @@ async fn update_factory_config(path: String, config: serde_json::Value) -> Resul
         .map_err(|error| format!("Could not save configuration: {error}"))?
 }
 
+fn repo_profiles(app: &tauri::AppHandle, path: &str) -> Result<ProfileStore, String> {
+    let repos = read_repos(&repos_file(app)?)?;
+    if !Path::new(path).is_absolute() || !repos.iter().any(|repo| repo.path == path) {
+        return Err("Repository is not registered.".into());
+    }
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    Ok(ProfileStore::new(&app_data, path))
+}
+
+#[derive(serde::Deserialize)]
+struct FactoryLaunchProfile {
+    id: String,
+    config: serde_json::Value,
+}
+
+fn prepare_factory_profile(
+    app: &tauri::AppHandle,
+    path: &str,
+    profile: Option<FactoryLaunchProfile>,
+) -> Result<Option<ProfileLaunch>, String> {
+    profile
+        .map(|profile| repo_profiles(app, path)?.prepare_launch(&profile.id, &profile.config))
+        .transpose()
+}
+
+/// Profile failures happen before the CLI starts, so they are reported apart
+/// from run failures and the desktop never adopts another run's log directory.
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+enum FactoryLaunchError {
+    Profile {
+        #[serde(rename = "profileError")]
+        profile_error: String,
+    },
+    Run(String),
+}
+
+/// A resent IPC request reuses its run ID; it must report the run as already
+/// tracked before the profile is saved or found in use by the original request.
+fn launch_with_profile(
+    processes: &RunProcesses,
+    run_id: &str,
+    prepare: impl FnOnce() -> Result<Option<ProfileLaunch>, String>,
+    launch: impl FnOnce(Option<&Path>) -> Result<RunOutcome, String>,
+) -> Result<RunOutcome, FactoryLaunchError> {
+    let _reservation = processes.reserve(run_id).map_err(FactoryLaunchError::Run)?;
+    let profile =
+        prepare().map_err(|profile_error| FactoryLaunchError::Profile { profile_error })?;
+    launch(profile.as_ref().map(ProfileLaunch::path)).map_err(FactoryLaunchError::Run)
+}
+
+#[tauri::command]
+async fn list_factory_profiles(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Vec<ProfileSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.list())
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn load_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.load(&id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn create_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    name: String,
+) -> Result<ProfileSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.create(&name))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn update_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.update(&id, &config))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn rename_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+    name: String,
+) -> Result<ProfileSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.rename(&id, &name))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn delete_factory_profile(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo_profiles(&app, &path)?.delete(&id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 async fn agent_sandbox_check_bin() -> bool {
     AgentSandboxRun::check_bin()
@@ -191,21 +314,32 @@ async fn start_tracked_factory_run(
     jira_url: Option<String>,
     mode: FactoryRunMode,
     image_paths: Option<Vec<String>>,
-) -> Result<RunOutcome, String> {
+    profile: Option<FactoryLaunchProfile>,
+) -> Result<RunOutcome, FactoryLaunchError> {
     tauri::async_runtime::spawn_blocking(move || {
         let processes = app.state::<RunProcesses>();
-        let workflow = FactoryRun::new(path);
+        let workflow = FactoryRun::new(path.clone());
 
-        workflow.start_tracked(
+        launch_with_profile(
             &processes,
-            run_id,
-            mode,
-            jira_url.as_deref(),
-            image_paths.as_deref().unwrap_or_default(),
+            &run_id.clone(),
+            || prepare_factory_profile(&app, &path, profile),
+            |config_path| {
+                workflow.start_tracked(
+                    &processes,
+                    run_id,
+                    mode,
+                    jira_url.as_deref(),
+                    image_paths.as_deref().unwrap_or_default(),
+                    config_path,
+                )
+            },
         )
     })
     .await
-    .map_err(|error| format!("Could not wait for software-factory: {error}"))?
+    .map_err(|error| {
+        FactoryLaunchError::Run(format!("Could not wait for software-factory: {error}"))
+    })?
 }
 
 #[tauri::command]
@@ -280,21 +414,30 @@ async fn resume_factory_run(
     branch: String,
     run_id: String,
     execution_id: String,
-) -> Result<RunOutcome, String> {
-    let home = app
-        .path()
-        .home_dir()
-        .map_err(|error| format!("Could not resolve home directory: {error}"))?;
+    profile: Option<FactoryLaunchProfile>,
+) -> Result<RunOutcome, FactoryLaunchError> {
+    let home = app.path().home_dir().map_err(|error| {
+        FactoryLaunchError::Run(format!("Could not resolve home directory: {error}"))
+    })?;
 
     tauri::async_runtime::spawn_blocking(move || {
-        let logs = stage_log::StageLog::new(&home, std::path::Path::new(&path))?;
-        let directory = logs.run_directory(&branch, &run_id)?;
+        let logs = stage_log::StageLog::new(&home, std::path::Path::new(&path))
+            .map_err(FactoryLaunchError::Run)?;
+        let directory = logs
+            .run_directory(&branch, &run_id)
+            .map_err(FactoryLaunchError::Run)?;
         let processes = app.state::<RunProcesses>();
+        let workflow = FactoryRun::new(path.clone());
 
-        FactoryRun::new(path).resume(&processes, execution_id, &directory)
+        launch_with_profile(
+            &processes,
+            &execution_id.clone(),
+            || prepare_factory_profile(&app, &path, profile),
+            |config_path| workflow.resume(&processes, execution_id, &directory, config_path),
+        )
     })
     .await
-    .map_err(|error| format!("Could not wait for resume: {error}"))?
+    .map_err(|error| FactoryLaunchError::Run(format!("Could not wait for resume: {error}")))?
 }
 
 #[tauri::command]
@@ -433,6 +576,12 @@ pub fn run() {
             create_factory_config,
             load_factory_config,
             update_factory_config,
+            list_factory_profiles,
+            load_factory_profile,
+            create_factory_profile,
+            update_factory_profile,
+            rename_factory_profile,
+            delete_factory_profile,
             start_tracked_factory_run,
             supports_factory_stop,
             resume_factory_run,
@@ -573,5 +722,104 @@ mod repo_removal_tests {
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert!(result.is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+    }
+}
+
+#[cfg(test)]
+mod launch_tests {
+    use super::*;
+    use serde_json::json;
+    use std::cell::Cell;
+
+    #[test]
+    fn profile_failures_are_reported_before_the_cli_is_started() {
+        let root = tempfile::tempdir().unwrap();
+        let repo = root.path().join("repo");
+        fs::create_dir(&repo).unwrap();
+        FactoryConfigFile::new(&repo)
+            .create(&json!({"agentSandbox": {"agent": "codex"}}))
+            .unwrap();
+        let store = ProfileStore::new(root.path(), repo.to_str().unwrap());
+        store.create("Quick review").unwrap();
+        let edited = json!({"agentSandbox": {"agent": "claude"}});
+        let running = store.prepare_launch("Quick review", &edited).unwrap();
+        let started = Cell::new(false);
+
+        let processes = RunProcesses::default();
+        let error = launch_with_profile(
+            &processes,
+            "desktop:second",
+            || store.prepare_launch("Quick review", &edited).map(Some),
+            |_| {
+                started.set(true);
+                Ok(RunOutcome::Succeeded)
+            },
+        )
+        .unwrap_err();
+        assert!(!started.get());
+        assert_eq!(
+            serde_json::to_value(error).unwrap(),
+            json!({"profileError": "This profile is in use by a running workflow."})
+        );
+
+        let profile_path = running.path().to_path_buf();
+        drop(running);
+        let error = launch_with_profile(
+            &processes,
+            "desktop:third",
+            || store.prepare_launch("Quick review", &edited).map(Some),
+            |config| {
+                assert_eq!(config, Some(profile_path.as_path()));
+                assert!(store.update("Quick review", &edited).is_err());
+                Err("Could not start software-factory.".into())
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            serde_json::to_value(error).unwrap(),
+            json!("Could not start software-factory.")
+        );
+        store.update("Quick review", &edited).unwrap();
+    }
+
+    #[test]
+    fn repeated_run_ids_are_already_tracked_without_touching_the_profile() {
+        let root = tempfile::tempdir().unwrap();
+        let repo = root.path().join("repo");
+        fs::create_dir(&repo).unwrap();
+        let saved = json!({"agentSandbox": {"agent": "codex"}});
+        FactoryConfigFile::new(&repo).create(&saved).unwrap();
+        let store = ProfileStore::new(root.path(), repo.to_str().unwrap());
+        store.create("Quick review").unwrap();
+        let processes = RunProcesses::default();
+        let original = processes.reserve("desktop:original").unwrap();
+        let running = store.prepare_launch("Quick review", &saved).unwrap();
+        let prepared = Cell::new(false);
+        let started = Cell::new(false);
+
+        let error = launch_with_profile(
+            &processes,
+            "desktop:original",
+            || {
+                prepared.set(true);
+                store
+                    .prepare_launch("Quick review", &json!({"edited": true}))
+                    .map(Some)
+            },
+            |_| {
+                started.set(true);
+                Ok(RunOutcome::Succeeded)
+            },
+        )
+        .unwrap_err();
+        assert!(!prepared.get());
+        assert!(!started.get());
+        assert_eq!(
+            serde_json::to_value(error).unwrap(),
+            json!("This run is already tracked.")
+        );
+        drop(running);
+        assert_eq!(store.load("Quick review").unwrap(), saved);
+        drop(original);
     }
 }

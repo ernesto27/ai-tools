@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Mutex;
 
@@ -7,9 +7,30 @@ struct RunningProcess {
     stop_requested: bool,
 }
 
+const ALREADY_TRACKED: &str = "This run is already tracked.";
+
 #[derive(Default)]
 pub struct RunProcesses {
     entries: Mutex<HashMap<String, RunningProcess>>,
+    reserved: Mutex<HashSet<String>>,
+}
+
+/// Claims a run ID before work that must not repeat for a resent request,
+/// such as saving a profile, and releases it when dropped.
+pub struct RunReservation<'a> {
+    processes: &'a RunProcesses,
+    run_id: String,
+}
+
+impl Drop for RunReservation<'_> {
+    fn drop(&mut self) {
+        let mut reserved = self
+            .processes
+            .reserved
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        reserved.remove(&self.run_id);
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -20,6 +41,24 @@ pub enum RunOutcome {
 }
 
 impl RunProcesses {
+    pub fn reserve(&self, run_id: &str) -> Result<RunReservation<'_>, String> {
+        let entries = self
+            .entries
+            .lock()
+            .map_err(|_| "Could not lock running processes.".to_string())?;
+        let mut reserved = self
+            .reserved
+            .lock()
+            .map_err(|_| "Could not lock running processes.".to_string())?;
+        if entries.contains_key(run_id) || !reserved.insert(run_id.to_string()) {
+            return Err(ALREADY_TRACKED.to_string());
+        }
+        Ok(RunReservation {
+            processes: self,
+            run_id: run_id.to_string(),
+        })
+    }
+
     pub fn run(&self, run_id: String, command: Command) -> Result<RunOutcome, String> {
         self.start(run_id.clone(), command)?;
 
@@ -39,7 +78,7 @@ impl RunProcesses {
             .map_err(|_| "Could not lock running processes.".to_string())?;
 
         if entries.contains_key(&run_id) {
-            return Err("This run is already tracked.".to_string());
+            return Err(ALREADY_TRACKED.to_string());
         }
 
         prepare(&mut command);
@@ -230,6 +269,43 @@ mod tests {
 
         assert!(matches!(outcome, RunOutcome::Interrupted));
         assert!(processes.poll(run_id).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reserved_or_running_ids_are_already_tracked() {
+        let processes = RunProcesses::default();
+        let reservation = processes.reserve("retry").unwrap();
+        assert_eq!(
+            processes.reserve("retry").err().unwrap(),
+            "This run is already tracked."
+        );
+        processes.reserve("other").unwrap();
+        let mut command = Command::new("sh");
+        command.args(["-c", "exit 0"]);
+        assert!(matches!(
+            processes.run("retry".to_string(), command),
+            Ok(RunOutcome::Succeeded)
+        ));
+        drop(reservation);
+
+        let mut command = Command::new("sleep");
+        command.arg("5");
+        processes.start("running".to_string(), command).unwrap();
+        assert_eq!(
+            processes.reserve("running").err().unwrap(),
+            "This run is already tracked."
+        );
+        processes.request_stop("running").unwrap();
+        let status = loop {
+            if let Some(status) = processes.poll("running").unwrap() {
+                break status;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        processes.finish("running", status).unwrap();
+        drop(processes.reserve("retry").unwrap());
+        drop(processes.reserve("running").unwrap());
     }
 
     #[test]

@@ -1,17 +1,21 @@
 import { toUiMessage, messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AGENTS, CONFIG_STAGES } from "../data";
 import { Checkbox, Crumb, Field, OutlineButton, PrimaryButton, SectionHeading, Select, Title } from "../components/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { DeleteConfirmationDialog } from "../components/DeleteConfirmationDialog";
+import { FactoryProfileSelect } from "../components/FactoryProfileSelect";
+import { ProfileNameDialog } from "../components/ProfileNameDialog";
 import { StatusMessage } from "../components/StatusMessage";
 import { ModelAutocomplete } from "../components/ModelAutocomplete";
 import { SkillAutocomplete } from "../components/SkillAutocomplete";
 import { TextAutocomplete } from "../components/TextAutocomplete";
 import { useSkills } from "../hooks/useSkills";
-import { configToForm, formToConfig, mergeConfigEdits, parseFactoryConfig } from "../config";
+import { configToForm, formToConfig, mergeConfigEdits } from "../config";
 import type { FactoryConfig, StageSettings } from "../config";
+import { loadFactoryConfiguration, useFactoryProfiles, type FactoryProfile } from "../factoryProfiles";
 
 const FLAGS = [
   { key: "push", hint: "commitPush" },
@@ -34,6 +38,10 @@ interface BaseImageSuggestions {
   names: string[];
   emptyMessage: "loadingBaseImages" | "noMatchingBaseImages" | "couldNotLoadBaseImages";
 }
+
+type ProfileDialog = { trigger: HTMLButtonElement } & (
+  { action: "create" } | { action: "rename" | "delete"; id: string }
+);
 
 export function Config({ repo, repoPath }: Props) {
   const { t } = useTranslation();
@@ -62,6 +70,14 @@ export function Config({ repo, repoPath }: Props) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [loadedConfig, setLoadedConfig] = useState<FactoryConfig | null>(null);
   const [initialConfig, setInitialConfig] = useState<FactoryConfig | null>(null);
+  const [profileId, setProfileId] = useState("");
+  const [profileDialog, setProfileDialog] = useState<ProfileDialog | null>(null);
+  const renamedProfileId = useRef<string | null>(null);
+  const confirmingDiscard = useRef(false);
+  const newProfileButton = useRef<HTMLButtonElement>(null);
+  const focusNewProfile = useRef(false);
+  const profileList = useFactoryProfiles(repoPath);
+  const profileLabel = profileList.profiles.find(({ id }) => id === profileId)?.name ?? profileId;
 
   useEffect(() => {
     let active = true;
@@ -76,16 +92,21 @@ export function Config({ repo, repoPath }: Props) {
   }, []);
 
   useEffect(() => {
+    if (renamedProfileId.current === profileId) {
+      renamedProfileId.current = null;
+      return;
+    }
     let active = true;
     setLoading(true);
     setLoadError(null);
     setSaveError(null);
     setSaveMessage(null);
+    setLoadedConfig(null);
+    setDirty(false);
 
-    invoke<unknown>("load_factory_config", { path: repoPath })
-      .then((value) => {
+    loadFactoryConfiguration(repoPath, profileId)
+      .then((config) => {
         if (!active) return;
-        const config = value === null ? null : parseFactoryConfig(value);
         const form = configToForm(config);
         setAgent(form.agent);
         setModel(form.model);
@@ -99,7 +120,6 @@ export function Config({ repo, repoPath }: Props) {
         setLoadedConfig(config);
         setInitialConfig(formToConfig(form));
         setSaved(config !== null);
-        setDirty(false);
       })
       .catch((error) => {
         if (active) setLoadError(toUiMessage(error));
@@ -109,7 +129,60 @@ export function Config({ repo, repoPath }: Props) {
       });
 
     return () => { active = false; };
-  }, [repoPath, loadAttempt]);
+  }, [repoPath, profileId, loadAttempt]);
+
+  useEffect(() => {
+    if (!loading && !profileDialog && focusNewProfile.current) {
+      focusNewProfile.current = false;
+      newProfileButton.current?.focus({ preventScroll: true });
+    }
+  }, [loading, profileDialog]);
+
+  async function replaceDraft(action: () => void) {
+    if (confirmingDiscard.current) return;
+    confirmingDiscard.current = true;
+    try {
+      // The Tauri dialog plugin makes window.confirm asynchronous in the desktop app.
+      if (!dirty || await window.confirm(t("discardFactoryProfileEdits"))) action();
+    } catch (error) {
+      setSaveError(toUiMessage(error));
+    } finally {
+      confirmingDiscard.current = false;
+    }
+  }
+
+  function selectProfile(id: string) {
+    if (id === profileId) return;
+    setLoading(true);
+    setProfileId(id);
+  }
+
+  async function submitProfileName(name: string) {
+    if (profileDialog?.action === "rename") {
+      const profile = await invoke<FactoryProfile>("rename_factory_profile", { path: repoPath, id: profileDialog.id, name });
+      if (profile.id !== profileId) {
+        if (loadError) {
+          focusNewProfile.current = true;
+          selectProfile(profile.id);
+        } else {
+          renamedProfileId.current = profile.id;
+          setProfileId(profile.id);
+        }
+      }
+    } else {
+      const profile = await invoke<FactoryProfile>("create_factory_profile", { path: repoPath, name });
+      focusNewProfile.current = true;
+      selectProfile(profile.id);
+    }
+    profileList.reload();
+  }
+
+  async function deleteProfile(id: string) {
+    await invoke("delete_factory_profile", { path: repoPath, id });
+    focusNewProfile.current = true;
+    selectProfile("");
+    profileList.reload();
+  }
 
   // Every edit marks the form dirty until Save is pressed.
   const edit = <T,>(fn: (v: T) => void) => (v: T) => {
@@ -151,15 +224,18 @@ export function Config({ repo, repoPath }: Props) {
     setSaveMessage(null);
 
     try {
-      await invoke(loadedConfig ? "update_factory_config" : "create_factory_config", {
-        path: repoPath,
-        config,
-      });
+      if (profileId) {
+        await invoke("update_factory_profile", { path: repoPath, id: profileId, config });
+      } else {
+        await invoke(loadedConfig ? "update_factory_config" : "create_factory_config", { path: repoPath, config });
+      }
       setLoadedConfig(config);
       setInitialConfig(formConfig);
       setSaved(true);
       setDirty(false);
-      setSaveMessage({ key: "softwareFactoryJsonSavedInPath", values: { path: repoPath } });
+      setSaveMessage(profileId
+        ? { key: "factoryProfileSaved" }
+        : { key: "softwareFactoryJsonSavedInPath", values: { path: repoPath } });
     } catch (error) {
       setSaveError(toUiMessage(error));
     } finally {
@@ -179,12 +255,55 @@ export function Config({ repo, repoPath }: Props) {
           <PrimaryButton disabled={saving || loading || !!loadError} onClick={saveConfig}>{saving ? t("saving") : t("save")}</PrimaryButton>
         </div>
       </header>
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <FactoryProfileSelect profiles={profileList.profiles} value={profileId} disabled={saving || loading}
+            onChange={(id) => { void replaceDraft(() => selectProfile(id)); }} />
+          <OutlineButton ref={newProfileButton} disabled={saving || loading} onClick={(event) => {
+            const trigger = event.currentTarget;
+            void replaceDraft(() => setProfileDialog({ action: "create", trigger }));
+          }}>+ {t("newFactoryProfile")}</OutlineButton>
+          {profileId && (
+            <>
+              <OutlineButton disabled={saving || loading} onClick={(event) =>
+                setProfileDialog({ action: "rename", id: profileId, trigger: event.currentTarget })
+              }>{t("renameFactoryProfile")}</OutlineButton>
+              <OutlineButton disabled={saving || loading} onClick={(event) =>
+                setProfileDialog({ action: "delete", id: profileId, trigger: event.currentTarget })
+              }>{t("deleteFactoryProfile")}</OutlineButton>
+            </>
+          )}
+        </div>
+        <p className="text-sm break-words text-muted">{profileId
+          ? t("editingNamedFactoryProfile", { name: profileLabel })
+          : t("editingRepositoryFactoryConfig")}</p>
+        {profileList.error && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
+            <span>{t("couldNotListFactoryProfiles")} {messageText(profileList.error, t)}</span>
+            <OutlineButton onClick={profileList.reload}>{t("retry")}</OutlineButton>
+          </div>
+        )}
+      </div>
+      {profileDialog?.action === "delete" && (
+        <DeleteConfirmationDialog name={profileDialog.id} title={t("deleteFactoryProfile")}
+          description={t("deleteFactoryProfileDescription", { name: profileDialog.id })}
+          pendingLabel={t("deletingFactoryProfile")} trigger={profileDialog.trigger}
+          onDelete={() => deleteProfile(profileDialog.id)} onClose={() => setProfileDialog(null)} />
+      )}
+      {profileDialog && profileDialog.action !== "delete" && (
+        <ProfileNameDialog title={t(profileDialog.action === "rename" ? "renameFactoryProfile" : "newFactoryProfile")}
+          initialName={profileDialog.action === "rename" ? profileDialog.id : ""} trigger={profileDialog.trigger}
+          onSubmit={submitProfileName} onClose={() => setProfileDialog(null)} />
+      )}
       {saveMessage && <StatusMessage message={messageText(saveMessage, t)} />}
       {saveError && <p role="alert" className="text-sm text-bad">{messageText(saveError, t)}</p>}
       {loadError && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-bad">
           <span>{messageText(loadError, t)}</span>
-          <OutlineButton onClick={() => setLoadAttempt((attempt) => attempt + 1)}>{t("retry")}</OutlineButton>
+          <OutlineButton disabled={loading} onClick={() => {
+            setLoading(true);
+            setLoadAttempt((attempt) => attempt + 1);
+          }}>{t("retry")}</OutlineButton>
         </div>
       )}
 
@@ -349,8 +468,8 @@ export function Config({ repo, repoPath }: Props) {
         </fieldset>
 
         <aside aria-labelledby="json-h" className="sticky top-0 flex min-w-0 flex-[1_1_440px] flex-col gap-2.5">
-          <h2 id="json-h" className="font-mono text-sm font-normal text-muted">
-            software-factory.json
+          <h2 id="json-h" className="font-mono text-sm font-normal break-words text-muted">
+            {profileId ? profileLabel : "software-factory.json"}
           </h2>
           <pre className="overflow-x-auto rounded-md bg-panel p-4 font-mono text-sm leading-[1.7] whitespace-pre">{loading ? t("loadingConfiguration") : loadError ? t("configurationUnavailable") : json}</pre>
         </aside>

@@ -37,8 +37,12 @@ impl FactoryRun {
         mode: FactoryRunMode,
         jira_url: Option<&str>,
         image_paths: &[String],
+        config_path: Option<&Path>,
     ) -> Result<RunOutcome, String> {
-        processes.run(run_id, self.tracked_command(mode, jira_url, image_paths))
+        processes.run(
+            run_id,
+            self.tracked_command(mode, jira_url, image_paths, config_path),
+        )
     }
 
     fn tracked_command(
@@ -46,11 +50,13 @@ impl FactoryRun {
         mode: FactoryRunMode,
         jira_url: Option<&str>,
         image_paths: &[String],
+        config_path: Option<&Path>,
     ) -> Command {
         let mut command = self.command();
         if matches!(mode, FactoryRunMode::Continue) {
             command.arg("continue");
         }
+        Self::add_config_path(&mut command, config_path);
         Self::add_jira(&mut command, jira_url);
         for path in image_paths {
             command.arg("--image").arg(path);
@@ -63,11 +69,22 @@ impl FactoryRun {
         processes: &RunProcesses,
         execution_id: String,
         directory: &Path,
+        config_path: Option<&Path>,
     ) -> Result<RunOutcome, String> {
+        processes.run(execution_id, self.resume_command(directory, config_path))
+    }
+
+    fn resume_command(&self, directory: &Path, config_path: Option<&Path>) -> Command {
         let mut command = self.command();
         command.arg("resume").arg(directory);
+        Self::add_config_path(&mut command, config_path);
+        command
+    }
 
-        processes.run(execution_id, command)
+    fn add_config_path(command: &mut Command, config_path: Option<&Path>) {
+        if let Some(path) = config_path {
+            command.arg("--config").arg(path);
+        }
     }
 
     pub fn audit(
@@ -262,7 +279,7 @@ mod tests {
         ];
         let jira_url = "https://jira.example/ABC-1";
 
-        let run = factory.tracked_command(FactoryRunMode::Run, None, &images);
+        let run = factory.tracked_command(FactoryRunMode::Run, None, &images, None);
         assert_eq!(run.get_current_dir(), Some(repository.path()));
         assert_eq!(
             run.get_args().collect::<Vec<_>>(),
@@ -274,7 +291,8 @@ mod tests {
             ]
         );
 
-        let continuing = factory.tracked_command(FactoryRunMode::Continue, Some(jira_url), &images);
+        let continuing =
+            factory.tracked_command(FactoryRunMode::Continue, Some(jira_url), &images, None);
         assert_eq!(
             continuing.get_args().collect::<Vec<_>>(),
             [
@@ -288,14 +306,52 @@ mod tests {
             ]
         );
 
-        let run_without_images = factory.tracked_command(FactoryRunMode::Run, None, &[]);
+        let run_without_images = factory.tracked_command(FactoryRunMode::Run, None, &[], None);
         assert_eq!(run_without_images.get_args().count(), 0);
 
-        let continue_without_images = factory.tracked_command(FactoryRunMode::Continue, None, &[]);
+        let continue_without_images =
+            factory.tracked_command(FactoryRunMode::Continue, None, &[], None);
         assert_eq!(
             continue_without_images.get_args().collect::<Vec<_>>(),
             ["continue"]
         );
+    }
+
+    #[test]
+    fn profile_commands_use_the_same_config_argument_in_each_mode() {
+        let repo = tempfile::tempdir().unwrap();
+        let factory = FactoryRun::new(repo.path());
+        let config = repo.path().join("profile config.json");
+        let run_directory = repo.path().join("logs/run");
+        let run = factory.tracked_command(FactoryRunMode::Run, None, &[], Some(&config));
+        let continuation =
+            factory.tracked_command(FactoryRunMode::Continue, None, &[], Some(&config));
+        let resume = factory.resume_command(&run_directory, Some(&config));
+
+        assert_eq!(
+            run.get_args().collect::<Vec<_>>(),
+            vec![OsStr::new("--config"), config.as_os_str()]
+        );
+        assert_eq!(
+            continuation.get_args().collect::<Vec<_>>(),
+            vec![
+                OsStr::new("continue"),
+                OsStr::new("--config"),
+                config.as_os_str()
+            ]
+        );
+        assert_eq!(
+            resume.get_args().collect::<Vec<_>>(),
+            vec![
+                OsStr::new("resume"),
+                run_directory.as_os_str(),
+                OsStr::new("--config"),
+                config.as_os_str()
+            ]
+        );
+        for command in [run, continuation, resume] {
+            assert_eq!(command.get_current_dir(), Some(repo.path()));
+        }
     }
 
     #[test]

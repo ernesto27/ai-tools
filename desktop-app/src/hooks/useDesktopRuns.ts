@@ -146,6 +146,14 @@ export function useDesktopRuns(
     }
   }
 
+  // Native profile save or in-use failures happen before the CLI starts, so
+  // a new run must not keep any run directory seen meanwhile.
+  function profileLaunchFailed(id: string, error: unknown, patch: Partial<DesktopRun> = {}): boolean {
+    if (typeof error !== "object" || error === null || !("profileError" in error)) return false;
+    update(id, { ...patch, state: RUN_STATE.FAILED, error: String(error.profileError), stopError: null });
+    return true;
+  }
+
   function forget(id: string, stopError: UiMessage | null = null) {
     const run = sessions.current[id];
     if (!run || run.tracking !== "restored") return;
@@ -198,7 +206,8 @@ export function useDesktopRuns(
         const outcome = await completion;
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        executionFailed(id, error);
+        if (profileLaunchFailed(id, error, { runId: null, directory: null })) dispatched = false;
+        else executionFailed(id, error);
       } finally {
         // A short run can finish before the shared polling loop first sees it.
         if (dispatched) await discovery.finish(id);
@@ -235,7 +244,8 @@ export function useDesktopRuns(
         });
         update(id, { state: outcome, stopError: null });
       } catch (error) {
-        executionFailed(id, error);
+        if (profileLaunchFailed(id, error)) dispatched = false;
+        else executionFailed(id, error);
       } finally {
         if (dispatched) await discovery.finish(id);
       }

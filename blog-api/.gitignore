@@ -1,0 +1,5 @@
+/blog-api
+/blog.db
+/blog.db-journal
+/blog.db-shm
+/blog.db-wal

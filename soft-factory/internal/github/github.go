@@ -66,9 +66,28 @@ func formatPRSummary(summary string) string {
 	return fence + "\n" + strings.TrimSuffix(summary, "\n") + "\n" + fence + "\n"
 }
 
+// appendPRBody appends the summary as a Markdown code block, then the
+// already-formatted Markdown critical section, to an existing PR body.
+func appendPRBody(body, summary, critical string) string {
+	if summary != "" {
+		if body != "" {
+			body += "\n\n"
+		}
+		body += formatPRSummary(summary)
+	}
+	if critical != "" {
+		if body != "" {
+			body += "\n\n"
+		}
+		body += critical
+	}
+	return body
+}
+
 // AppendPRSummary appends a plain-text execution summary to an existing PR
-// description as a Markdown code block. The PR may be a number, URL, or branch.
-func AppendPRSummary(ctx context.Context, repository, pr, summary string) error {
+// description as a Markdown code block, followed by the Markdown critical
+// section when it is not empty. The PR may be a number, URL, or branch.
+func AppendPRSummary(ctx context.Context, repository, pr, summary, critical string) error {
 	output, err := command(ctx, nil,
 		"pr", "view", pr, "--repo", repository, "--json", "body")
 	if err != nil {
@@ -83,14 +102,10 @@ func AppendPRSummary(ctx context.Context, repository, pr, summary string) error 
 	if current.Body == nil {
 		return fmt.Errorf("GitHub CLI returned no PR description")
 	}
-	if summary == "" {
+	if summary == "" && critical == "" {
 		return nil
 	}
-	body := *current.Body
-	if body != "" {
-		body += "\n\n"
-	}
-	body += formatPRSummary(summary)
+	body := appendPRBody(*current.Body, summary, critical)
 	if _, err := command(ctx, strings.NewReader(body),
 		"pr", "edit", pr, "--repo", repository, "--body-file", "-"); err != nil {
 		return fmt.Errorf("append PR description: %w", err)

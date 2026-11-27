@@ -17,6 +17,7 @@ type Config struct {
 	GoogleDrive  *GoogleDriveConfig   `json:"googleDrive,omitempty"`
 	Stages       StagesConfig         `json:"stages"`
 	Audit        StageConfig          `json:"audit"`
+	Critical     Critical             `json:"critical"`
 }
 
 type StageConfig struct {
@@ -40,6 +41,11 @@ type StagesConfig struct {
 	SecurityReview     SecurityReviewConfig `json:"securityReview"`
 	RiskClassification StageConfig          `json:"riskClassification"`
 	ReviewChanges      StageConfig          `json:"reviewChanges"`
+}
+
+type Critical struct {
+	Files   []string
+	Folders []string
 }
 
 // Stage is a public, case-sensitive pipeline stage identifier.

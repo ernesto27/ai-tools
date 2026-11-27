@@ -264,9 +264,18 @@ func runWorkflow(opts workflowOptions) error {
 		return nil
 	}
 
+	var criticalSection string
+	if len(cfg.Critical.Files) > 0 || len(cfg.Critical.Folders) > 0 {
+		files, err := sandbox.CriticalChanges(ctx, branch, cfg.Critical)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: check critical files: %v\n", err)
+		}
+		criticalSection = sandbox.CriticalSection(files)
+	}
+
 	repository, err := github.RepositoryFromOrigin(ctx)
 	if err == nil {
-		err = github.AppendPRSummary(ctx, repository, branch, runLog.Summary())
+		err = github.AppendPRSummary(ctx, repository, branch, runLog.Summary(), criticalSection)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr,

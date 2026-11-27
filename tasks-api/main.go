@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
+)
+
+const (
+	maxBodyBytes  = 1 << 20
+	maxTitleRunes = 200
 )
 
 type task struct {
@@ -38,13 +45,32 @@ func (s *taskStore) create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Title string `json:"title"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&input); err != nil || decoder.Decode(new(json.RawMessage)) != io.EOF {
+	err := decoder.Decode(&input)
+	if err == nil {
+		if extra := decoder.Decode(new(json.RawMessage)); extra != io.EOF {
+			err = extra
+			if err == nil {
+				err = errors.New("trailing data")
+			}
+		}
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	if err != nil {
 		http.Error(w, "expected a single JSON object", http.StatusBadRequest)
 		return
 	}
 	if strings.TrimSpace(input.Title) == "" {
 		http.Error(w, "title must not be blank", http.StatusBadRequest)
+		return
+	}
+	if utf8.RuneCountInString(input.Title) > maxTitleRunes {
+		http.Error(w, "title must be at most 200 characters", http.StatusBadRequest)
 		return
 	}
 
@@ -121,6 +147,9 @@ func main() {
 		Addr:              ":8080",
 		Handler:           newHandler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 	log.Fatal(server.ListenAndServe())
 }

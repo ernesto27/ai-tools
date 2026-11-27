@@ -70,6 +70,14 @@ func TestRepeatedDeleteReturnsNoContent(t *testing.T) {
 	}
 }
 
+func TestCreateRejectsOversizedInput(t *testing.T) {
+	handler := newHandler()
+	huge := `{"title":"` + strings.Repeat("a", 1<<20) + `"}`
+	request(t, handler, "POST", "/tasks", huge, http.StatusRequestEntityTooLarge)
+	request(t, handler, "POST", "/tasks", `{"title":"`+strings.Repeat("é", 201)+`"}`, http.StatusBadRequest)
+	createTask(t, handler, strings.Repeat("é", 200))
+}
+
 func createTask(t *testing.T, handler http.Handler, title string) task {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"title": title})

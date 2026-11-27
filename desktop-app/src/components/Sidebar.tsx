@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { BranchWorktree } from "../worktrees";
+import { readDirtyWorktreeError, type BranchWorktree } from "../worktrees";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { STATUS_COLOR } from "../data";
 import { RUN_MODE, type Navigate, type Route } from "../router";
@@ -19,7 +19,7 @@ interface Props {
   route: Route;
   navigate: Navigate;
   onDeleteRepo: (repo: SavedRepo) => Promise<void>;
-  onDeleteWorktree: (repo: SavedRepo, branch: string) => Promise<void>;
+  onDeleteWorktree: (repo: SavedRepo, branch: string, force?: boolean) => Promise<void>;
 }
 
 export interface SavedRepo {
@@ -128,6 +128,12 @@ export function Sidebar({ hidden = false, repos, branchesByPath, onRefreshBranch
         pendingLabel={t(isWorktree ? "deletingWorktree" : "removingRepository")}
         trigger={trigger}
         onDelete={() => isWorktree ? onDeleteWorktree(repo, target.branch) : onDeleteRepo(repo)}
+        forceDelete={isWorktree ? {
+          label: t("forceDeleteWorktree"),
+          warning: t("forceDeleteWorktreeWarning"),
+          readError: readDirtyWorktreeError,
+          onDelete: () => onDeleteWorktree(repo, target.branch, true),
+        } : undefined}
         onClose={() => setDeleteTarget(null)}
       />
     );

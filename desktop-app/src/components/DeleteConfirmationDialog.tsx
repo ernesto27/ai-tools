@@ -10,10 +10,16 @@ interface Props {
   pendingLabel: string;
   trigger: HTMLButtonElement;
   onDelete: () => Promise<void>;
+  forceDelete?: {
+    label: string;
+    warning: string;
+    readError: (error: unknown) => string | undefined;
+    onDelete: () => Promise<void>;
+  };
   onClose: () => void;
 }
 
-export function DeleteConfirmationDialog({ name, title, description, pendingLabel, trigger, onDelete, onClose }: Props) {
+export function DeleteConfirmationDialog({ name, title, description, pendingLabel, trigger, onDelete, forceDelete, onClose }: Props) {
   const { t } = useTranslation();
   const titleId = useId();
   const descriptionId = useId();
@@ -21,25 +27,35 @@ export function DeleteConfirmationDialog({ name, title, description, pendingLabe
   const cancel = useRef<HTMLButtonElement>(null);
   const deleting = useRef(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<UiMessage | null>(null);
+  const [failure, setFailure] = useState<{ message: UiMessage; canForce: boolean } | null>(null);
+  const forceAction = failure?.canForce ? forceDelete : undefined;
+  const canForce = Boolean(forceAction);
 
   useLayoutEffect(() => {
     dialog.current?.showModal();
     cancel.current?.focus();
   }, []);
 
-  async function confirm() {
+  useLayoutEffect(() => {
+    if (canForce) cancel.current?.focus();
+  }, [canForce]);
+
+  async function confirm(deleteAction: () => Promise<void>) {
     if (deleting.current) return;
     deleting.current = true;
     setPending(true);
-    setError(null);
+    setFailure(null);
     try {
-      await onDelete();
+      await deleteAction();
       dialog.current?.close();
     } catch (error) {
-      setError(error instanceof AppMessageError ? error.descriptor : {
-        key: "couldNotDeleteNameError",
-        values: { name, error: String(error) },
+      const dirtyError = deleteAction === onDelete ? forceDelete?.readError(error) : undefined;
+      setFailure({
+        message: error instanceof AppMessageError ? error.descriptor : {
+          key: "couldNotDeleteNameError",
+          values: { name, error: dirtyError ?? String(error) },
+        },
+        canForce: dirtyError !== undefined,
       });
     } finally {
       deleting.current = false;
@@ -63,13 +79,18 @@ export function DeleteConfirmationDialog({ name, title, description, pendingLabe
       <p id={descriptionId} className="mt-2 break-words text-sm text-muted">
         {description}
       </p>
-      {error && <p role="alert" className="mt-3 whitespace-pre-wrap break-words text-sm text-bad">{messageText(error, t)}</p>}
+      {failure && (
+        <div role="alert" className="mt-3 whitespace-pre-wrap break-words text-sm text-bad">
+          <p>{messageText(failure.message, t)}</p>
+          {forceAction && <p className="mt-2 font-medium">{forceAction.warning}</p>}
+        </div>
+      )}
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <OutlineButton ref={cancel} disabled={pending} onClick={() => dialog.current?.close()}>
           {t("cancel")}
         </OutlineButton>
-        <OutlineButton disabled={pending} className="text-bad!" onClick={() => void confirm()}>
-          {pending ? pendingLabel : title}
+        <OutlineButton disabled={pending} className="text-bad!" onClick={() => void confirm(forceAction?.onDelete ?? onDelete)}>
+          {pending ? pendingLabel : forceAction?.label ?? title}
         </OutlineButton>
       </div>
     </dialog>

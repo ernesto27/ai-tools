@@ -74,6 +74,8 @@
   "confirmRemoveRepository": "This will remove \"{{name}}\" from your saved repositories.",
   "removingRepository": "Removing repository…",
   "deleteWorktree": "Delete worktree",
+  "forceDeleteWorktree": "Force delete worktree",
+  "forceDeleteWorktreeWarning": "Uncommitted changes will be permanently discarded.",
   "confirmDeleteWorktree": "This will delete the local branch \"{{branch}}\" and its worktree in \"{{repo}}\". Unmerged commits may become unreachable.",
   "worktreeDeletionInProgress": "Wait for the worktree deletion to finish.",
   "deletingWorktree": "Deleting worktree…",

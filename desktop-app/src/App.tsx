@@ -107,13 +107,13 @@ function MainApp({ theme, toggleTheme, updater }: {
     setRoute((current) => isRemoved(current) ? HOME : current);
   };
 
-  async function deleteWorktree(repo: SavedRepo, branch: string): Promise<void> {
+  async function deleteWorktree(repo: SavedRepo, branch: string, force = false): Promise<void> {
     if (deletingWorktree.current) {
       throw new AppMessageError({ key: "worktreeDeletionInProgress" });
     }
     deletingWorktree.current = { path: repo.path, branch };
     try {
-      await invoke<void>("delete_worktree", { path: repo.path, branch });
+      await invoke<void>("delete_worktree", { path: repo.path, branch, force });
       branchRequests.current.delete(repo.path);
       setBranchesByPath((previous) => ({
         ...previous,

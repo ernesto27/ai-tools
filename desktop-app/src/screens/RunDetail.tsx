@@ -6,6 +6,7 @@ import { implementationPullRequestUrl } from "../runPullRequest";
 import { useRunLogs } from "../hooks/useRunLogs";
 import type { DesktopAudits } from "../hooks/useDesktopAudits";
 import { isDesktopRunActive, RUN_STATE, type DesktopRuns } from "../hooks/useDesktopRuns";
+import { runLogLines, searchRunLogs, type RunLogMatch } from "../runLogSearch";
 import { STAGES, stageProgress } from "../runProgress";
 import { STAGE_STATUS } from "../runStatus";
 import { RUN_MODE, type Navigate } from "../router";
@@ -14,7 +15,7 @@ import { AuditDuration } from "../components/AuditDuration";
 import { AuditReportLink } from "../components/AuditReportLink";
 import { RunChanges } from "../components/RunChanges";
 import { WalkthroughMarkdown, WalkthroughReader } from "../components/Walkthrough";
-import { Crumb, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
+import { Crumb, Input, LinkButton, OutlineButton, PrimaryButton, Tabs, TextButton, Title } from "../components/ui";
 
 type Tab = "log" | "summary" | "walk" | "changes";
 
@@ -66,6 +67,10 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   );
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
   const [tab, setTab] = useState<Tab>("log");
+  const [logQuery, setLogQuery] = useState("");
+  const [selectedMatch, setSelectedMatch] = useState<RunLogMatch | null>(null);
+  const query = logQuery.trim();
+  const matchGroups = useMemo(() => searchRunLogs(logs, query), [logs, query]);
   const [folderError, setFolderError] = useState<string | null>(null);
   const [stopDialogError, setStopDialogError] = useState<UiMessage | null>(null);
   const stopConfirmationPending = useRef(false);
@@ -83,19 +88,44 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
 
   const stages = STAGES.filter((stage) =>
     logs.some((log) => log.filename === stage.filename)
-    || run?.stages.some((entry) => entry.stage === stage.id),
+    || run?.stages.some((entry) => entry.stage === stage.id)
+    || selectedMatch?.source.filename === stage.filename,
   );
   const currentStage = stages.find((stage) => stage.id === selectedStage) ?? stages[0];
   const filename = tab === "changes" ? undefined
     : tab === "summary" ? "summary.log"
     : tab === "walk" ? "05-reviewChanges.md" : currentStage?.filename;
   const output = logs.find((log) => log.filename === filename);
+  const selectedLine = selectedMatch?.source.filename === filename
+    ? selectedMatch?.lineNumber
+    : undefined;
 
   useLayoutEffect(() => {
-    if (outputPanel.current) {
-      outputPanel.current.scrollTop = outputPanel.current.scrollHeight;
+    const panel = outputPanel.current;
+    if (panel && selectedLine === undefined) {
+      panel.scrollTop = panel.scrollHeight;
     }
-  }, [filename, output?.content]);
+  }, [filename, output?.content, selectedLine]);
+
+  useLayoutEffect(() => {
+    const panel = outputPanel.current;
+    if (!panel || selectedLine === undefined) return;
+
+    const row = panel.querySelector<HTMLElement>(`[data-log-line="${selectedLine}"]`);
+    if (!row) return;
+
+    panel.scrollTop += row.getBoundingClientRect().top - panel.getBoundingClientRect().top
+      - (panel.clientHeight - row.offsetHeight) / 2;
+    panel.scrollIntoView({ block: "nearest", inline: "nearest" });
+    row.focus({ preventScroll: true });
+  }, [filename, selectedLine, selectedMatch]);
+
+  function openLogMatch(match: RunLogMatch) {
+    setFollowing(false);
+    if (match.source.tab === "log") setSelectedStage(match.source.stage);
+    setTab(match.source.tab);
+    setSelectedMatch({ ...match });
+  }
 
   async function stopRun() {
     if (!session || session.state !== RUN_STATE.RUNNING || stopConfirmationPending.current) return;
@@ -136,7 +166,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-6 overflow-hidden xl:gap-9" aria-busy={loading}>
+    <div className="flex h-full min-h-0 w-full flex-col gap-6 overflow-x-hidden overflow-y-auto xl:gap-9 [@media(max-height:720px)]:gap-3" aria-busy={loading}>
       <header className="flex min-w-0 shrink-0 flex-col gap-2">
         <Crumb>
           {repo} /{" "}
@@ -218,6 +248,7 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             selectedStage={currentStage?.id}
             onSelectStage={(stage) => {
               setFollowing(false);
+              setSelectedMatch(null);
               setSelectedStage(stage);
               setTab("log");
             }}
@@ -271,11 +302,16 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
         </>
       )}
 
-      <section aria-label={t("output")} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+      <section aria-label={t("output")} className="flex min-h-72 min-w-0 flex-1 flex-col gap-3 overflow-hidden [@media(max-height:720px)]:gap-2">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line">
-          <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => { setFollowing(false); setTab(next); }} size="sm" bordered={false} />
+          <Tabs label={t("views")} items={TABS.map(([key, label]) => [key, t(label)] as const)} value={tab} onChange={(next) => {
+            setFollowing(false);
+            setSelectedMatch(null);
+            setTab(next);
+          }} size="sm" bordered={false} />
           {live && (
             <TextButton aria-pressed={following} onClick={() => {
+              setSelectedMatch(null);
               setFollowing(true);
               setTab("log");
               if (progress.followStage) setSelectedStage(progress.followStage);
@@ -293,6 +329,48 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             </div>
           )}
         </div>
+
+        <Input
+          type="search"
+          aria-label={t("searchRunLogs")}
+          placeholder={t("searchRunLogs")}
+          value={logQuery}
+          disabled={loading}
+          onChange={(event) => setLogQuery(event.currentTarget.value)}
+          className="w-full shrink-0"
+        />
+        {!loading && query && (
+          matchGroups.length === 0 ? (
+            <p role="status" className="shrink-0 text-sm text-muted">{t("noMatchingLogLines")}</p>
+          ) : (
+            <div
+              role="region"
+              aria-label={t("runLogSearchResults")}
+              className="max-h-[30%] shrink-0 overflow-auto overscroll-contain rounded-md bg-panel p-2"
+            >
+              {matchGroups.map(({ source, matches }) => (
+                <div key={source.filename} className="space-y-1 pb-2 last:pb-0">
+                  <h3 className="px-2 text-sm font-medium text-muted">{t(source.label)}</h3>
+                  <ul>
+                    {matches.map((match) => (
+                      <li key={match.lineNumber}>
+                        <button
+                          type="button"
+                          data-log-match={`${source.filename}:${match.lineNumber}`}
+                          className="flex w-full min-w-0 items-baseline gap-3 rounded-sm px-2 py-1 text-left font-mono text-sm hover:bg-selected focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-info"
+                          onClick={() => openLogMatch(match)}
+                        >
+                          <span className="shrink-0 text-muted">{t("runLogLineNumber", { line: match.lineNumber })}</span>
+                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{match.text}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )
+        )}
 
         <RunChanges
           repoPath={repoPath}
@@ -321,8 +399,13 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
               <WalkthroughMarkdown content={output.content} className="p-5" />
             ) : (
               <div className="py-4 font-mono text-sm leading-[1.8]">
-                {output.content.replace(/\r\n/g, "\n").split("\n").map((line, index) => (
-                  <div key={index} className="flex gap-4 px-4 whitespace-pre">
+                {runLogLines(output.content).map((line, index) => (
+                  <div
+                    key={index}
+                    data-log-line={index + 1}
+                    tabIndex={-1}
+                    className={`flex gap-4 px-4 whitespace-pre focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-info ${selectedLine === index + 1 ? "bg-info/10" : ""}`}
+                  >
                     <span className="w-8 shrink-0 text-right text-faint select-none" aria-hidden="true">{index + 1}</span>
                     <span>{line}</span>
                   </div>

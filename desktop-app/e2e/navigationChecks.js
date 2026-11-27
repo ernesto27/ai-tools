@@ -7,6 +7,7 @@ import { runSkillAutocompleteChecks } from "./skillAutocompleteChecks.js";
 import { runStageTimingChecks } from "./stageTimingChecks.js";
 import { runPullRequestChecks } from "./pullRequestChecks.js";
 import { runWalkthroughChecks } from "./walkthroughChecks.js";
+import { runLogSearchChecks } from "./runLogSearchChecks.js";
 
 async function checkRunChanges(browser, fixture, artifacts, command, { openRuns, click, text }) {
   const tab = '//main//button[@role="tab" and normalize-space(.)="Changes"]';
@@ -661,6 +662,9 @@ export async function runNavigationChecks(t, browser, fixture, artifacts, comman
     await runPullRequestChecks(browser, fixture, artifacts, { text, openRuns, click });
     await runWalkthroughChecks(browser, fixture, artifacts, { text, click });
   }, 120_000);
+  await screen("Run log search", async () => {
+    await runLogSearchChecks(browser, fixture, artifacts, { click, openRuns, text });
+  });
   await screen("Run changes", async () => {
     await checkRunChanges(browser, fixture, artifacts, command, { openRuns, click, text });
   });

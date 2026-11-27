@@ -24,16 +24,26 @@ interface RunLogMatchGroup {
   matches: RunLogMatch[];
 }
 
+interface RunLogSearchResult {
+  groups: RunLogMatchGroup[];
+  total: number;
+  shown: number;
+}
+
+// Keeps the result list cheap to re-render while logs refresh every second.
+const RUN_LOG_MATCH_LIMIT = 200;
+
 export function runLogLines(content: string) {
   return content.split(/\r?\n/);
 }
 
-export function searchRunLogs(logs: RunLog[], query: string): RunLogMatchGroup[] {
+export function searchRunLogs(logs: RunLog[], query: string): RunLogSearchResult {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [];
+  const groups: RunLogMatchGroup[] = [];
+  let total = 0;
+  if (!needle) return { groups, total, shown: 0 };
 
   const contentByFilename = new Map(logs.map((log) => [log.filename, log.content]));
-  const groups: RunLogMatchGroup[] = [];
 
   for (const source of SOURCES) {
     const content = contentByFilename.get(source.filename);
@@ -41,12 +51,12 @@ export function searchRunLogs(logs: RunLog[], query: string): RunLogMatchGroup[]
 
     const matches: RunLogMatch[] = [];
     for (const [index, line] of runLogLines(content).entries()) {
-      if (line.toLowerCase().includes(needle)) {
-        matches.push({ source, lineNumber: index + 1, text: line });
-      }
+      if (!line.toLowerCase().includes(needle)) continue;
+      total += 1;
+      if (total <= RUN_LOG_MATCH_LIMIT) matches.push({ source, lineNumber: index + 1, text: line });
     }
     if (matches.length > 0) groups.push({ source, matches });
   }
 
-  return groups;
+  return { groups, total, shown: Math.min(total, RUN_LOG_MATCH_LIMIT) };
 }

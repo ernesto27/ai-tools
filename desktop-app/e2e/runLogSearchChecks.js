@@ -9,6 +9,8 @@ export async function runLogSearchChecks(browser, fixture, artifacts, { click, o
   const query = `${dialog} input[aria-label="Search run logs"]`;
   const results = `${dialog} [aria-label="Log search results"]`;
   const noMatch = '//main//dialog//*[@role="status" and text()="No matching log lines."]';
+  const truncatedText = "Showing 200 of 250 matches. Refine your search to see the rest.";
+  const truncated = `//main//dialog//p[text()="${truncatedText}"]`;
   const implementationMatch = `${results} [data-log-match="01-implementation.log:2"]`;
   const reviewMatch = `${results} [data-log-match="02-codeReview.log:2"]`;
   const summaryMatch = `${results} [data-log-match="summary.log:1"]`;
@@ -63,6 +65,7 @@ export async function runLogSearchChecks(browser, fixture, artifacts, { click, o
     create("02-codeReview.log", review);
     create("summary.log", "Summary includes search[42].\n");
     create("05-reviewChanges.md", "SEARCH[42] in the walkthrough.\n");
+    create("03-securityReview.log", Array.from({ length: 250 }, (_, index) => `Bulk result ${index + 1}`).join("\n"));
 
     await openRuns();
     await click(runButton);
@@ -79,6 +82,7 @@ export async function runLogSearchChecks(browser, fixture, artifacts, { click, o
       Array.from(document.querySelectorAll(`${selector} h3`), (node) => node.textContent),
     results), ["Implement", "Code review", "Summary"]);
     assert.equal((await browser.$$(`${results} [data-log-match]`)).length, 3);
+    assert.equal(await (await browser.$(truncated)).isExisting(), false);
     await browser.saveScreenshot(join(artifacts, "run-log-search.png"));
 
     await click(implementationMatch);
@@ -117,12 +121,17 @@ export async function runLogSearchChecks(browser, fixture, artifacts, { click, o
     assert.equal(await input.getValue(), " search[42] ");
     await text(`${summaryMatch} span:last-child`, "Summary includes search[42].");
 
+    await input.setValue("bulk result");
+    await text(truncated, truncatedText);
+    assert.equal((await browser.$$(`${results} [data-log-match]`)).length, 200);
+
     await input.setValue("absent query");
     await text(noMatch, "No matching log lines.");
     assert.equal(await (await browser.$(results)).isExisting(), false);
     await input.setValue("   ");
     assert.equal(await (await browser.$(results)).isExisting(), false);
     assert.equal(await (await browser.$(noMatch)).isExisting(), false);
+    assert.equal(await (await browser.$(truncated)).isExisting(), false);
 
     await input.setValue("search[42]");
     await browser.keys("Escape");

@@ -248,6 +248,7 @@
   "closeRunLogSearch": "Close",
   "runLogSearchResults": "Log search results",
   "noMatchingLogLines": "No matching log lines.",
+  "runLogSearchTruncated": "Showing {{shown}} of {{total}} matches. Refine your search to see the rest.",
   "runLogLineNumber": "Line {{line}}",
   "couldNotShowFolderError": "Could not show folder: {{error}}",
   "couldNotConfirmStoppingTheRunError": "Could not confirm stopping the run: {{error}}",

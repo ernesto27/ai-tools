@@ -248,6 +248,7 @@
   "closeRunLogSearch": "Cerrar",
   "runLogSearchResults": "Resultados de búsqueda en los logs",
   "noMatchingLogLines": "No se encontraron líneas que coincidan.",
+  "runLogSearchTruncated": "Se muestran {{shown}} de {{total}} coincidencias. Refiná la búsqueda para ver el resto.",
   "runLogLineNumber": "Línea {{line}}",
   "couldNotShowFolderError": "No se pudo mostrar la carpeta: {{error}}",
   "couldNotConfirmStoppingTheRunError": "No se pudo confirmar la detención de la ejecución: {{error}}",

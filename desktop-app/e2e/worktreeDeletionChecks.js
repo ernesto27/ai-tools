@@ -104,6 +104,24 @@ export async function runWorktreeDeletionChecks(browser, fixture, artifacts, com
     await openFor(dirty);
     assert.equal(await (await button("Force delete worktree")).isExisting(), false);
     await (await button("Delete worktree")).click();
+    await (await button("Force delete worktree")).waitForDisplayed({ timeout: 15_000 });
+    command("git", ["-C", fixture.repo, "worktree", "lock", dirty.path]);
+    try {
+      await (await button("Force delete worktree")).click();
+      const forceFailure = await browser.$('dialog[open] [role="alert"]');
+      await browser.waitUntil(async () => /locked/i.test(await forceFailure.getText()), { timeout: 15_000 });
+      await (await button("Delete worktree")).waitForDisplayed({ timeout: 15_000 });
+      assert.ok(await (await button("Delete worktree")).isEnabled());
+      assert.equal(await (await button("Force delete worktree")).isExisting(), false);
+      assert.equal((await (await openDialog()).getText()).includes("Uncommitted changes will be permanently discarded."), false);
+      assert.ok(await (await row(dirty.branch)).isExisting());
+      assert.ok(localRef(dirty.branch) && cliBranches().includes(dirty.branch));
+      assert.equal(readFileSync(join(dirty.path, "unsaved.txt"), "utf8"), "keep these local changes\n");
+    } finally {
+      command("git", ["-C", fixture.repo, "worktree", "unlock", dirty.path]);
+    }
+
+    await (await button("Delete worktree")).click();
     const forceButton = await button("Force delete worktree");
     await forceButton.waitForDisplayed({ timeout: 15_000 });
     await browser.saveScreenshot(join(artifacts, "force-delete-worktree.png"));

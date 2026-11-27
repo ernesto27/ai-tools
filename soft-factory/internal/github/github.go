@@ -13,8 +13,8 @@ import (
 	"strings"
 )
 
-// RepositoryFromOrigin resolves the current directory's origin remote to
-// host/owner/repository for use with the GitHub CLI.
+// RepositoryFromOrigin reads the current directory's "origin" remote URL and
+// returns "host/owner/repo" for use with the GitHub CLI.
 func RepositoryFromOrigin(ctx context.Context) (string, error) {
 	output, err := exec.CommandContext(
 		ctx, "git", "remote", "get-url", "origin",

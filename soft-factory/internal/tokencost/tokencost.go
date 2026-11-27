@@ -26,6 +26,7 @@ type TokenCost struct {
 	models []Model
 }
 
+// NewTokenCost loads the embedded model pricing catalog.
 func NewTokenCost() (*TokenCost, error) {
 	var catalog struct {
 		Models []Model `json:"models"`
@@ -40,6 +41,7 @@ func NewTokenCost() (*TokenCost, error) {
 	}, nil
 }
 
+// GetCostUsage returns the reported or calculated token usage cost in USD.
 func (tc *TokenCost) GetCostUsage(agent string, model string, tokenUsage agentoutput.TokenUsage) (float64, error) {
 	if tokenUsage.TotalCostUSD != nil {
 		return *tokenUsage.TotalCostUSD, nil

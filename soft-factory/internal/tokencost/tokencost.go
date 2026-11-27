@@ -26,6 +26,7 @@ type TokenCost struct {
 	models []Model
 }
 
+// NewTokenCost loads the embedded model pricing catalog.
 func NewTokenCost() (*TokenCost, error) {
 	var catalog struct {
 		Models []Model `json:"models"`

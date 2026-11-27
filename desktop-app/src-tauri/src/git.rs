@@ -11,8 +11,8 @@ pub struct ChangedFile {
 }
 
 pub fn diff(repo: &Path, branch: &str) -> Result<Vec<ChangedFile>, String> {
-    let tip = format!("refs/heads/{branch}");
-    let parent = format!("{tip}^");
+    let comparison = format!("HEAD...refs/heads/{branch}");
+
     let options = [
         "--numstat",
         "--patch",
@@ -24,23 +24,14 @@ pub fn diff(repo: &Path, branch: &str) -> Result<Vec<ChangedFile>, String> {
         "--no-relative",
         "--submodule=short",
     ];
-    let mut output = Command::new("git")
+    let output = Command::new("git")
         .current_dir(repo)
         .arg("diff")
         .args(options)
-        .args([&parent, &tip, "--"])
+        .arg(&comparison)
+        .arg("--")
         .output()
         .map_err(|error| error.to_string())?;
-    if !output.status.success() {
-        // The first commit has no parent. diff-tree can compare it to the empty tree.
-        output = Command::new("git")
-            .current_dir(repo)
-            .args(["diff-tree", "--root", "--no-commit-id", "-r"])
-            .args(options)
-            .args([&tip, "--"])
-            .output()
-            .map_err(|error| error.to_string())?;
-    }
     if !output.status.success() {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
@@ -117,7 +108,7 @@ mod tests {
         std::fs::write(repo.join("root.txt"), "initial\n").unwrap();
         git(&repo, &["add", "."]);
         git(&repo, &["commit", "-m", "Initial"]);
-        assert_eq!(diff(&repo, "main").unwrap()[0].path, "root.txt");
+        assert!(diff(&repo, "main").unwrap().is_empty());
 
         git(
             &repo,
@@ -150,15 +141,23 @@ mod tests {
         git(&worktree, &["add", "wide.txt", "long.txt", "small.txt"]);
         git(&worktree, &["commit", "-m", "Mixed patch sizes"]);
         let files = diff(&repo, "feature").unwrap();
-        assert_eq!(files.len(), 3);
-        assert_eq!(files[0].path, "long.txt");
-        assert!(files[0].patch.is_none());
-        assert_eq!(files[1].path, "small.txt");
-        assert!(files[1].patch.as_deref().unwrap().contains("+small"));
-        assert_eq!(files[2].path, "wide.txt");
-        assert!(files[2].patch.is_none());
+        assert_eq!(files.len(), 5);
+        assert_eq!(files[0].path, name);
+        assert_eq!(files[1].path, "long.txt");
+        assert!(files[1].patch.is_none());
+        assert_eq!(files[2].path, "second.txt");
+        assert_eq!(files[3].path, "small.txt");
+        assert!(files[3].patch.as_deref().unwrap().contains("+small"));
+        assert_eq!(files[4].path, "wide.txt");
+        assert!(files[4].patch.is_none());
 
-        git(&worktree, &["commit", "--allow-empty", "-m", "No changes"]);
+        git(
+            &worktree,
+            &["commit", "--allow-empty", "-m", "Empty commit"],
+        );
+        assert_eq!(diff(&repo, "feature").unwrap().len(), 5);
+
+        git(&repo, &["merge", "--ff-only", "feature"]);
         assert!(diff(&repo, "feature").unwrap().is_empty());
         assert!(diff(&repo, "missing").is_err());
     }

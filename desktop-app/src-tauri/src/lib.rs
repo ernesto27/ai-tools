@@ -9,7 +9,7 @@ mod factory_run;
 mod git;
 mod stage_log;
 
-use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree};
+use agent_sandbox_run::{AgentSandboxRun, Requirement, Worktree, WorktreeDeleteError};
 use desktop_updates::{DesktopUpdates, check_desktop_update, install_desktop_update};
 use docker::{Docker, Image};
 use factory_config::FactoryConfigFile;
@@ -124,12 +124,18 @@ async fn list_branches(path: String) -> Result<Vec<Worktree>, String> {
 }
 
 #[tauri::command]
-async fn delete_worktree(path: String, branch: String) -> Result<(), String> {
+async fn delete_worktree(
+    path: String,
+    branch: String,
+    force: Option<bool>,
+) -> Result<(), WorktreeDeleteError> {
     tauri::async_runtime::spawn_blocking(move || {
-        AgentSandboxRun::new(path).delete_worktree(&branch)
+        AgentSandboxRun::new(path).delete_worktree(&branch, force.unwrap_or(false))
     })
     .await
-    .map_err(|error| format!("Could not wait for worktree deletion: {error}"))?
+    .map_err(|error| {
+        WorktreeDeleteError::Other(format!("Could not wait for worktree deletion: {error}"))
+    })?
 }
 
 #[tauri::command]

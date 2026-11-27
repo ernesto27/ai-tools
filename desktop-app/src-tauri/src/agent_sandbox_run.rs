@@ -13,6 +13,33 @@ pub struct Worktree {
     pub path: String,
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+pub enum WorktreeDeleteError {
+    Dirty {
+        #[serde(rename = "dirtyWorktreeError")]
+        dirty_worktree_error: String,
+    },
+    Other(String),
+}
+
+fn classify_worktree_delete_error(message: String, force: bool) -> WorktreeDeleteError {
+    const DIRTY_WORKTREE_DIAGNOSTIC: &str =
+        " has uncommitted changes; pass --force to delete it anyway";
+
+    if !force
+        && message
+            .lines()
+            .any(|line| line.trim_end().ends_with(DIRTY_WORKTREE_DIAGNOSTIC))
+    {
+        WorktreeDeleteError::Dirty {
+            dirty_worktree_error: message,
+        }
+    } else {
+        WorktreeDeleteError::Other(message)
+    }
+}
+
 pub struct AgentSandboxRun {
     repository: PathBuf,
 }
@@ -49,11 +76,20 @@ impl AgentSandboxRun {
         parse_worktrees(&Self::output(command)?)
     }
 
-    pub fn delete_worktree(&self, branch: &str) -> Result<(), String> {
+    pub fn delete_worktree(&self, branch: &str, force: bool) -> Result<(), WorktreeDeleteError> {
+        Self::output(self.worktree_delete_command(branch, force))
+            .map(|_| ())
+            .map_err(|message| classify_worktree_delete_error(message, force))
+    }
+
+    fn worktree_delete_command(&self, branch: &str, force: bool) -> Command {
         let mut command = Self::command();
         command.current_dir(&self.repository);
         command.args(["worktree-delete", "-b", branch]);
-        Self::output(command).map(|_| ())
+        if force {
+            command.arg("--force");
+        }
+        command
     }
 
     pub fn check_bin() -> bool {
@@ -140,7 +176,56 @@ fn parse_worktrees(bytes: &[u8]) -> Result<Vec<Worktree>, String> {
 
 #[cfg(test)]
 mod worktree_tests {
-    use super::parse_worktrees;
+    use super::{AgentSandboxRun, classify_worktree_delete_error, parse_worktrees};
+
+    #[test]
+    fn adds_force_only_for_the_explicit_retry() {
+        use std::ffi::OsStr;
+        use std::path::Path;
+
+        let runner = AgentSandboxRun::new("repo with spaces");
+        let branch = "feature/árbol";
+        for force in [false, true] {
+            let command = runner.worktree_delete_command(branch, force);
+            let mut expected = vec!["worktree-delete", "-b", branch];
+            if force {
+                expected.push("--force");
+            }
+            assert_eq!(command.get_program(), OsStr::new("agent-sandbox"));
+            assert_eq!(
+                command.get_current_dir(),
+                Some(Path::new("repo with spaces"))
+            );
+            assert!(command.get_args().eq(expected.into_iter().map(OsStr::new)));
+        }
+    }
+
+    #[test]
+    fn only_tags_the_dirty_worktree_refusal_from_a_normal_delete() {
+        let dirty = concat!(
+            "Error: The operation failed.\r\n\r\nCause:\r\n",
+            "/tmp/árbol with spaces has uncommitted changes; pass --force to delete it anyway \t\r\n",
+        );
+
+        let ipc_error = |message: &str, force| {
+            serde_json::to_value(classify_worktree_delete_error(message.to_owned(), force)).unwrap()
+        };
+
+        assert_eq!(
+            ipc_error(dirty, false),
+            serde_json::json!({ "dirtyWorktreeError": dirty })
+        );
+        assert_eq!(ipc_error(dirty, true), serde_json::json!(dirty));
+
+        for message in [
+            "git worktree remove: worktree is locked",
+            "could not run agent-sandbox: executable missing",
+            "uncommitted changes",
+            "try --force",
+        ] {
+            assert_eq!(ipc_error(message, false), serde_json::json!(message));
+        }
+    }
 
     #[test]
     fn preserves_exact_branches_and_paths() {

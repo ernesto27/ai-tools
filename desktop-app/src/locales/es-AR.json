@@ -74,6 +74,8 @@
   "confirmRemoveRepository": "Se quitará \"{{name}}\" de tus repositorios guardados.",
   "removingRepository": "Quitando repositorio…",
   "deleteWorktree": "Eliminar árbol de trabajo",
+  "forceDeleteWorktree": "Forzar eliminación del árbol de trabajo",
+  "forceDeleteWorktreeWarning": "Los cambios sin confirmar se perderán de forma permanente.",
   "confirmDeleteWorktree": "Se eliminarán la rama local \"{{branch}}\" y su árbol de trabajo en \"{{repo}}\". Los commits sin fusionar podrían quedar inaccesibles.",
   "worktreeDeletionInProgress": "Esperá a que termine la eliminación del árbol de trabajo.",
   "deletingWorktree": "Eliminando árbol de trabajo…",

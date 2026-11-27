@@ -22,9 +22,10 @@ export const MODEL_CATALOG: Readonly<Record<string, readonly string[]>> = {
     "claude-fable-5-2", // Requires Claude Code 2.1.321+; usage credits may apply.
     "claude-fable-5-1",
     "claude-fable-5",
-    // Mythos access requires an Anthropic verification program grant.
+    // Mythos: verified organizations only (Anthropic verification programs, e.g. Cyber Verification Program).
+    // Source: https://platform.claude.com/docs/en/models/mythos-5-2/overview
     "claude-mythos-5-2",
-    "claude-mythos-5-1",
+    "claude-mythos-5-1", // Unverified in Claude Code docs; API status Active.
     "claude-mythos-5",
     "claude-opus-5-5",
     "claude-opus-5",

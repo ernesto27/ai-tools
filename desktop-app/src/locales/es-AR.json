@@ -245,6 +245,7 @@
   "runFailed": "La ejecución falló.",
   "loadingRunLogs": "Cargando logs de la ejecución…",
   "searchRunLogs": "Buscar en los logs",
+  "closeRunLogSearch": "Cerrar",
   "runLogSearchResults": "Resultados de búsqueda en los logs",
   "noMatchingLogLines": "No se encontraron líneas que coincidan.",
   "runLogLineNumber": "Línea {{line}}",

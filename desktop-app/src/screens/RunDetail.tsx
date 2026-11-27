@@ -1,6 +1,6 @@
 import { messageText, type UiMessage } from "../messages";
 import { useTranslation } from "react-i18next";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { implementationPullRequestUrl } from "../runPullRequest";
 import { useRunLogs } from "../hooks/useRunLogs";
@@ -67,10 +67,18 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   );
   const [selectedStage, setSelectedStage] = useState<string>(STAGES[0].id);
   const [tab, setTab] = useState<Tab>("log");
+  const [logSearchOpen, setLogSearchOpen] = useState(false);
+  const logSearchTitle = useId();
+  const logSearchTrigger = useRef<HTMLButtonElement>(null);
+  const logSearchDialog = useRef<HTMLDialogElement>(null);
+  const logSearchInput = useRef<HTMLInputElement>(null);
   const [logQuery, setLogQuery] = useState("");
   const [selectedMatch, setSelectedMatch] = useState<RunLogMatch | null>(null);
   const query = logQuery.trim();
-  const matchGroups = useMemo(() => searchRunLogs(logs, query), [logs, query]);
+  const matchGroups = useMemo(
+    () => logSearchOpen ? searchRunLogs(logs, query) : [],
+    [logSearchOpen, logs, query],
+  );
   const [folderError, setFolderError] = useState<string | null>(null);
   const [stopDialogError, setStopDialogError] = useState<UiMessage | null>(null);
   const stopConfirmationPending = useRef(false);
@@ -78,6 +86,13 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
   const [following, setFollowing] = useState(true);
   const outputPanel = useRef<HTMLDivElement>(null);
   const progress = stageProgress(run?.stages ?? [], logs, live, session !== undefined && !trackingUnavailable);
+
+  useLayoutEffect(() => {
+    if (logSearchOpen) {
+      logSearchDialog.current?.showModal();
+      logSearchInput.current?.focus();
+    }
+  }, [logSearchOpen]);
 
   useEffect(() => {
     if (following && progress.followStage) {
@@ -120,7 +135,18 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
     row.focus({ preventScroll: true });
   }, [filename, selectedLine, selectedMatch]);
 
+  function closeLogSearch() {
+    logSearchDialog.current?.close();
+    setLogSearchOpen(false);
+  }
+
+  function dismissLogSearch() {
+    closeLogSearch();
+    logSearchTrigger.current?.focus({ preventScroll: true });
+  }
+
   function openLogMatch(match: RunLogMatch) {
+    closeLogSearch();
     setFollowing(false);
     if (match.source.tab === "log") setSelectedStage(match.source.stage);
     setTab(match.source.tab);
@@ -309,6 +335,14 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
             setSelectedMatch(null);
             setTab(next);
           }} size="sm" bordered={false} />
+          <OutlineButton
+            ref={logSearchTrigger}
+            aria-haspopup="dialog"
+            disabled={loading}
+            onClick={() => setLogSearchOpen(true)}
+          >
+            {t("searchRunLogs")}
+          </OutlineButton>
           {live && (
             <TextButton aria-pressed={following} onClick={() => {
               setSelectedMatch(null);
@@ -330,46 +364,68 @@ export function RunDetail({ repo, repoPath, branch, runId, navigate, desktopRuns
           )}
         </div>
 
-        <Input
-          type="search"
-          aria-label={t("searchRunLogs")}
-          placeholder={t("searchRunLogs")}
-          value={logQuery}
-          disabled={loading}
-          onChange={(event) => setLogQuery(event.currentTarget.value)}
-          className="w-full shrink-0"
-        />
-        {!loading && query && (
-          matchGroups.length === 0 ? (
-            <p role="status" className="shrink-0 text-sm text-muted">{t("noMatchingLogLines")}</p>
-          ) : (
-            <div
-              role="region"
-              aria-label={t("runLogSearchResults")}
-              className="max-h-[30%] shrink-0 overflow-auto overscroll-contain rounded-md bg-panel p-2"
-            >
-              {matchGroups.map(({ source, matches }) => (
-                <div key={source.filename} className="space-y-1 pb-2 last:pb-0">
-                  <h3 className="px-2 text-sm font-medium text-muted">{t(source.label)}</h3>
-                  <ul>
-                    {matches.map((match) => (
-                      <li key={match.lineNumber}>
-                        <button
-                          type="button"
-                          data-log-match={`${source.filename}:${match.lineNumber}`}
-                          className="flex w-full min-w-0 items-baseline gap-3 rounded-sm px-2 py-1 text-left font-mono text-sm hover:bg-selected focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-info"
-                          onClick={() => openLogMatch(match)}
-                        >
-                          <span className="shrink-0 text-muted">{t("runLogLineNumber", { line: match.lineNumber })}</span>
-                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{match.text}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+        {logSearchOpen && (
+          <dialog
+            ref={logSearchDialog}
+            aria-labelledby={logSearchTitle}
+            onCancel={(event) => {
+              event.preventDefault();
+              dismissLogSearch();
+            }}
+            className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col gap-4 overflow-hidden rounded-lg border border-field-line bg-panel p-4 text-ink shadow-2xl open:flex backdrop:bg-[#0009] sm:p-5"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-4">
+              <h2 id={logSearchTitle} className="text-lg font-semibold text-ink-strong">{t("searchRunLogs")}</h2>
+              <OutlineButton onClick={dismissLogSearch}>{t("closeRunLogSearch")}</OutlineButton>
             </div>
-          )
+            <Input
+              ref={logSearchInput}
+              type="search"
+              aria-label={t("searchRunLogs")}
+              placeholder={t("searchRunLogs")}
+              value={logQuery}
+              onChange={(event) => setLogQuery(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+                // Search inputs can consume Escape to clear their value.
+                event.preventDefault();
+                dismissLogSearch();
+              }}
+              className="w-full shrink-0"
+            />
+            {query && (
+              matchGroups.length === 0 ? (
+                <p role="status" className="shrink-0 text-sm text-muted">{t("noMatchingLogLines")}</p>
+              ) : (
+                <div
+                  role="region"
+                  aria-label={t("runLogSearchResults")}
+                  className="min-h-0 overflow-auto overscroll-contain rounded-md border border-line p-2"
+                >
+                  {matchGroups.map(({ source, matches }) => (
+                    <div key={source.filename} className="space-y-1 pb-2 last:pb-0">
+                      <h3 className="px-2 text-sm font-medium text-muted">{t(source.label)}</h3>
+                      <ul>
+                        {matches.map((match) => (
+                          <li key={match.lineNumber}>
+                            <button
+                              type="button"
+                              data-log-match={`${source.filename}:${match.lineNumber}`}
+                              className="flex w-full min-w-0 items-baseline gap-3 rounded-sm px-2 py-1 text-left font-mono text-sm hover:bg-selected focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-info"
+                              onClick={() => openLogMatch(match)}
+                            >
+                              <span className="shrink-0 text-muted">{t("runLogLineNumber", { line: match.lineNumber })}</span>
+                              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{match.text}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </dialog>
         )}
 
         <RunChanges

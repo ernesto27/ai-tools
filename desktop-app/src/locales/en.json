@@ -245,6 +245,7 @@
   "runFailed": "Run failed.",
   "loadingRunLogs": "Loading run logs…",
   "searchRunLogs": "Search run logs",
+  "closeRunLogSearch": "Close",
   "runLogSearchResults": "Log search results",
   "noMatchingLogLines": "No matching log lines.",
   "runLogLineNumber": "Line {{line}}",

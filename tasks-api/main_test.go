@@ -45,6 +45,31 @@ func TestBadRequests(t *testing.T) {
 	}
 }
 
+func TestListRespectsLimit(t *testing.T) {
+	handler := newHandler()
+	first := createTask(t, handler, "first")
+	second := createTask(t, handler, "second")
+	createTask(t, handler, "third")
+
+	var listed []task
+	readJSON(t, request(t, handler, "GET", "/tasks?limit=2", "", http.StatusOK), &listed)
+	if !slices.Equal(listed, []task{first, second}) {
+		t.Fatalf("listed %+v, want [%+v %+v]", listed, first, second)
+	}
+}
+
+func TestRepeatedDeleteReturnsNoContent(t *testing.T) {
+	handler := newHandler()
+	created := createTask(t, handler, "doomed")
+	path := fmt.Sprintf("/tasks/%d", created.ID)
+	for attempt := 1; attempt <= 2; attempt++ {
+		deleted := request(t, handler, "DELETE", path, "", http.StatusNoContent)
+		if deleted.Body.Len() != 0 {
+			t.Fatalf("delete attempt %d returned a body: %q", attempt, deleted.Body.String())
+		}
+	}
+}
+
 func createTask(t *testing.T, handler http.Handler, title string) task {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"title": title})

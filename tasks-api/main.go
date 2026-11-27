@@ -78,7 +78,7 @@ func (s *taskStore) list(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.RUnlock()
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })
-	tasks = tasks[:min(len(tasks), limit+1)]
+	tasks = tasks[:min(len(tasks), limit)]
 	writeJSON(w, http.StatusOK, tasks)
 }
 
@@ -105,14 +105,8 @@ func (s *taskStore) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	_, exists := s.tasks[id]
-	previouslyDeleted := !exists && id <= s.nextID
 	delete(s.tasks, id)
 	s.mu.Unlock()
-	if previouslyDeleted {
-		http.NotFound(w, r)
-		return
-	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
